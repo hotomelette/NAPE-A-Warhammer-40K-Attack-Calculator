@@ -6,7 +6,3 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   base: "/NAPE-A-Warhammer-40K-Attack-Calculator/",
 });
-
-
-
-});
