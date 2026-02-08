@@ -1,0 +1,30 @@
+/* NAPE styles are primarily Tailwind. This file is intentionally minimal. */
+
+
+/* Page-wide emoji marquee backdrop */
+.nape-marquee {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding-top: 40px;
+}
+
+.nape-marquee-row {
+  white-space: nowrap;
+  font-size: 42px;
+  line-height: 1.15;
+  filter: saturate(1.15);
+  animation: nape-marquee-scroll 36s linear infinite;
+}
+
+.nape-marquee-row.nape-marquee-reverse,
+.nape-marquee-reverse {
+  animation-direction: reverse;
+}
+
+@keyframes nape-marquee-scroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}

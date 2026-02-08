@@ -1,0 +1,63 @@
+@import "tailwindcss";
+
+/* =========================================================
+   Anti-flashbang "dark default" overrides (minimal refactor)
+   This FORCE-remaps common Tailwind light utilities inside #root
+   ========================================================= */
+
+/* Default theme */
+:root {
+  --page-bg: #0b0f1a;
+  --panel-bg: #0f172a;     /* slate-900-ish */
+  --panel-bg-2: #111827;   /* gray-900-ish */
+  --panel-border: rgba(255,255,255,0.10);
+  --text: #e5e7eb;
+  --muted: rgba(229,231,235,0.70);
+}
+
+/* Light mode is dim, not white */
+html[data-theme="light"] {
+  --page-bg: #eef2f7;
+  --panel-bg: #ffffff;
+  --panel-bg-2: #f1f5f9;
+  --panel-border: rgba(15,23,42,0.12);
+  --text: #0f172a;
+  --muted: rgba(15,23,42,0.70);
+}
+
+html, body {
+  background: var(--page-bg);
+  color: var(--text);
+}
+
+/* Keep silly overflow feature */
+html, body, #root {
+  overflow-x: visible;
+  min-height: 100vh;
+}
+
+/* ---- The important part: override "white UI" inside the app ---- */
+html[data-theme="dark"] #root .bg-white {
+  background-color: var(--panel-bg) !important;
+}
+html[data-theme="dark"] #root .bg-gray-50,
+html[data-theme="dark"] #root .bg-slate-50 {
+  background-color: var(--panel-bg-2) !important;
+}
+html[data-theme="dark"] #root .text-gray-900,
+html[data-theme="dark"] #root .text-slate-900,
+html[data-theme="dark"] #root .text-black {
+  color: var(--text) !important;
+}
+html[data-theme="dark"] #root .text-gray-600,
+html[data-theme="dark"] #root .text-gray-500,
+html[data-theme="dark"] #root .text-slate-600,
+html[data-theme="dark"] #root .text-slate-500 {
+  color: var(--muted) !important;
+}
+html[data-theme="dark"] #root .border-gray-200,
+html[data-theme="dark"] #root .border-gray-300,
+html[data-theme="dark"] #root .border-slate-200,
+html[data-theme="dark"] #root .border-slate-300 {
+  border-color: var(--panel-border) !important;
+}

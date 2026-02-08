@@ -1,0 +1,445 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>40K Decoded Dice Sequence (W/T)</title>
+  <style>
+    :root{
+      --bg:#0b0f14;
+      --text:#e8eef7;
+      --muted:#a8b3c2;
+      --line:#263244;
+      --wep:#ff5c7a;   /* Weapon side */
+      --tgt:#4da3ff;   /* Target side */
+      --chip:#1a2432;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      background: radial-gradient(1200px 800px at 20% 0%, #132033 0%, var(--bg) 55%);
+      color:var(--text);
+      padding:24px;
+    }
+    .wrap{
+      max-width:1800px;
+      margin:0 auto;
+    }
+    header{display:flex;flex-direction:column;gap:8px;margin-bottom:16px;}
+    h1{margin:0;font-size:28px;line-height:1.15;}
+    .sub{margin:0;color:var(--muted);font-size:14px;line-height:1.4;}
+
+    /* V7: Always vertical stack */
+    .grid{
+      display:grid;
+      grid-template-columns: 1fr;
+      gap:14px;
+      align-items:start;
+    }
+
+    .card{
+      background: linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.01));
+      border:1px solid var(--line);
+      border-radius:16px;
+      padding:16px;
+      box-shadow:0 10px 30px rgba(0,0,0,.25);
+    }
+
+    .legend h2,.modes h2{
+      margin:0 0 10px 0;
+      font-size:14px;
+      letter-spacing:.12em;
+      text-transform:uppercase;
+      color:var(--muted);
+    }
+
+    /* Weapon/Target header strip */
+    .wtHeader{
+      display:grid;
+      grid-template-columns: minmax(0,1fr) clamp(56px,6vw,76px) minmax(0,1fr);
+      gap: clamp(10px,1.4vw,16px);
+      align-items:center;
+      margin-bottom:12px;
+      padding:10px 12px;
+      border-radius:14px;
+      border:1px solid var(--line);
+      background:
+        linear-gradient(90deg,
+          rgba(255,92,122,.16) 0%,
+          rgba(255,92,122,.08) 42%,
+          rgba(77,163,255,.08) 58%,
+          rgba(77,163,255,.16) 100%
+        );
+    }
+    .wtLabel{
+      font-size:12px;
+      letter-spacing:.14em;
+      text-transform:uppercase;
+      color:var(--muted);
+      display:flex;
+      align-items:center;
+      gap:8px;
+      white-space:nowrap;
+    }
+    .wtLabel.wep{justify-content:flex-end;}
+    .wtLabel.tgt{justify-content:flex-start;}
+
+    .wtChip{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      width:22px;height:22px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.18);
+      background: rgba(12,17,24,.65);
+      font-weight:900;
+      font-size:12px;
+      color:var(--text);
+    }
+    .wtChip.wep{ box-shadow: 0 0 0 3px rgba(255,92,122,.12); }
+    .wtChip.tgt{ box-shadow: 0 0 0 3px rgba(77,163,255,.12); }
+
+    .dividerHeader{
+      height:22px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      color:rgba(255,255,255,.55);
+      user-select:none;
+      font-size:14px;
+    }
+
+    .mode{
+      border:1px solid var(--line);
+      border-radius:14px;
+      padding:14px;
+      background: linear-gradient(180deg, rgba(18,25,35,.9), rgba(15,22,32,.8));
+      margin-top:12px;
+    }
+    .mode:first-of-type{margin-top:0;}
+
+    .modehead{
+      display:flex;
+      flex-wrap:wrap;
+      align-items:baseline;
+      justify-content:space-between;
+      gap:10px;
+      margin-bottom:10px;
+    }
+    .modetitle{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      font-size:16px;
+      font-weight:700;
+      white-space:nowrap;
+    }
+    .count{
+      font-size:12px;
+      color:var(--muted);
+      border:1px solid var(--line);
+      background:#0c1118;
+      padding:4px 8px;
+      border-radius:999px;
+      white-space:nowrap;
+    }
+
+    /* Split layout (stable) */
+    .split{
+      position:relative;
+      display:grid;
+      grid-template-columns: minmax(0,1fr) clamp(56px,6vw,76px) minmax(0,1fr);
+      gap: clamp(10px,1.4vw,16px);
+      align-items:center;
+      overflow-x:auto;
+      overflow-y:hidden;
+      padding: 6px 10px;
+      border-radius:12px;
+    }
+    .split:before{
+      content:"";
+      position:absolute;
+      inset:0;
+      pointer-events:none;
+      background:
+        linear-gradient(90deg,
+          rgba(255,92,122,.10) 0%,
+          rgba(255,92,122,.04) 40%,
+          rgba(77,163,255,.04) 60%,
+          rgba(77,163,255,.10) 100%
+        );
+      border-radius:12px;
+      opacity:.9;
+    }
+
+    .side{
+      position:relative;
+      display:flex;
+      flex-wrap:nowrap;
+      gap:10px;
+      align-items:center;
+      min-width:0;
+      padding:6px 0;
+      z-index:1;
+    }
+    .side.wep{
+      justify-content:flex-end;
+      padding-right: clamp(14px,2vw,22px);
+    }
+    .side.tgt{
+      justify-content:flex-start;
+      padding-left: clamp(14px,2vw,22px);
+    }
+
+    .divider{
+      position:relative;
+      height:54px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      z-index:1;
+      pointer-events:none;
+    }
+    .divider:before{
+      content:"";
+      position:absolute;
+      top:0; bottom:0;
+      width:2px;
+      background: linear-gradient(180deg, rgba(255,255,255,0), rgba(255,255,255,.35), rgba(255,255,255,0));
+      border-radius:2px;
+      opacity:.95;
+    }
+    .divider span{
+      position:relative;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      width:30px;height:30px;
+      border-radius:999px;
+      border:1px solid var(--line);
+      background: rgba(12,17,24,.92);
+      color:rgba(255,255,255,.65);
+      font-size:14px;
+      user-select:none;
+      z-index:2;
+    }
+
+    .step{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding:10px 12px;
+      border-radius:14px;
+      border:1px solid var(--line);
+      background:#0c1118;
+      font-size:14px;
+      line-height:1;
+      white-space:nowrap;
+      flex:0 0 auto;
+    }
+    .step .who{
+      font-weight:900;
+      font-size:12px;
+      padding:4px 8px;
+      border-radius:999px;
+      border:1px solid var(--line);
+      background:rgba(255,255,255,.03);
+      letter-spacing:.06em;
+    }
+    .who.wep{ color:var(--wep); }
+    .who.tgt{ color:var(--tgt); }
+
+    .arrow{
+      color:rgba(255,255,255,.55);
+      font-size:16px;
+      line-height:1;
+      flex:0 0 auto;
+      user-select:none;
+    }
+
+    .note{
+      font-size:13px;
+      color:var(--muted);
+      line-height:1.45;
+      margin:10px 0 0 0;
+    }
+
+    /* Legend */
+    .pillrow{display:flex;flex-wrap:wrap;gap:8px;}
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding:8px 10px;
+      border-radius:999px;
+      background:var(--chip);
+      border:1px solid var(--line);
+      font-size:13px;
+      white-space:nowrap;
+    }
+    .dot{width:10px;height:10px;border-radius:50%;}
+    .dot.wep{background:var(--wep); box-shadow:0 0 0 3px rgba(255,92,122,.14);}
+    .dot.tgt{background:var(--tgt); box-shadow:0 0 0 3px rgba(77,163,255,.14);}
+
+    .key{
+      display:grid;
+      gap:8px;
+      margin-top:10px;
+      color:var(--muted);
+      font-size:13px;
+      line-height:1.45;
+    }
+    .key code{
+      background:#0c1118;
+      border:1px solid var(--line);
+      padding:2px 6px;
+      border-radius:8px;
+      color:var(--text);
+    }
+
+    footer{
+      margin-top:14px;
+      color:var(--muted);
+      font-size:12px;
+      line-height:1.4;
+    }
+    .smallcaps{ letter-spacing:.08em; text-transform:uppercase; font-size:11px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>🎲 40K Decoded Dice Sequence</h1>
+      <p class="sub">
+        Visual reference for the core roll flow. Each step shows the dice being rolled and who rolls it:
+        <strong>W</strong> = Weapon side, <strong>T</strong> = Target side.
+      </p>
+    </header>
+
+    <div class="grid">
+      <section class="card modes">
+        <h2>Modes</h2>
+
+        <div class="wtHeader" aria-label="Weapon vs Target header">
+          <div class="wtLabel wep"><span>Weapon side</span><span class="wtChip wep">W</span></div>
+          <div class="dividerHeader">⇄</div>
+          <div class="wtLabel tgt"><span class="wtChip tgt">T</span><span>Target side</span></div>
+        </div>
+
+        <div class="mode">
+          <div class="modehead">
+            <div class="modetitle">⚔️ Normal</div>
+            <div class="count">3 rolls</div>
+          </div>
+          <div class="split" aria-label="Normal split sequence">
+            <div class="side wep">
+              <span class="step">🎯 Hits <span class="who wep">W</span></span>
+              <span class="arrow">➡️</span>
+              <span class="step">🩸 Wounds <span class="who wep">W</span></span>
+            </div>
+            <div class="divider" aria-label="Responsibility shifts to target side"><span>⇄</span></div>
+            <div class="side tgt">
+              <span class="step">🛡️ Saves <span class="who tgt">T</span></span>
+            </div>
+          </div>
+          <p class="note">Use when attacks are fixed (no random attack quantity) and there is no Feel No Pain step.</p>
+        </div>
+
+        <div class="mode">
+          <div class="modehead">
+            <div class="modetitle">🎲 Random Attacks</div>
+            <div class="count">4 rolls</div>
+          </div>
+          <div class="split" aria-label="Random attacks split sequence">
+            <div class="side wep">
+              <span class="step">🎲 Attack Qty <span class="who wep">W</span></span>
+              <span class="arrow">➡️</span>
+              <span class="step">🎯 Hits <span class="who wep">W</span></span>
+              <span class="arrow">➡️</span>
+              <span class="step">🩸 Wounds <span class="who wep">W</span></span>
+            </div>
+            <div class="divider" aria-label="Responsibility shifts to target side"><span>⇄</span></div>
+            <div class="side tgt">
+              <span class="step">🛡️ Saves <span class="who tgt">T</span></span>
+            </div>
+          </div>
+          <p class="note">Adds a front-loaded dice roll to determine the number of attacks before resolving hits/wounds/saves.</p>
+        </div>
+
+        <div class="mode">
+          <div class="modehead">
+            <div class="modetitle">💉 Feel No Pain (FNP)</div>
+            <div class="count">4 rolls</div>
+          </div>
+          <div class="split" aria-label="FNP split sequence">
+            <div class="side wep">
+              <span class="step">🎯 Hits <span class="who wep">W</span></span>
+              <span class="arrow">➡️</span>
+              <span class="step">🩸 Wounds <span class="who wep">W</span></span>
+            </div>
+            <div class="divider" aria-label="Responsibility shifts to target side"><span>⇄</span></div>
+            <div class="side tgt">
+              <span class="step">🛡️ Saves <span class="who tgt">T</span></span>
+              <span class="arrow">➡️</span>
+              <span class="step">💉 FNP <span class="who tgt">T</span></span>
+            </div>
+          </div>
+          <p class="note">Adds a post-save defensive mitigation roll (rolled by the target side).</p>
+        </div>
+
+        <div class="mode">
+          <div class="modehead">
+            <div class="modetitle">🎲 + 💉 Random Attacks &amp; FNP</div>
+            <div class="count">5 rolls</div>
+          </div>
+          <div class="split" aria-label="Random attacks plus FNP split sequence">
+            <div class="side wep">
+              <span class="step">🎲 Attack Qty <span class="who wep">W</span></span>
+              <span class="arrow">➡️</span>
+              <span class="step">🎯 Hits <span class="who wep">W</span></span>
+              <span class="arrow">➡️</span>
+              <span class="step">🩸 Wounds <span class="who wep">W</span></span>
+            </div>
+            <div class="divider" aria-label="Responsibility shifts to target side"><span>⇄</span></div>
+            <div class="side tgt">
+              <span class="step">🛡️ Saves <span class="who tgt">T</span></span>
+              <span class="arrow">➡️</span>
+              <span class="step">💉 FNP <span class="who tgt">T</span></span>
+            </div>
+          </div>
+          <p class="note">Full sequence when both random attack quantity and Feel No Pain apply.</p>
+        </div>
+      </section>
+
+      <aside class="card legend">
+        <h2>Legend</h2>
+
+        <div class="pillrow" aria-label="Legend pills">
+          <span class="pill"><span class="dot wep"></span><strong>W</strong> = Weapon side rolls</span>
+          <span class="pill"><span class="dot tgt"></span><strong>T</strong> = Target side rolls</span>
+        </div>
+
+        <div class="key">
+          <div><code>🎲</code> Attack Qty: dice that determine number of attacks (rolled by W in your definitions).</div>
+          <div><code>🎯</code> Hits: weapon side hit rolls.</div>
+          <div><code>🩸</code> Wounds: weapon side wound rolls.</div>
+          <div><code>🛡️</code> Saves: target side saving throws.</div>
+          <div><code>💉</code> FNP: target side Feel No Pain rolls.</div>
+          <div><code>⇄</code> Divider: responsibility shifts from weapon-side rolls to target-side rolls.</div>
+        </div>
+
+        <footer>
+          <div class="smallcaps">Data source</div>
+          <div>
+            Normal: Hits(W) → Wounds(W) → Saves(T)<br/>
+            Random Attacks: Attack Qty(W) → Hits(W) → Wounds(W) → Saves(T)<br/>
+            FNP: Hits(W) → Wounds(W) → Saves(T) → FNP(T)<br/>
+            Random Attacks + FNP: Attack Qty(W) → Hits(W) → Wounds(W) → Saves(T) → FNP(T)
+          </div>
+        </footer>
+      </aside>
+    </div>
+  </div>
+</body>
+</html>
