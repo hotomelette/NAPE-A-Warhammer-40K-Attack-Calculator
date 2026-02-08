@@ -1268,7 +1268,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
 	            <div className="min-w-0">
 	              <div className="flex items-center gap-3 min-w-0 self-start">
   <img
-    src="/favicon-256.png"
+    src="/dist/favicon-256.png"
     alt="NAPE"
     className="h-16 w-16 md:h-20 md:w-20 rounded-xl border border-gray-700 bg-gray-900/40 p-1 shrink-0"
   />
@@ -2184,7 +2184,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
 
 	          <div className="mt-6 text-center text-xs text-gray-400 space-y-1">
 	            <div className="flex items-center justify-center gap-3">
-  <img src="/favicon-256.png" alt="NAPE" className="h-9 w-9 rounded-lg border border-gray-600 bg-gray-950/30 p-1" />
+  <img src="/dist/favicon-256.png" alt="NAPE" className="h-9 w-9 rounded-lg border border-gray-600 bg-gray-950/30 p-1" />
   <div className="font-semibold text-gray-300">{APP_NAME} · v{APP_VERSION}</div>
 </div>
 	            <div>Deterministic Combat Patrol-first rules interpretation. Manual dice entry. Not official rules.</div>
@@ -2222,7 +2222,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                     </div>
                     <iframe
                       title="40k dice sequencing reference"
-                      src="/40k_decoded_dice_sequence_v7_vertical_stack.html"
+                      src="/dist/40k_decoded_dice_sequence_v7_vertical_stack.html"
                       className="w-full h-full flex-1 min-h-0 rounded-xl border border-gray-800 bg-black"
                     />
                   </div>
