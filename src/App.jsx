@@ -70,19 +70,22 @@ function meets(targetNumber, unmodifiedRoll, mod) {
   return modified >= targetNumber;
 }
 
-function Section({ title, theme, children }) {
+function Section({ title, theme, children, action }) {
   const panelClass =
     theme === "dark"
       ? "rounded-2xl bg-slate-900 shadow p-4 border border-gray-700 text-gray-100"
       : "rounded-2xl bg-white shadow p-4 border border-gray-200 text-gray-900";
   const titleClass =
     theme === "dark"
-      ? "text-xl md:text-2xl font-extrabold tracking-wide mb-3 border-b border-gray-700 pb-2"
-      : "text-xl md:text-2xl font-extrabold tracking-wide mb-3 border-b border-gray-200 pb-2";
+      ? "text-xl md:text-2xl font-extrabold tracking-wide border-b border-gray-700 pb-2 mb-3"
+      : "text-xl md:text-2xl font-extrabold tracking-wide border-b border-gray-200 pb-2 mb-3";
 
   return (
     <div className={panelClass}>
-      <div className={titleClass}>{title}</div>
+      <div className={`flex items-center justify-between gap-2 ${titleClass}`}>
+        <span>{title}</span>
+        {action && <div className="shrink-0">{action}</div>}
+      </div>
       <div className="space-y-4">{children}</div>
     </div>
   );
@@ -1486,6 +1489,127 @@ export default function AttackCalculator() {
   : "px-3 py-2 rounded-lg border border-gray-300 bg-white text-sm font-semibold text-gray-900 hover:bg-gray-50 hover:border-gray-400 transition";
 const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font-semibold border border-gray-700 hover:bg-gray-800";
 
+  // ── Roll All with slot-machine animation ──
+  const [isRollingAll, setIsRollingAll] = useState(false);
+
+  const animateField = (setter, finalRolls, sides, delay) => {
+    return new Promise(resolve => {
+      setTimeout(() => {
+        const count = finalRolls.length;
+        if (count === 0) { resolve(); return; }
+        const duration = 600;
+        const interval = 60;
+        const steps = Math.floor(duration / interval);
+        let step = 0;
+        const ticker = setInterval(() => {
+          // Generate random-looking interim values
+          const fakeRolls = Array.from({ length: count }, () => Math.ceil(Math.random() * sides));
+          setter(fakeRolls.join(" "));
+          step++;
+          if (step >= steps) {
+            clearInterval(ticker);
+            setter(finalRolls.join(" "));
+            resolve();
+          }
+        }, interval);
+      }, delay);
+    });
+  };
+
+  const rollAll = async () => {
+    if (isRollingAll || !statsReady) return;
+    setIsRollingAll(true);
+
+    // ── Step 1: Attack rolls (if random) ──
+    const attackSpec = parseDiceSpec(attacksValue);
+    let attackRollsFinal = [];
+    if (!attacksFixed && attackSpec.n > 0) {
+      attackRollsFinal = Array.from({ length: attackSpec.n }, () => Math.ceil(Math.random() * attackSpec.sides));
+      await animateField(setAttacksRolls, attackRollsFinal, attackSpec.sides, 0);
+      // small pause to let React recompute computed.A
+      await new Promise(r => setTimeout(r, 150));
+    }
+
+    // ── Step 2: Hit rolls ──
+    const hitCount = torrent ? 0 : computed.A;
+    let hitFinal = [];
+    if (hitCount > 0) {
+      hitFinal = Array.from({ length: hitCount }, () => Math.ceil(Math.random() * 6));
+      await animateField(setHitRollsText, hitFinal, 6, 0);
+      await new Promise(r => setTimeout(r, 150));
+    }
+
+    // We need to compute hit rerolls from the rolls we just made
+    // Parse hits to find reroll eligible dice
+    const toHitNum = Number(toHit);
+    let hitRerollFinal = [];
+    if (hitFinal.length > 0 && (rerollHitOnes || rerollHitFails)) {
+      const eligible = hitFinal.filter(d => rerollHitOnes ? d === 1 : d < toHitNum);
+      hitRerollFinal = eligible.map(() => Math.ceil(Math.random() * 6));
+      if (hitRerollFinal.length > 0) {
+        await animateField(setHitRerollRollsText, hitRerollFinal, 6, 0);
+        await new Promise(r => setTimeout(r, 150));
+      }
+    }
+
+    // ── Step 3: Wound rolls ──
+    // woundRollPool is computed from hits — use current computed value after hits settle
+    const woundCount = computed.woundRollPool;
+    let woundFinal = [];
+    if (woundCount > 0) {
+      woundFinal = Array.from({ length: woundCount }, () => Math.ceil(Math.random() * 6));
+      await animateField(setWoundRollsText, woundFinal, 6, 0);
+      await new Promise(r => setTimeout(r, 150));
+    }
+
+    // Wound rerolls
+    const strengthNum = Number(strength);
+    const toughnessNum = Number(toughness);
+    const woundTarget = strengthNum >= toughnessNum * 2 ? 2 : strengthNum > toughnessNum ? 3 : strengthNum === toughnessNum ? 4 : strengthNum * 2 <= toughnessNum ? 6 : 5;
+    let woundRerollFinal = [];
+    if (woundFinal.length > 0 && (rerollWoundOnes || rerollWoundFails || twinLinked)) {
+      const eligible = woundFinal.filter(d => (rerollWoundOnes || twinLinked) ? d === 1 : d < woundTarget);
+      woundRerollFinal = eligible.map(() => Math.ceil(Math.random() * 6));
+      if (woundRerollFinal.length > 0) {
+        await animateField(setWoundRerollRollsText, woundRerollFinal, 6, 0);
+        await new Promise(r => setTimeout(r, 150));
+      }
+    }
+
+    // ── Step 4: Save rolls ──
+    const saveCount = computed.savableWounds;
+    let saveFinal = [];
+    if (saveCount > 0) {
+      saveFinal = Array.from({ length: saveCount }, () => Math.ceil(Math.random() * 6));
+      await animateField(setSaveRollsText, saveFinal, 6, 0);
+      await new Promise(r => setTimeout(r, 150));
+    }
+
+    // ── Step 5: Variable damage ──
+    // failedSaves derived from saveFinal inline
+    if (!damageFixed && parseDiceSpec(damageValue).hasDie) {
+      const dmgSpec = parseDiceSpec(damageValue);
+      const saveTargetNum = computed.saveTarget;
+      const rawFailed = saveFinal.filter(d => d < saveTargetNum).length;
+      const effectiveFailed = Math.max(0, rawFailed - (ignoreFirstFailedSave ? 1 : 0));
+      const totalDmgDice = effectiveFailed + (devastatingWounds ? computed.mortalWoundAttacks : 0);
+      if (totalDmgDice > 0) {
+        const dmgFinal = Array.from({ length: totalDmgDice }, () => Math.ceil(Math.random() * dmgSpec.sides));
+        await animateField(setDamageRolls, dmgFinal, dmgSpec.sides, 0);
+        await new Promise(r => setTimeout(r, 150));
+      }
+    }
+
+    // ── Step 6: FNP ──
+    const fnpCount = computed.totalPreFnp;
+    if (fnpEnabled && fnp !== "" && fnpCount > 0) {
+      const fnpFinal = Array.from({ length: fnpCount }, () => Math.ceil(Math.random() * 6));
+      await animateField(setFnpRollsText, fnpFinal, 6, 0);
+    }
+
+    setIsRollingAll(false);
+  };
+
   return (
     <div className={`min-h-screen ${viz.pageBg || "bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950"} p-4 relative overflow-hidden`}>
       {/* Animated page-wide emoji backdrop synced to total damage tier */}
@@ -1679,17 +1803,17 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                       <div className="flex gap-2">
                         <input
                           className={`flex-1 rounded border p-2 text-lg font-semibold ${!damageFixed && damageRolls.trim() === "" ? "border-red-500 ring-2 ring-red-200" : ""}`}
-                          placeholder={`${computed.failedSavesEffective > 0 ? `Enter ${computed.failedSavesEffective} result${computed.failedSavesEffective !== 1 ? "s" : ""}` : "Roll 1 die per failed save"}${parseDiceSpec(damageValue).hasDie ? ` (${damageValue})` : ""}`}
+                          placeholder={`Roll 1 die per failed save${parseDiceSpec(damageValue).hasDie ? ` (${damageValue})` : ""}`}
                           value={damageRolls}
                           onChange={(e) => setDamageRolls(e.target.value)}
                         />
                         <button
                           type="button"
-                          title="Roll damage dice (one per failed save)"
-                          disabled={!parseDiceSpec(damageValue).hasDie || computed.failedSavesEffective === 0}
+                          title="Roll damage dice"
+                          disabled={!parseDiceSpec(damageValue).hasDie || saveNeeded === 0}
                           onClick={() => {
                             const sp = parseDiceSpec(damageValue);
-                            if (sp.hasDie) setDamageRolls(rollDice(computed.failedSavesEffective, sp.sides));
+                            if (sp.hasDie) setDamageRolls(rollDice(saveNeeded, sp.sides));
                           }}
                           className="rounded-lg bg-amber-500 hover:bg-amber-400 disabled:opacity-30 text-gray-950 px-3 font-bold text-lg transition"
                         >🎲</button>
@@ -1953,7 +2077,17 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
               className={`rounded-2xl shadow-xl p-1 overflow-visible ${theme === "dark" ? "bg-gradient-to-br from-slate-950 via-gray-950 to-slate-900 border border-gray-700" : "bg-gradient-to-br from-amber-100 via-gray-50 to-red-100 border border-gray-300"}`}
               style={{ height: "100vh", overflowY: "auto", overflowX: "visible" }}
             >
-                            <Section theme={theme} title="Manual dice entry">
+                            <Section theme={theme} title="Manual dice entry" action={
+                              <button
+                                type="button"
+                                onClick={rollAll}
+                                disabled={!statsReady || isRollingAll}
+                                title={statsReady ? "Roll all dice at once with animation" : "Enter weapon and target stats first"}
+                                className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-extrabold border transition ${isRollingAll ? "bg-amber-600 border-amber-400 text-gray-950 animate-pulse cursor-wait" : statsReady ? "bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 border-amber-400/40 text-gray-950" : "bg-gray-800 border-gray-600 text-gray-500 cursor-not-allowed"}`}
+                              >
+                                {isRollingAll ? "🎲 Rolling…" : "🎲 Roll all"}
+                              </button>
+                            }>
               {!attacksFixed ? (
                               <Field
                                 label={
