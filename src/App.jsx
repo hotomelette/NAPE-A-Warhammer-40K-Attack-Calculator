@@ -24,14 +24,21 @@ function parseDiceList(text) {
 
 function parseDiceSpec(raw) {
   const s = String(raw ?? "").trim();
-  if (!s) return { ok: false, n: 0, sides: 6 };
-  const m = s.match(/^(\d+)(?:\s*[dD](\d+))?$/);
-  if (!m) return { ok: false, n: 0, sides: 6 };
-  const n = Math.max(0, parseInt(m[1], 10) || 0);
+  if (!s) return { ok: false, n: 0, sides: 6, mod: 0, hasDie: false };
+  // Supports: "6", "2D6", "D6", "2D6+1", "D6+2", "2D3+3"
+  // Group 1: die count (optional, defaults to 1 if die type present)
+  // Group 2: die type (e.g. D6, D3) — optional
+  // Group 3: flat modifier (e.g. +1) — optional
+  const m = s.match(/^(\d+)?(?:\s*[dD](\d+))?(?:\s*\+\s*(\d+))?$/);
+  if (!m || (!m[1] && !m[2])) return { ok: false, n: 0, sides: 6, mod: 0, hasDie: false };
+  const hasDie = !!m[2];
+  const n = hasDie
+    ? Math.max(1, parseInt(m[1] || "1", 10) || 1)
+    : Math.max(0, parseInt(m[1], 10) || 0);
   const sides = Math.max(2, parseInt(m[2] || "6", 10) || 6);
-  return { ok: n > 0, n, sides };
+  const mod = Math.max(0, parseInt(m[3] || "0", 10) || 0);
+  return { ok: n > 0, n, sides, mod, hasDie };
 }
-
 
 function clampModPlusMinusOne(mod) {
   if (mod > 1) return 1;
@@ -239,6 +246,256 @@ function damageViz(total) {
    App
 ========================= */
 
+/* =========================
+   Roll helpers
+========================= */
+function rollDice(n, sides = 6) {
+  return Array.from({ length: n }, () => Math.ceil(Math.random() * sides)).join(" ");
+}
+
+/* =========================
+   WizardOverlay
+========================= */
+function WizardOverlay({
+  theme, onClose,
+  // Weapon state (mandatory)
+  attacksFixed, setAttacksFixed, attacksValue, setAttacksValue,
+  attacksRolls, setAttacksRolls,
+  toHit, setToHit, strength, setStrength, ap, setAp,
+  damageFixed, setDamageFixed, damageValue, setDamageValue,
+  // Target state (mandatory only)
+  toughness, setToughness, armorSave, setArmorSave,
+  // Dice
+  hitRollsText, setHitRollsText,
+  woundRollsText, setWoundRollsText,
+  saveRollsText, setSaveRollsText,
+  // Computed (for dice counts)
+  computed, hitNeeded, woundNeeded, saveNeeded,
+  // Needed for torrent display only
+  torrent, fnp, fnpEnabled,
+}) {
+  const dark = theme === "dark";
+
+  const overlay = dark
+    ? "bg-gray-950 border-gray-700 text-gray-100"
+    : "bg-white border-gray-300 text-gray-900";
+  const section = dark ? "border-gray-700" : "border-gray-200";
+  const sectionLabel = `text-xs font-bold uppercase tracking-widest mb-3 ${dark ? "text-amber-400" : "text-amber-600"}`;
+  const input = dark
+    ? "bg-gray-800 border-gray-500 text-white font-bold placeholder:text-gray-500 placeholder:font-normal"
+    : "bg-white border-gray-400 text-gray-900 font-bold placeholder:text-gray-400 placeholder:font-normal";
+  const btnPrimary = "bg-amber-500 hover:bg-amber-400 text-gray-950 font-bold px-4 py-2 rounded-lg transition";
+
+  const attackSpec = parseDiceSpec(attacksValue);
+  const autoRollHits   = () => setHitRollsText(rollDice(hitNeeded, 6));
+  const autoRollWounds = () => setWoundRollsText(rollDice(woundNeeded, 6));
+  const autoRollSaves  = () => setSaveRollsText(rollDice(saveNeeded, 6));
+  const autoRollAttacks = () => {
+    if (!attacksFixed && attackSpec.n > 0)
+      setAttacksRolls(rollDice(attackSpec.n, attackSpec.sides));
+  };
+
+  const fieldLabel = (text) => (
+    <div className={`text-xs font-semibold uppercase tracking-wider mb-1 ${dark ? "text-gray-400" : "text-gray-500"}`}>{text}</div>
+  );
+  const numField = (label, value, onChange, placeholder, hint) => (
+    <div>
+      {fieldLabel(label)}
+      {hint && <div className={`text-xs mb-1 ${dark ? "text-gray-500" : "text-gray-400"}`}>{hint}</div>}
+      <input
+        type="text" inputMode="numeric"
+        value={value} onChange={e => onChange(e.target.value)}
+        placeholder={placeholder}
+        className={`w-full rounded-lg border p-2 text-base font-bold ${input}`}
+      />
+    </div>
+  );
+  const diceField = (label, value, onChange, needed, onRoll, info) => (
+    <div>
+      {fieldLabel(label)}
+      {info && <div className={`text-xs mb-1 ${dark ? "text-gray-500" : "text-gray-400"}`}>{info}</div>}
+      <div className="flex gap-2">
+        <input
+          type="text" value={value} onChange={e => onChange(e.target.value)}
+          placeholder={needed > 0 ? `Enter ${needed} results…` : "—"}
+          className={`flex-1 rounded-lg border p-2 text-base font-bold ${input}`}
+        />
+        <button onClick={onRoll} disabled={needed === 0}
+          className="rounded-lg bg-amber-500 hover:bg-amber-400 disabled:opacity-30 text-gray-950 px-3 font-bold text-lg transition"
+          title="Roll for me">🎲</button>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="fixed inset-0 z-40 flex items-center justify-center p-4">
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-black/60" onClick={onClose} />
+
+      {/* Centered panel */}
+      <div
+        className={`pointer-events-auto relative w-full max-w-lg max-h-[90vh] flex flex-col rounded-2xl border shadow-2xl overflow-hidden ${overlay}`}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className={`flex items-center justify-between gap-3 px-4 py-3 border-b ${dark ? "border-gray-700 bg-gray-900" : "border-gray-200 bg-gray-50"}`}>
+          <div className="flex items-center gap-2">
+            <span className="text-xl">🧙</span>
+            <div className="font-extrabold text-base">Quick Wizard</div>
+          </div>
+          <button onClick={onClose}
+            className={`rounded-lg px-3 py-1.5 text-sm font-semibold border transition ${dark ? "border-gray-600 bg-gray-800 hover:bg-gray-700 text-gray-300" : "border-gray-400 bg-gray-100 hover:bg-gray-200 text-gray-800"}`}>
+            ✕ Close
+          </button>
+        </div>
+
+        {/* Live damage banner */}
+        {computed.totalPostFnp > 0 && (
+          <div className={`mx-4 mt-3 rounded-xl border px-3 py-2 flex items-center justify-between ${dark ? "border-amber-700/40 bg-amber-900/20" : "border-amber-300 bg-amber-50"}`}>
+            <span className={`text-xs font-bold uppercase tracking-wider ${dark ? "text-amber-400" : "text-amber-600"}`}>Total damage</span>
+            <span className="text-2xl font-black text-amber-400">{computed.totalPostFnp}</span>
+          </div>
+        )}
+
+        {/* Scrollable body — all fields on one page */}
+        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-6">
+
+          {/* ── WEAPON ── */}
+          <div>
+            <div className={sectionLabel}>⚔️ Weapon</div>
+            <div className="space-y-3">
+
+              {/* Attacks */}
+              <div>
+                {fieldLabel("Attacks")}
+                <label className="flex items-center gap-2 text-sm mb-2 cursor-pointer select-none">
+                  <input type="checkbox" checked={attacksFixed} onChange={e => setAttacksFixed(e.target.checked)} className="h-4 w-4 accent-amber-400" />
+                  <span>Fixed attacks</span>
+                </label>
+                {attacksFixed ? (
+                  <input type="text" inputMode="numeric" value={attacksValue}
+                    onChange={e => setAttacksValue(e.target.value.replace(/[^0-9]/g, ""))}
+                    placeholder="e.g. 6"
+                    className={`w-full rounded-lg border p-2 text-base font-bold ${input}`} />
+                ) : (
+                  <div className="space-y-2">
+                    <input value={attacksValue}
+                      onChange={e => setAttacksValue(e.target.value.replace(/[^0-9dD+]/g, "").toUpperCase())}
+                      placeholder="e.g. D6+1, 2D6, D3"
+                      className={`w-full rounded-lg border p-2 text-base font-bold ${input}`} />
+                    {attackSpec.n > 0 && (
+                      <div className="flex gap-2">
+                        <input value={attacksRolls} onChange={e => setAttacksRolls(e.target.value)}
+                          placeholder={`Enter ${attackSpec.n} dice results…`}
+                          className={`flex-1 rounded-lg border p-2 text-base font-bold ${input}`} />
+                        <button onClick={autoRollAttacks} className={btnPrimary}>🎲 Roll</button>
+                      </div>
+                    )}
+                    {attackSpec.mod > 0 && <div className={`text-xs ${dark ? "text-gray-500" : "text-gray-400"}`}>+{attackSpec.mod} modifier added automatically</div>}
+                  </div>
+                )}
+              </div>
+
+              {numField("BS / WS (To Hit)", toHit, setToHit, "e.g. 4", "4 = 4+")}
+              {numField("Strength", strength, setStrength, "e.g. 5")}
+
+              {/* AP — always 0 or negative */}
+              <div>
+                {fieldLabel("AP")}
+                <input type="text" inputMode="numeric" value={ap}
+                  onChange={e => {
+                    const raw = e.target.value;
+                    if (raw === "" || raw === "-") { setAp(raw); return; }
+                    const n = parseFloat(raw);
+                    if (!isNaN(n)) setAp(String(Math.min(0, -Math.abs(n))));
+                  }}
+                  placeholder="e.g. -1  (always 0 or negative)"
+                  className={`w-full rounded-lg border p-2 text-base font-bold ${input}`} />
+              </div>
+
+              {/* Damage */}
+              <div>
+                {fieldLabel("Damage")}
+                <label className="flex items-center gap-2 text-sm mb-2 cursor-pointer select-none">
+                  <input type="checkbox" checked={damageFixed} onChange={e => setDamageFixed(e.target.checked)} className="h-4 w-4 accent-amber-400" />
+                  <span>Fixed damage</span>
+                </label>
+                {damageFixed ? (
+                  <input type="text" inputMode="numeric"
+                    value={damageValue} onChange={e => setDamageValue(e.target.value)}
+                    placeholder="e.g. 2"
+                    className={`w-full rounded-lg border p-2 text-base font-bold ${input}`} />
+                ) : (
+                  <input
+                    value={damageValue}
+                    onChange={e => setDamageValue(e.target.value.replace(/[^0-9dD+]/g, "").toUpperCase())}
+                    placeholder="e.g. D3, D6, D3+1"
+                    className={`w-full rounded-lg border p-2 text-base font-bold ${input}`} />
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* ── TARGET ── */}
+          <div className={`border-t pt-5 ${section}`}>
+            <div className={sectionLabel}>🛡️ Target</div>
+            <div className="space-y-3">
+              {numField("Toughness", toughness, setToughness, "e.g. 4")}
+              {numField("Armor Save", armorSave, setArmorSave, "e.g. 3", "3 = 3+")}
+              <div className={`text-xs ${dark ? "text-gray-600" : "text-gray-400"}`}>Invuln, FNP, cover & modifiers → main form</div>
+            </div>
+          </div>
+
+          {/* ── DICE ── */}
+          <div className={`border-t pt-5 ${section}`}>
+            <div className={sectionLabel}>🎲 Dice</div>
+            <div className="space-y-4">
+
+              {/* Hit rolls */}
+              {torrent ? (
+                <div className={`rounded-xl border border-amber-500/40 bg-amber-900/20 p-3 text-sm`}>
+                  ⚡ <strong>Torrent</strong> — {computed.A} attacks auto-hit. No hit dice needed.
+                </div>
+              ) : diceField(
+                `Hit rolls (need ${hitNeeded})`,
+                hitRollsText, setHitRollsText, hitNeeded, autoRollHits,
+                toHit ? `To-hit: ${toHit}+` : null
+              )}
+              {computed.critHits > 0 && <div className="text-xs text-amber-400 -mt-2">✨ {computed.critHits} crit hit{computed.critHits !== 1 ? "s" : ""}</div>}
+
+              {/* Wound rolls */}
+              {diceField(
+                `Wound rolls (need ${woundNeeded})`,
+                woundRollsText, setWoundRollsText, woundNeeded, autoRollWounds,
+                computed.needed ? `Wound target: ${computed.needed}+` : null
+              )}
+              {computed.critWounds > 0 && <div className="text-xs text-rose-400 -mt-2">💥 {computed.critWounds} crit wound{computed.critWounds !== 1 ? "s" : ""}</div>}
+              {computed.mortalWoundAttacks > 0 && <div className="text-xs text-red-400 -mt-2">☠️ {computed.mortalWoundAttacks} mortal wound{computed.mortalWoundAttacks !== 1 ? "s" : ""} (skip saves)</div>}
+
+              {/* Save rolls */}
+              {diceField(
+                `Save rolls (need ${saveNeeded})`,
+                saveRollsText, setSaveRollsText, saveNeeded, autoRollSaves,
+                computed.saveTarget ? `Save target: ${computed.saveTarget}+` : null
+              )}
+              {computed.failedSaves > 0 && <div className="text-xs text-red-400 -mt-2">❌ {computed.failedSaves} failed save{computed.failedSaves !== 1 ? "s" : ""}</div>}
+
+            </div>
+          </div>
+
+        </div>
+
+        {/* Footer */}
+        <div className={`px-4 py-3 border-t ${dark ? "border-gray-700" : "border-gray-200"}`}>
+          <button onClick={onClose} className={`${btnPrimary} w-full`}>✅ Done</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+
 export default function AttackCalculator() {
 
   // Theme (dark default, manual toggle)
@@ -266,10 +523,8 @@ export default function AttackCalculator() {
 
   // Results UI
   const [showLog, setShowLog] = useState(false);
-  const [showRoadmap, setShowRoadmap] = useState(false);
   const [showLimitations, setShowLimitations] = useState(false);
   const [showCheatSheet, setShowCheatSheet] = useState(false);
-  const [showAiDisclaimer, setShowAiDisclaimer] = useState(false);
 
   const [toHit, setToHit] = useState("");
   const [strength, setStrength] = useState("");
@@ -307,7 +562,6 @@ export default function AttackCalculator() {
   const [precision, setPrecision] = useState(false);
 
   // Rapid Fire
-// Rapid Fire
   // Matches the rules: Rapid Fire X adds X attacks at half range.
   // We keep an explicit toggle (like Sustained Hits) so the UI can mirror datasheets cleanly.
   const [rapidFire, setRapidFire] = useState(false);
@@ -344,6 +598,10 @@ export default function AttackCalculator() {
 
   const [strictMode, setStrictMode] = useState(false);
   const [showDiceRef, setShowDiceRef] = useState(false);
+
+  // Wizard
+  const [showWizard, setShowWizard] = useState(false);
+  const [wizardStep, setWizardStep] = useState(0);
 
   useEffect(() => {
     if (!showDiceRef) return;
@@ -534,17 +792,19 @@ export default function AttackCalculator() {
       A = Math.max(0, parseInt(String(attacksValue || "0"), 10) || 0);
       log.push(`Attacks fixed: A = ${A}`);
     } else {
-      const attacksText = String(attacksValue ?? "").trim();
-      const isND6 = attacksText === "" || /^\d+$/.test(attacksText);
-      const diceCount = isND6 ? Math.max(0, parseInt(attacksText || "0", 10)) : 0;
-      if (!isND6) {
-        errors.push('Random attacks are ND6 only. Enter a number like "2" for 2D6.');
+      // Supports expressions like "2", "2D6", "D6+1", "2D6+2", "D3+3"
+      const spec = parseDiceSpec(attacksValue);
+      const diceCount = spec.n;
+      const attackMod = spec.mod || 0;
+
+      if (!spec.ok) {
+        errors.push('Random attacks: enter a dice expression like "2D6", "D6+1", or "2" (for 2D6).');
       }
 
       const rolls = parseDiceList(attacksRolls);
 
       if (diceCount <= 0) {
-        errors.push('Attacks are random: enter N for ND6 (e.g. "2" for 2D6).');
+        errors.push('Attacks are random: enter a dice expression (e.g. "D6+1", "2D6", "2").');
       } else if (rolls.length !== diceCount) {
         errors.push(`Attack rolls provided (${rolls.length}) must equal dice count (${diceCount}).`);
       }
@@ -553,8 +813,10 @@ export default function AttackCalculator() {
         errors.push("Attacks are random but no attack-roll dice were provided.");
       }
 
-      A = rolls.reduce((sum, r) => sum + r, 0);
-      log.push(`Attacks random: dice = ${diceCount}D6, rolls = [${rolls.join(", ")}], A = ${A}`);
+      const diceSum = rolls.reduce((sum, r) => sum + r, 0);
+      A = diceSum + attackMod;
+      const modStr = attackMod > 0 ? ` + ${attackMod} (modifier)` : "";
+      log.push(`Attacks random: spec = ${attacksValue || "?"}, dice = ${diceCount}D${spec.sides}, rolls = [${rolls.join(", ")}]${modStr}, A = ${A}`);
     }
 
     // Rapid Fire: at half range, add X attacks to the weapon's Attacks characteristic.
@@ -846,22 +1108,26 @@ export default function AttackCalculator() {
       if (devastatingWounds && mortalWoundAttacks > 0) {
         for (let i = 0; i < mortalWoundAttacks; i++) {
           const d = damageDice[idx++];
-          if (!(d >= 1 && d <= 6)) {
-            errors.push(`Damage roll #${idx} is not a valid D6 result (1-6).`);
+          const dmgSpec = parseDiceSpec(damageValue);
+          const dmgSides = dmgSpec.hasDie ? dmgSpec.sides : 6;
+          if (!(d >= 1 && d <= dmgSides)) {
+            errors.push(`Damage roll #${idx} is not a valid D${dmgSides} result (1-${dmgSides}).`);
             continue;
           }
-          mortalDamage += applyDamageMods(d);
+          mortalDamage += applyDamageMods(d + (dmgSpec.mod || 0));
         }
         log.push(`Dev Wounds damage: variable. Sum after mods = ${mortalDamage}`);
       }
 
       for (let i = 0; i < failedSavesEffective; i++) {
         const d = damageDice[idx++];
-        if (!(d >= 1 && d <= 6)) {
-          errors.push(`Damage roll #${idx} is not a valid D6 result (1-6).`);
+        const dmgSpec2 = parseDiceSpec(damageValue);
+        const dmgSides2 = dmgSpec2.hasDie ? dmgSpec2.sides : 6;
+        if (!(d >= 1 && d <= dmgSides2)) {
+          errors.push(`Damage roll #${idx} is not a valid D${dmgSides2} result (1-${dmgSides2}).`);
           continue;
         }
-        normalDamage += applyDamageMods(d);
+        normalDamage += applyDamageMods(d + (dmgSpec2.mod || 0));
       }
       if (failedSavesEffective > 0) log.push(`Damage: variable. Normal damage sum after mods = ${normalDamage}`);
     }
@@ -992,7 +1258,7 @@ export default function AttackCalculator() {
       return { title: "All that… for nothing.", emoji: "🫠🙂", note: null };
     }
     return null;
-  })();;
+  })();
 
   // Dice counters and inline error flags
   const hitEntered = parseDiceList(hitRollsText).length;
@@ -1043,7 +1309,7 @@ export default function AttackCalculator() {
   if (damageFixed) {
     if (!isNum(damageValue)) missingWeapon.push("Damage");
   } else {
-    if (damageRolls.trim() === "") missingWeapon.push("Damage rolls");
+    if (!parseDiceSpec(damageValue).hasDie && damageValue.trim() === "") missingWeapon.push("Damage expression");
   }
 
   const missingTarget = [];
@@ -1074,24 +1340,24 @@ export default function AttackCalculator() {
   const viz = damageViz(shownTotalPostFnp);
   const ignoredTotal = shownIgnoredTotal;
 
-	const dmgTotalNum = Number(shownTotalPostFnp || 0);
-	const dmgTierBorder =
-	  dmgTotalNum >= 15
-	    ? "border-fuchsia-400/40"
-	    : dmgTotalNum >= 10
-	      ? "border-rose-400/40"
-	      : dmgTotalNum >= 6
-	        ? "border-amber-400/35"
-	        : dmgTotalNum >= 3
-	          ? "border-sky-400/35"
-	          : "border-emerald-400/35";
-	const dmgSubWrapClass =
-	  theme === "dark"
-	    ? `bg-slate-950/40 border ${dmgTierBorder} text-gray-100`
-	    : `${viz.container}`;
-	const dmgSubTileClass =
-	  theme === "dark" ? "bg-white/5 border-white/10" : "bg-white/70 border-gray-200";
-	const dmgSubLabelClass = theme === "dark" ? "text-gray-300" : "text-gray-600";
+  const dmgTotalNum = Number(shownTotalPostFnp || 0);
+  const dmgTierBorder =
+    dmgTotalNum >= 15
+      ? "border-fuchsia-400/40"
+      : dmgTotalNum >= 10
+        ? "border-rose-400/40"
+        : dmgTotalNum >= 6
+          ? "border-amber-400/35"
+          : dmgTotalNum >= 3
+            ? "border-sky-400/35"
+            : "border-emerald-400/35";
+  const dmgSubWrapClass =
+    theme === "dark"
+      ? `bg-slate-950/40 border ${dmgTierBorder} text-gray-100`
+      : `${viz.container}`;
+  const dmgSubTileClass =
+    theme === "dark" ? "bg-white/5 border-white/10" : "bg-white/70 border-gray-200";
+  const dmgSubLabelClass = theme === "dark" ? "text-gray-300" : "text-gray-600";
 
   const rawDmgStr = String(computed.totalPostFnp ?? "");
   const expandScientific = (s) => {
@@ -1178,8 +1444,8 @@ export default function AttackCalculator() {
     {
       name: "Rerolls (Hit/Wound)",
       what: "Allows rerolling certain hit or wound dice.",
-      how: "This build exposes reroll toggles in the Rerolls panel. Eligibility math is not wired yet.",
-      notes: "When wired, the tool will request reroll dice explicitly and enforce counts.",
+      how: "Enable in the Rerolls panel: reroll 1s or reroll all fails for hits and wounds. Twin-linked locks reroll failed wounds ON. The tool determines eligible dice from initial rolls and prompts for the exact reroll count.",
+      notes: "Reroll dice are entered separately in Manual dice entry after the initial rolls.",
     },
     {
       name: "Precision",
@@ -1201,14 +1467,6 @@ export default function AttackCalculator() {
 
 
 
-  const roadmapItems = [
-    { key: "Strict", note: "Option: suppress results until stats + dice are complete." },
-    { key: "Rerolls", note: "Support common rerolls (reroll 1s / reroll all) with correct sequencing." },
-    { key: "Export", note: "One-click snapshot (inputs + dice + step log)." },
-    { key: "Presets", note: "Save/load weapon and target presets." },
-    { key: "Wizard", note: "Guided step-by-step entry for tabletop use. Prompts only missing fields and dice in sequence." },
-    { key: "Multi-target", note: "Split one volley across multiple targets (declare allocation first)." },
-  ];
 
   const statusClass =
     status === "Ready"
@@ -1263,12 +1521,12 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
 
 
               <div className="max-w-screen-2xl mx-auto space-y-4 px-2 overflow-visible">
-	        <div className={`rounded-2xl ${viz.headerBg} shadow p-4 border border-gray-700 text-gray-100`}>
-	          <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-4 items-stretch">
-	            <div className="min-w-0">
-	              <div className="flex items-center gap-3 min-w-0 self-start">
+          <div className={`rounded-2xl ${viz.headerBg} shadow p-4 border border-gray-700 text-gray-100`}>
+            <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-4 items-stretch">
+              <div className="min-w-0">
+                <div className="flex items-center gap-3 min-w-0 self-start">
   <img
-    src="/dist/favicon-256.png"
+    src="/favicon-256.png"
     alt="NAPE"
     className="h-16 w-16 md:h-20 md:w-20 rounded-xl border border-gray-700 bg-gray-900/40 p-1 shrink-0"
   />
@@ -1276,24 +1534,24 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
     {APP_NAME}
   </div>
 </div>
-	              <div className="text-2xl md:text-3xl font-extrabold tracking-wide leading-tight mt-0.5">
-	                10th Edition
-	              </div>
+                <div className="text-2xl md:text-3xl font-extrabold tracking-wide leading-tight mt-0.5">
+                  10th Edition
+                </div>
               <div className={`text-sm uppercase tracking-widest ${viz.accentText} mt-1`}>Manual dice, rules-accurate sequencing</div>
                             <div className="mt-2">
                 <div className="text-sm text-gray-200 font-semibold">Table use</div>
                 <ul className="mt-1 text-xs text-gray-200 list-disc pl-5 space-y-1">
                   <li>Enter Weapon stats → Target stats → then dice (dice entry is last).</li>
-                  <li>If Attacks is random (D3/D6/2D6), roll Attacks first and enter those dice in “Attack rolls”.</li>
+                  <li>If Attacks is random (e.g. D6, 2D6, D6+1), enter the expression in the Attacks field. Roll your attack dice and enter the rolled values in “Attack rolls” — any +N modifier is added automatically.</li>
                   <li>Then roll Hit dice, then Wound dice, then Save dice, then FNP dice (if applicable).</li>
                   <li>Wound-roll pool auto-adjusts for Lethal Hits and Sustained Hits.</li>
                 </ul>
               </div>
             </div>
 
-	            {/* Status (centered between title and controls) */}
-	            <div className="flex flex-col justify-center">
-	              <div className={`w-full inline-flex items-center justify-center gap-3 rounded-2xl border px-6 py-4 text-xl ${statusClass}`}>
+              {/* Status (centered between title and controls) */}
+              <div className="flex flex-col justify-center">
+                <div className={`w-full inline-flex items-center justify-center gap-3 rounded-2xl border px-6 py-4 text-xl ${statusClass}`}>
                 <span className="text-3xl leading-none">{statusEmoji}</span>
                 <span className="font-extrabold tracking-wide">{status}</span>
               </div>
@@ -1309,17 +1567,36 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
               ) : null}
             </div>
 
-	          </div>
+            </div>
+
+            {/* Header action buttons */}
+            <div className="flex flex-wrap gap-2 mt-3">
+              <button
+                type="button"
+                className="rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-gray-950 px-4 py-2 text-sm font-extrabold border border-amber-400/40 transition flex items-center gap-2"
+                onClick={() => setShowWizard(true)}
+              >
+                🧙 Quick Wizard
+              </button>
+              <button
+                type="button"
+                className="rounded-lg bg-gray-900 text-gray-100 px-4 py-2 text-sm font-semibold border border-gray-700 hover:bg-gray-800 transition"
+                onClick={() => setShowDiceRef(true)}
+                title="Opens the dice sequencing reference."
+              >
+                🎲 Dice reference
+              </button>
+            </div>
 
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 overflow-visible">
           {/* LEFT: Inputs */}
-          <div className="lg:col-span-7 space-y-4">
+          <div className="lg:col-span-6 space-y-4">
             <Section theme={theme} title="Weapon">
               <Field
                 label="Attacks"
-                hint="Fixed: enter A. Random: uncheck Fixed, enter dice count N (e.g. 2 for 2D6), then enter the rolled results in Manual dice entry → Attack rolls."
+                hint="Fixed: enter A. Random: uncheck Fixed, enter a dice expression (e.g. D6+1, 2D6, D3+2), then enter the rolled dice in Manual dice entry → Attack rolls. The +N modifier is added automatically."
               >
                 <div className="flex flex-col md:flex-row md:items-center gap-2">
                   <label className="inline-flex items-center gap-2 text-sm text-gray-200 md:min-w-[160px]">
@@ -1336,19 +1613,25 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                     value={attacksValue}
                     onChange={(e) => {
                       const raw = e.target.value;
-                      // Random attacks are ND6 only. Accept integer N.
-                      // Fixed attacks also expects an integer.
-                      const cleaned = raw.replace(/[^0-9]/g, "");
-                      setAttacksValue(cleaned);
+                      if (attacksFixed) {
+                        // Fixed: integers only
+                        setAttacksValue(raw.replace(/[^0-9]/g, ""));
+                      } else {
+                        // Random: allow dice expressions like D6+1, 2D6, 2D3+2
+                        setAttacksValue(raw.replace(/[^0-9dD+]/g, "").toUpperCase());
+                      }
                     }}
                     inputMode="text"
-                    placeholder={attacksFixed ? "e.g. 6" : "e.g. 2 (means 2D6)"}
+                    placeholder={attacksFixed ? "e.g. 6" : "e.g. D6+1, 2D6, D3+2"}
                     className={`flex-1 rounded border p-2 text-lg font-semibold ${!isNum(attacksValue) ? "border-red-500 ring-2 ring-red-200" : ""}`}
                   />
                 </div>
 
                 <div className="mt-1 text-xs text-gray-300">
                   Computed attacks this volley: <span className="font-semibold">{computed.A}</span>
+                  {!attacksFixed && parseDiceSpec(attacksValue).mod > 0 ? (
+                    <span className="ml-2 text-gray-400">(dice sum + {parseDiceSpec(attacksValue).mod} modifier)</span>
+                  ) : null}
                 </div>
               </Field>
 
@@ -1359,25 +1642,58 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                 <Field label="Strength" hint="Weapon Strength characteristic.">
                   <input className={`w-full rounded border p-2 text-lg font-semibold ${!isNum(strength) ? "border-red-500 ring-2 ring-red-200" : ""}`} type="number" value={strength} onChange={(e) => setStrength(e.target.value)} placeholder="required" />
                 </Field>
-                <Field label="AP" hint="Use negative values, e.g. -1.">
-                  <input className={`w-full rounded border p-2 text-lg font-semibold ${!isNum(ap) ? "border-red-500 ring-2 ring-red-200" : ""}`} type="number" value={ap} onChange={(e) => setAp(e.target.value)} placeholder="required" />
+                <Field label="AP" hint="Always 0 or negative (e.g. -1, -2). Enter the number and it will auto-negate.">
+                  <input
+                    className={`w-full rounded border p-2 text-lg font-semibold ${!isNum(ap) ? "border-red-500 ring-2 ring-red-200" : ""}`}
+                    type="number"
+                    value={ap}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      if (raw === "" || raw === "-") { setAp(raw); return; }
+                      const n = parseFloat(raw);
+                      if (!isNaN(n)) setAp(String(Math.min(0, -Math.abs(n))));
+                    }}
+                    placeholder="e.g. -1"
+                  />
                 </Field>
 
-                <Field label="Damage" hint="Fixed or variable per failed save.">
-	                <div className="flex items-center gap-2 self-start">
-                    <label className="flex items-center gap-2 text-sm">
-                      <input type="checkbox" checked={damageFixed} onChange={(e) => setDamageFixed(e.target.checked)} />
-                      Fixed
-                    </label>
-                    {damageFixed ? (
-	                    <input className={`flex-1 rounded border p-2 text-lg font-semibold ${damageFixed && !isNum(damageValue) ? "border-red-500 ring-2 ring-red-200" : ""}`} type="number" value={damageValue} onChange={(e) => setDamageValue(e.target.value)} placeholder="required" />
-                    ) : (
-                      <input
-	                      className={`flex-1 rounded border p-2 text-lg font-semibold ${!damageFixed && damageRolls.trim() === "" ? "border-red-500 ring-2 ring-red-200" : ""}`}
-                        placeholder="Damage dice per failed save, e.g. 4 2 6"
-                        value={damageRolls}
-                        onChange={(e) => setDamageRolls(e.target.value)}
-                      />
+                <Field label="Damage" hint="Fixed: enter a number. Variable: enter a dice expression (e.g. D3, D6, D3+1), then roll one die per failed save and enter results.">
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center gap-2">
+                      <label className="flex items-center gap-2 text-sm">
+                        <input type="checkbox" checked={damageFixed} onChange={(e) => setDamageFixed(e.target.checked)} />
+                        Fixed
+                      </label>
+                      {damageFixed ? (
+                        <input className={`flex-1 rounded border p-2 text-lg font-semibold ${damageFixed && !isNum(damageValue) ? "border-red-500 ring-2 ring-red-200" : ""}`} type="number" value={damageValue} onChange={(e) => setDamageValue(e.target.value)} placeholder="required" />
+                      ) : (
+                        <input
+                          className={`flex-1 rounded border p-2 text-lg font-semibold`}
+                          placeholder="e.g. D3, D6, D3+1"
+                          value={damageValue}
+                          onChange={(e) => setDamageValue(e.target.value.replace(/[^0-9dD+]/g, "").toUpperCase())}
+                        />
+                      )}
+                    </div>
+                    {!damageFixed && (
+                      <div className="flex gap-2">
+                        <input
+                          className={`flex-1 rounded border p-2 text-lg font-semibold ${!damageFixed && damageRolls.trim() === "" ? "border-red-500 ring-2 ring-red-200" : ""}`}
+                          placeholder={`Roll 1 die per failed save${parseDiceSpec(damageValue).hasDie ? ` (${damageValue})` : ""}`}
+                          value={damageRolls}
+                          onChange={(e) => setDamageRolls(e.target.value)}
+                        />
+                        <button
+                          type="button"
+                          title="Roll damage dice"
+                          disabled={!parseDiceSpec(damageValue).hasDie || saveNeeded === 0}
+                          onClick={() => {
+                            const sp = parseDiceSpec(damageValue);
+                            if (sp.hasDie) setDamageRolls(rollDice(saveNeeded, sp.sides));
+                          }}
+                          className="rounded-lg bg-amber-500 hover:bg-amber-400 disabled:opacity-30 text-gray-950 px-3 font-bold text-lg transition"
+                        >🎲</button>
+                      </div>
                     )}
                   </div>
                 </Field>
@@ -1632,7 +1948,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
           </div>
 
           {/* RIGHT: Results - full height, sticky, scroll inside */}
-          <div className="lg:col-span-5 lg:sticky lg:top-0 self-start overflow-visible" style={{ height: "100vh" }}>
+          <div className="lg:col-span-6 lg:sticky lg:top-0 self-start overflow-visible" style={{ height: "100vh" }}>
             <div
               className={`rounded-2xl shadow-xl p-1 overflow-visible ${theme === "dark" ? "bg-gradient-to-br from-slate-950 via-gray-950 to-slate-900 border border-gray-700" : "bg-gradient-to-br from-amber-100 via-gray-50 to-red-100 border border-gray-300"}`}
               style={{ height: "100vh", overflowY: "auto", overflowX: "visible" }}
@@ -1642,26 +1958,32 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                               <Field
                                 label={
                                   <CounterLabel
-                                    prefix="Attack rolls"
+                                    prefix={`Attack rolls${parseDiceSpec(attacksValue).mod > 0 ? ` (+${parseDiceSpec(attacksValue).mod} added after)` : ""}`}
                                     need={parseDiceSpec(attacksValue).n}
                                     entered={parseDiceList(attacksRolls).length}
                                     remaining={Math.max(0, parseDiceSpec(attacksValue).n - parseDiceList(attacksRolls).length)}
                                     theme={theme}
                                   />
                                 }
-                                hint='Enter exactly N dice results when Attacks is random. Enter N results (the dice count).'
+                                hint='Enter exactly N dice results (the roll count). Any +N modifier in the expression is added to the total automatically.'
                                 theme={theme}
                               >
-                                <input
-                                  className={`w-full rounded border p-2 text-lg font-semibold ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100 placeholder:text-gray-500" : "bg-white border-gray-300 text-gray-900"} ${
-                                    parseDiceList(attacksRolls).length !== Math.max(0, parseInt(String(attacksValue || "0"), 10) || 0)
-                                      ? "border-red-500 ring-2 ring-red-200"
-                                      : ""
-                                  }`}
-                                  value={attacksRolls}
-                                  onChange={(e) => setAttacksRolls(e.target.value)}
-                                  placeholder='e.g. 4 6 (for 2D6)'
-                                />
+                                <div className="flex gap-2">
+                                  <input
+                                    className={`flex-1 rounded border p-2 text-lg font-semibold ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100 placeholder:text-gray-500" : "bg-white border-gray-300 text-gray-900"} ${
+                                      parseDiceList(attacksRolls).length !== parseDiceSpec(attacksValue).n
+                                        ? "border-red-500 ring-2 ring-red-200"
+                                        : ""
+                                    }`}
+                                    value={attacksRolls}
+                                    onChange={(e) => setAttacksRolls(e.target.value)}
+                                    placeholder='e.g. 3 5 (rolls only — +N modifier is auto-added)'
+                                  />
+                                  <button type="button" title="Roll for me"
+                                    disabled={parseDiceSpec(attacksValue).n === 0}
+                                    onClick={() => { const sp = parseDiceSpec(attacksValue); setAttacksRolls(rollDice(sp.n, sp.sides)); }}
+                                    className="rounded-lg bg-amber-500 hover:bg-amber-400 disabled:opacity-30 text-gray-950 px-3 font-bold text-lg transition">🎲</button>
+                                </div>
                               </Field>
                             ) : null}
 
@@ -1669,12 +1991,17 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                               label={<CounterLabel prefix="Hit rolls" need={hitNeeded} entered={hitEntered} remaining={hitNeeded - hitEntered} />}
                               hint="Enter exactly A hit dice unless TORRENT."
                             >
-                              <input
-                                className={`w-full rounded border p-2 text-lg font-semibold ${hasHitCountError ? "border-red-500 ring-2 ring-red-200" : ""}`}
-                                value={hitRollsText}
-                                onChange={(e) => setHitRollsText(e.target.value)}
-                                placeholder="e.g. 6 5 2 1 4 ..."
-                              />
+                              <div className="flex gap-2">
+                                <input
+                                  className={`flex-1 rounded border p-2 text-lg font-semibold ${hasHitCountError ? "border-red-500 ring-2 ring-red-200" : ""}`}
+                                  value={hitRollsText}
+                                  onChange={(e) => setHitRollsText(e.target.value)}
+                                  placeholder="e.g. 6 5 2 1 4 ..."
+                                />
+                                <button type="button" title="Roll for me" disabled={hitNeeded === 0}
+                                  onClick={() => setHitRollsText(rollDice(hitNeeded, 6))}
+                                  className="rounded-lg bg-amber-500 hover:bg-amber-400 disabled:opacity-30 text-gray-950 px-3 font-bold text-lg transition">🎲</button>
+                              </div>
                             </Field>
 
                             {(rerollHitOnes || rerollHitFails) ? (
@@ -1695,12 +2022,17 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                               label={<CounterLabel prefix="Wound rolls" need={woundNeeded} entered={woundEntered} remaining={woundNeeded - woundEntered} />}
                               hint={`Pool already accounts for Lethal and Sustained. Lethal auto-wounds this volley: ${computed.autoWoundsFromLethal}.`}
                             >
-                              <input
-                                className={`w-full rounded border p-2 text-lg font-semibold ${hasWoundCountError ? "border-red-500 ring-2 ring-red-200" : ""}`}
-                                value={woundRollsText}
-                                onChange={(e) => setWoundRollsText(e.target.value)}
-                                placeholder="e.g. 6 4 3 1 ..."
-                              />
+                              <div className="flex gap-2">
+                                <input
+                                  className={`flex-1 rounded border p-2 text-lg font-semibold ${hasWoundCountError ? "border-red-500 ring-2 ring-red-200" : ""}`}
+                                  value={woundRollsText}
+                                  onChange={(e) => setWoundRollsText(e.target.value)}
+                                  placeholder="e.g. 6 4 3 1 ..."
+                                />
+                                <button type="button" title="Roll for me" disabled={woundNeeded === 0}
+                                  onClick={() => setWoundRollsText(rollDice(woundNeeded, 6))}
+                                  className="rounded-lg bg-amber-500 hover:bg-amber-400 disabled:opacity-30 text-gray-950 px-3 font-bold text-lg transition">🎲</button>
+                              </div>
                             </Field>
 
                             {(rerollWoundOnes || rerollWoundFails || twinLinked) ? (
@@ -1721,12 +2053,17 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                               label={<CounterLabel prefix="Save rolls" need={saveNeeded} entered={saveEntered} remaining={saveNeeded - saveEntered} />}
                               hint="Roll saves only for savable wounds. Mortal wounds skip saves."
                             >
-                              <input
-                                className={`w-full rounded border p-2 text-lg font-semibold ${hasSaveCountError ? "border-red-500 ring-2 ring-red-200" : ""}`}
-                                value={saveRollsText}
-                                onChange={(e) => setSaveRollsText(e.target.value)}
-                                placeholder="e.g. 5 2 6 ..."
-                              />
+                              <div className="flex gap-2">
+                                <input
+                                  className={`flex-1 rounded border p-2 text-lg font-semibold ${hasSaveCountError ? "border-red-500 ring-2 ring-red-200" : ""}`}
+                                  value={saveRollsText}
+                                  onChange={(e) => setSaveRollsText(e.target.value)}
+                                  placeholder="e.g. 5 2 6 ..."
+                                />
+                                <button type="button" title="Roll for me" disabled={saveNeeded === 0}
+                                  onClick={() => setSaveRollsText(rollDice(saveNeeded, 6))}
+                                  className="rounded-lg bg-amber-500 hover:bg-amber-400 disabled:opacity-30 text-gray-950 px-3 font-bold text-lg transition">🎲</button>
+                              </div>
                             </Field>
 
                             {(fnpEnabled && fnp !== "") ? (
@@ -1734,12 +2071,17 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                                             label={<CounterLabel prefix="FNP rolls" need={fnpNeeded} entered={fnpEntered} remaining={fnpNeeded - fnpEntered} />}
                                             hint="Only if FNP is enabled. One die per point of damage."
                                           >
-                                            <input
-                                              className={`w-full rounded border p-2 text-lg font-semibold ${hasFnpCountError ? "border-red-500 ring-2 ring-red-200" : ""}`}
-                                              value={fnpRollsText}
-                                              onChange={(e) => setFnpRollsText(e.target.value)}
-                                              placeholder="e.g. 1 5 6 2 ..."
-                                            />
+                                            <div className="flex gap-2">
+                                              <input
+                                                className={`flex-1 rounded border p-2 text-lg font-semibold ${hasFnpCountError ? "border-red-500 ring-2 ring-red-200" : ""}`}
+                                                value={fnpRollsText}
+                                                onChange={(e) => setFnpRollsText(e.target.value)}
+                                                placeholder="e.g. 1 5 6 2 ..."
+                                              />
+                                              <button type="button" title="Roll for me" disabled={fnpNeeded === 0}
+                                                onClick={() => setFnpRollsText(rollDice(fnpNeeded, 6))}
+                                                className="rounded-lg bg-amber-500 hover:bg-amber-400 disabled:opacity-30 text-gray-950 px-3 font-bold text-lg transition">🎲</button>
+                                            </div>
                                           </Field>
                             ) : null}
 
@@ -1776,38 +2118,38 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
 
                 
                 {/* Prominent total damage panel (full width) */}
-	                <div className={`mt-4 rounded-2xl border p-4 ${viz.totalPanel} relative overflow-visible inline-block w-max min-w-full`}>
-	                  {/* Backdrop state cue: soft = static tile, final = animated marquee */}
-	                  {statsReady ? (
-	                    diceReady ? (
-	                      <div className="absolute inset-0 pointer-events-none opacity-15 overflow-hidden rounded-2xl">
-	                        <div className="nape-marquee-row" style={{ animationDuration: "24s" }}>
-	                          {Array.from({ length: 28 }).map((_, i) => (
-	                            <span key={`m-${i}`}>{viz.emoji}</span>
-	                          ))}
-	                          {Array.from({ length: 28 }).map((_, i) => (
-	                            <span key={`m-dup-${i}`}>{viz.emoji}</span>
-	                          ))}
-	                        </div>
-	                        <div className="nape-marquee-row nape-marquee-reverse" style={{ animationDuration: "26s" }}>
-	                          {Array.from({ length: 28 }).map((_, i) => (
-	                            <span key={`mr-${i}`}>{viz.emoji}</span>
-	                          ))}
-	                          {Array.from({ length: 28 }).map((_, i) => (
-	                            <span key={`mr-dup-${i}`}>{viz.emoji}</span>
-	                          ))}
-	                        </div>
-	                      </div>
-	                    ) : (
-	                      <div className="absolute inset-0 pointer-events-none opacity-10 overflow-hidden rounded-2xl">
-	                        <div className="w-full h-full flex flex-wrap items-start content-start gap-6 text-5xl md:text-6xl leading-none select-none py-6">
-	                          {Array.from({ length: 40 }).map((_, i) => (
-	                            <span key={i}>{viz.emoji}</span>
-	                          ))}
-	                        </div>
-	                      </div>
-	                    )
-	                  ) : null}
+                  <div className={`mt-4 rounded-2xl border p-4 ${viz.totalPanel} relative overflow-visible inline-block w-max min-w-full`}>
+                    {/* Backdrop state cue: soft = static tile, final = animated marquee */}
+                    {statsReady ? (
+                      diceReady ? (
+                        <div className="absolute inset-0 pointer-events-none opacity-15 overflow-hidden rounded-2xl">
+                          <div className="nape-marquee-row" style={{ animationDuration: "24s" }}>
+                            {Array.from({ length: 28 }).map((_, i) => (
+                              <span key={`m-${i}`}>{viz.emoji}</span>
+                            ))}
+                            {Array.from({ length: 28 }).map((_, i) => (
+                              <span key={`m-dup-${i}`}>{viz.emoji}</span>
+                            ))}
+                          </div>
+                          <div className="nape-marquee-row nape-marquee-reverse" style={{ animationDuration: "26s" }}>
+                            {Array.from({ length: 28 }).map((_, i) => (
+                              <span key={`mr-${i}`}>{viz.emoji}</span>
+                            ))}
+                            {Array.from({ length: 28 }).map((_, i) => (
+                              <span key={`mr-dup-${i}`}>{viz.emoji}</span>
+                            ))}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="absolute inset-0 pointer-events-none opacity-10 overflow-hidden rounded-2xl">
+                          <div className="w-full h-full flex flex-wrap items-start content-start gap-6 text-5xl md:text-6xl leading-none select-none py-6">
+                            {Array.from({ length: 40 }).map((_, i) => (
+                              <span key={i}>{viz.emoji}</span>
+                            ))}
+                          </div>
+                        </div>
+                      )
+                    ) : null}
 
                   <div className="relative">
                   <div className="flex items-start justify-between gap-3">
@@ -1840,11 +2182,8 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                   </div>
                 </div>
 
-	              <div className={`mt-3 rounded-xl border p-3 ${theme === "dark" ? "border-gray-700 bg-gray-950/30" : "bg-white"}`}>
-                  
-
-                <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                  <div className="rounded-lg border p-2 bg-white">
+                <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
+                  <div className={`rounded-lg border p-2 ${theme === "dark" ? "bg-gray-900 border-gray-700 text-gray-100" : "bg-white border-gray-200 text-gray-900"}`}>
                     <div className="text-base font-extrabold">Attack math</div>
                     <div className="mt-1">{computed.A} attacks</div>
                     <div>Wound-roll pool: {computed.woundRollPool}</div>
@@ -1852,7 +2191,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                     <div>Save target: {computed.saveTarget}+ </div>
                   </div>
 
-                  <div className="rounded-lg border p-2 bg-white">
+                  <div className={`rounded-lg border p-2 ${theme === "dark" ? "bg-gray-900 border-gray-700 text-gray-100" : "bg-white border-gray-200 text-gray-900"}`}>
                     <div className="text-base font-extrabold">Crit branches</div>
                     <div className="mt-1">Crit hits: {computed.critHits}</div>
                     <div>Sustained extra hits: {computed.sustainedExtraHits}</div>
@@ -1860,7 +2199,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                     <div>Crit wounds: {computed.critWounds}</div>
                   </div>
 
-                  <div className="rounded-lg border p-2 bg-white">
+                  <div className={`rounded-lg border p-2 ${theme === "dark" ? "bg-gray-900 border-gray-700 text-gray-100" : "bg-white border-gray-200 text-gray-900"}`}>
                     <div className="text-base font-extrabold">Wounds and saves</div>
                     <div className="mt-1">Total wounds: {computed.totalWounds}</div>
                     <div>Dev Wounds conversions: {computed.mortalWoundAttacks}</div>
@@ -1868,61 +2207,55 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                     <div>Failed saves: {computed.failedSaves}</div>
                   </div>
 
-	                  <div className={`rounded-xl border p-3 ${dmgSubWrapClass}`}>
-	                    <div className="text-base font-extrabold flex items-center justify-between">
-	                      <span>Damage subtotals</span>
+                    <div className={`rounded-xl border p-3 ${dmgSubWrapClass}`}>
+                      <div className="text-base font-extrabold flex items-center justify-between">
+                        <span>Damage subtotals</span>
                       <span className="text-3xl leading-none">{viz.emoji}</span>
                     </div>
 
-	                        <div className="mt-2 grid grid-cols-2 gap-2">
-	                          <div className={`rounded-lg border p-2 ${dmgSubTileClass}`}>
-	                            <div className={`text-xs uppercase tracking-widest ${dmgSubLabelClass}`}>Normal</div>
-	                            <div className={`text-3xl font-extrabold ${theme === "dark" ? "text-white" : Number(shownNormalDamage || 0) >= 10 ? "text-gray-900" : "text-gray-900"}`}>{shownNormalDamage}</div>
-	                          </div>
-	                          <div className={`rounded-lg border p-2 ${dmgSubTileClass}`}>
-	                            <div className={`text-xs uppercase tracking-widest ${dmgSubLabelClass}`}>Mortal</div>
-	                            <div className={`text-3xl font-extrabold ${theme === "dark" ? "text-white" : "text-gray-900"}`}>{shownMortalDamage}</div>
-	                          </div>
-	                        </div>
+                          <div className="mt-2 grid grid-cols-2 gap-2">
+                            <div className={`rounded-lg border p-2 ${dmgSubTileClass}`}>
+                              <div className={`text-xs uppercase tracking-widest ${dmgSubLabelClass}`}>Normal</div>
+                              <div className={`text-3xl font-extrabold ${theme === "dark" ? "text-white" : Number(shownNormalDamage || 0) >= 10 ? "text-gray-900" : "text-gray-900"}`}>{shownNormalDamage}</div>
+                            </div>
+                            <div className={`rounded-lg border p-2 ${dmgSubTileClass}`}>
+                              <div className={`text-xs uppercase tracking-widest ${dmgSubLabelClass}`}>Mortal</div>
+                              <div className={`text-3xl font-extrabold ${theme === "dark" ? "text-white" : "text-gray-900"}`}>{shownMortalDamage}</div>
+                            </div>
+                          </div>
 
-	                        <div className="mt-3 grid grid-cols-2 gap-2">
-	                          <div className={`rounded-lg border p-2 ${dmgSubTileClass}`}>
-	                            <div className={`text-xs uppercase tracking-widest ${dmgSubLabelClass}`}>Pre-FNP</div>
-	                            <div className={`text-3xl font-extrabold ${theme === "dark" ? "text-white" : "text-gray-900"}`}>{shownTotalPreFnp}</div>
-	                          </div>
-	                          <div className={`rounded-lg border p-2 ${dmgSubTileClass}`}>
-	                            <div className={`text-xs uppercase tracking-widest ${dmgSubLabelClass}`}>Ignored</div>
-	                            <div className={`text-3xl font-extrabold ${theme === "dark" ? "text-white" : "text-gray-900"}`}>{ignoredTotal}</div>
+                          <div className="mt-3 grid grid-cols-2 gap-2">
+                            <div className={`rounded-lg border p-2 ${dmgSubTileClass}`}>
+                              <div className={`text-xs uppercase tracking-widest ${dmgSubLabelClass}`}>Pre-FNP</div>
+                              <div className={`text-3xl font-extrabold ${theme === "dark" ? "text-white" : "text-gray-900"}`}>{shownTotalPreFnp}</div>
+                            </div>
+                            <div className={`rounded-lg border p-2 ${dmgSubTileClass}`}>
+                              <div className={`text-xs uppercase tracking-widest ${dmgSubLabelClass}`}>Ignored</div>
+                              <div className={`text-3xl font-extrabold ${theme === "dark" ? "text-white" : "text-gray-900"}`}>{ignoredTotal}</div>
                             {computed.ignoredByRule ? (
-	                              <div className={`text-xs mt-0.5 ${theme === "dark" ? "text-gray-300" : "text-gray-700"}`}>incl. ignore-first-failed-save</div>
+                                <div className={`text-xs mt-0.5 ${theme === "dark" ? "text-gray-300" : "text-gray-700"}`}>incl. ignore-first-failed-save</div>
                             ) : null}
                           </div>
                         </div>
 
-                  </div>
                 </div>
 
-	                
                 <div className="mt-3">
                   <div className="space-y-2">
                     {/* Row 1: Load example + Clear all */}
                     <div className="grid grid-cols-2 gap-2">
                       <button
                         type="button"
-                        className="rounded-lg bg-gradient-to-r from-yellow-400/80 to-amber-400/80 text-gray-950 px-3 py-2 text-sm font-extrabold border border-yellow-200/40 hover:from-yellow-300/90 hover:to-amber-300/90"
+                        className="rounded-lg bg-gradient-to-r from-yellow-400/80 to-amber-400/80 text-gray-950 px-3 py-2 text-sm font-extrabold border border-yellow-200/40 hover:from-yellow-300/90 hover:to-amber-300/90 w-full"
                         onClick={loadExample}
                         title="Fill all fields with a known working example"
                       >
                         Load example
                       </button>
-
                       <button
                         type="button"
-                        className="rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font-semibold border border-gray-700 hover:bg-gray-800"
-                        onClick={() => {
-                          handleClearAllEaster();
-                          clearAll();
-                        }}
+                        className="rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font-semibold border border-gray-700 hover:bg-gray-800 w-full"
+                        onClick={() => { handleClearAllEaster(); clearAll(); }}
                       >
                         Clear all
                       </button>
@@ -1932,108 +2265,67 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                     <div className="grid grid-cols-3 gap-2">
                       <button
                         type="button"
-                        className="rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font-semibold border border-gray-700 hover:bg-gray-800"
+                        className="rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font-semibold border border-gray-700 hover:bg-gray-800 w-full"
                         onClick={clearWeapon}
                       >
                         Clear weapon
                       </button>
-
                       <button
                         type="button"
-                        className="rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font-semibold border border-gray-700 hover:bg-gray-800"
+                        className="rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font-semibold border border-gray-700 hover:bg-gray-800 w-full"
                         onClick={clearTarget}
                       >
                         Clear target
                       </button>
-
-                      <button type="button" className={ctlBtnClass} onClick={() => clearDice()}>
+                      <button type="button" className="rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font-semibold border border-gray-700 hover:bg-gray-800 w-full" onClick={() => clearDice()}>
                         Clear dice
                       </button>
                     </div>
 
-                    {/* Row 3: Preserve hooks + Strict mode */}
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        className={`rounded-lg px-3 py-2 text-sm font-extrabold border ${
-                          preserveHooks
-                            ? "bg-gradient-to-r from-sky-500/80 to-indigo-500/80 text-white border-sky-200/30 hover:from-sky-400/90 hover:to-indigo-400/90"
-                            : "bg-gray-900 text-gray-100 border-gray-700 hover:bg-gray-800"
-                        }`}
-                        onClick={() => setPreserveHooks((v) => !v)}
-                        title="When enabled, Clear actions keep persistent toggle/option hooks."
-                      >
-                        Preserve hooks: {preserveHooks ? "ON" : "OFF"}
-                      </button>
 
-                      <button
-                        type="button"
-                        className={`rounded-lg px-3 py-2 text-sm font-extrabold border ${
-                          strictMode
-                            ? "bg-gradient-to-r from-red-500/80 to-rose-500/80 text-white border-red-200/30 hover:from-red-400/90 hover:to-rose-400/90"
-                            : "bg-gray-900 text-gray-100 border-gray-700 hover:bg-gray-800"
-                        }`}
-                        onClick={() => setStrictMode((v) => !v)}
-                        title="When enabled, totals are locked until stats + dice are complete (no soft totals)."
-                      >
-                        Strict mode: {strictMode ? "ON" : "OFF"}
-                      </button>
-                    </div>
 
-                    {/* Row 4: Dice sequencing reference (modal) */}
-                    <div className="grid grid-cols-1">
-                      <button
-                        type="button"
-                        className="rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font-semibold border border-gray-700 hover:bg-gray-800 text-center"
-                        onClick={() => setShowDiceRef(true)}
-                        title="Opens the dice sequencing reference."
-                      >
-                        Dice sequencing reference
-                      </button>
-                    </div>
                   </div>
                 </div>
 
-	                <div className="flex items-center justify-between mb-2">
-                    <div className="text-sm font-semibold">Step-by-step log</div>
-                    <button
-                      type="button"
-                      className={mainToggleBtnClass}
-                      onClick={() => setShowLog((v) => !v)}
-                    >
-                      {showLog ? "Hide log" : "Show log"}
-                    </button>
-                  </div>
-
-                  {showLog && (
-	                    <ol className={`text-sm leading-relaxed list-decimal pl-5 space-y-1 ${theme === "dark" ? "text-gray-100" : "text-gray-800"}`}>
-                      {computed.log.map((line, idx) => (
-                        <li key={idx}>{line}</li>
-                      ))}
-                    </ol>
-                  )}
-
-
-                
                 </div>
+              </Section>
+
+              <Section theme={theme} title="Step-by-step log">
+                <div className="flex items-center justify-between mb-2">
+                  <div className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>Detailed resolution trace for this volley.</div>
+                  <button
+                    type="button"
+                    className={mainToggleBtnClass}
+                    onClick={() => setShowLog((v) => !v)}
+                  >
+                    {showLog ? "Hide log" : "Show log"}
+                  </button>
+                </div>
+                {showLog && (
+                  <ol className={`text-sm leading-relaxed list-decimal pl-5 space-y-1 ${theme === "dark" ? "text-gray-100" : "text-gray-800"}`}>
+                    {computed.log.map((line, idx) => (
+                      <li key={idx}>{line}</li>
+                    ))}
+                  </ol>
+                )}
               </Section>
             </div>
           </div>
 
         </div>
 
-	        <div className="rounded-2xl bg-gray-900/40 border border-gray-700 text-gray-100 p-4">
-	          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-	            <div className="text-center md:text-left">
-	              <div className="text-sm font-semibold">Reference and accuracy</div>
-	              <div className="text-xs text-gray-300">
-	                Deterministic Combat Patrol-first rules interpretation. Rough accuracy: ~96–98% Combat Patrol, ~85–95% full 40k (varies by edge cases).
-	              </div>
-	            </div>
-	            <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+          <div className="rounded-2xl bg-gray-900/40 border border-gray-700 text-gray-100 p-4">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+              <div className="text-center md:text-left">
+                <div className="text-sm font-semibold">Reference and accuracy</div>
+                <div className="text-xs text-gray-300">
+                  Deterministic Combat Patrol-first rules interpretation. Rough accuracy: ~96–98% Combat Patrol, ~85–95% full 40k (varies by edge cases).
+                </div>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
               <button
                 type="button"
-	                className="rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font-semibold border border-gray-700 hover:bg-gray-800 w-full md:w-auto"
+                  className="rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font-semibold border border-gray-700 hover:bg-gray-800 w-full md:w-auto"
                 onClick={toggleTheme}
                 title="Toggle light/dark theme"
               >
@@ -2041,28 +2333,40 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
               </button>
               <button
                 type="button"
-	                className="rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font-semibold border border-gray-700 hover:bg-gray-800 w-full md:w-auto"
-                onClick={() => setShowRoadmap((v) => !v)}
+                className={`rounded-lg px-3 py-2 text-sm font-extrabold border w-full md:w-auto ${
+                  preserveHooks
+                    ? "bg-gradient-to-r from-sky-500/80 to-indigo-500/80 text-white border-sky-200/30 hover:from-sky-400/90 hover:to-indigo-400/90"
+                    : "bg-gray-900 text-gray-100 border-gray-700 hover:bg-gray-800"
+                }`}
+                onClick={() => setPreserveHooks((v) => !v)}
+                title="When enabled, Clear actions keep persistent toggle/option hooks."
               >
-                {showRoadmap ? "Hide roadmap" : "Show roadmap"}
+                Preserve hooks: {preserveHooks ? "ON" : "OFF"}
               </button>
               <button
                 type="button"
-	                className="rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font-semibold border border-gray-700 hover:bg-gray-800 w-full md:w-auto"
+                className={`rounded-lg px-3 py-2 text-sm font-extrabold border w-full md:w-auto ${
+                  strictMode
+                    ? "bg-gradient-to-r from-red-500/80 to-rose-500/80 text-white border-red-200/30 hover:from-red-400/90 hover:to-rose-400/90"
+                    : "bg-gray-900 text-gray-100 border-gray-700 hover:bg-gray-800"
+                }`}
+                onClick={() => setStrictMode((v) => !v)}
+                title="When enabled, totals are locked until stats + dice are complete (no soft totals)."
+              >
+                Strict mode: {strictMode ? "ON" : "OFF"}
+              </button>
+
+              <button
+                type="button"
+                  className="rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font-semibold border border-gray-700 hover:bg-gray-800 w-full md:w-auto"
                 onClick={() => setShowLimitations((v) => !v)}
               >
                 {showLimitations ? "Hide limitations" : "Show limitations"}
               </button>
-	              <button
-	                type="button"
-	                className="rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font-semibold border border-gray-700 hover:bg-gray-800 w-full md:w-auto"
-	                onClick={() => setShowAiDisclaimer((v) => !v)}
-	              >
-	                {showAiDisclaimer ? "Hide AI disclaimer" : "AI disclaimer"}
-	              </button>
+
               <button
                 type="button"
-	                className="rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font-semibold border border-gray-700 hover:bg-gray-800 w-full md:w-auto"
+                  className="rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font-semibold border border-gray-700 hover:bg-gray-800 w-full md:w-auto"
                 onClick={() => setShowCheatSheet((v) => !v)}
               >
                 {showCheatSheet ? "Hide cheat sheet" : "Show cheat sheet"}
@@ -2070,9 +2374,9 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
             </div>
           </div>
 
-	          <div className="mt-3 flex flex-wrap items-center justify-center md:justify-start gap-2">
-	            <Chip>~96–98% Combat Patrol</Chip>
-	            <Chip>~85–95% full 40k</Chip>
+            <div className="mt-3 flex flex-wrap items-center justify-center md:justify-start gap-2">
+              <Chip>~96–98% Combat Patrol</Chip>
+              <Chip>~85–95% full 40k</Chip>
             <Chip>Manual rolls</Chip>
             <Chip>Crit thresholds</Chip>
             <Chip>Lethal Hits</Chip>
@@ -2086,20 +2390,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
             <Chip>Half Damage</Chip>
           </div>
 
-          {showRoadmap && (
-            <div className="mt-4 rounded-xl border border-gray-700 bg-gray-950/30 p-3">
-              <div className="text-sm font-semibold">Roadmap</div>
-              <div className="text-xs text-gray-300">3–5 targets. Hover a chip for the note.</div>
 
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                {roadmapItems.map((item) => (
-                  <span key={item.key} title={item.note}>
-                    <Chip>{item.key}</Chip>
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
 
           {showLimitations && (
             <div className="mt-4 rounded-xl border border-gray-700 bg-gray-950/30 p-3">
@@ -2113,15 +2404,18 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                   <ul className="mt-2 list-disc pl-5 text-gray-200 space-y-1">
                     <li>Manual dice entry with step-by-step log</li>
                     <li>Hit, wound, save, FNP sequencing</li>
-                    <li>Crit thresholds, Sustained, Lethal, Dev Wounds, Precision hook</li>
+                    <li>Crit thresholds, Sustained Hits, Lethal Hits, Devastating Wounds, Precision hook</li>
+                    <li>Rerolls: reroll 1s and reroll fails for both hit and wound rolls; Twin-linked</li>
+                    <li>Rapid Fire X (half-range bonus attacks)</li>
+                    <li>Variable attacks: fixed integer or dice expression (e.g. D6+1, 2D6, D3+2)</li>
                     <li>Cover (+1 save), Ignore AP</li>
                     <li>Ignore first failed save, Half damage (round up), -1 Damage (min 1)</li>
+                    <li>Step-by-step Wizard with auto-roll for quick table use</li>
                   </ul>
                 </div>
                 <div className="rounded-lg border border-gray-700 bg-gray-900/30 p-2">
                   <div className="text-xs uppercase tracking-widest text-gray-300">Not implemented</div>
                   <ul className="mt-2 list-disc pl-5 text-gray-200 space-y-1">
-                    <li>Rerolls (hit/wound) UI hooks exist but eligibility is not wired in this build</li>
                     <li>Multi-target allocation</li>
                     <li>Model-level damage caps and unit wound tracking</li>
                     <li>All full-40k edge-case keyword interactions</li>
@@ -2129,34 +2423,10 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                 </div>
               </div>
               <div className="mt-3 text-xs text-gray-300">
-                Notes: Cover here is a simple +1 save toggle (not range/terrain conditional). Damage-mod ordering used: half (round up) then -1 (min 1).
+                Notes: Cover is a simple +1 save toggle (not range/terrain conditional). AP is enforced as 0 or negative. Damage-mod ordering: half (round up) then -1 (min 1).
               </div>
             </div>
           )}
-
-	          {showAiDisclaimer && (
-	            <div className="mt-4 rounded-xl border border-gray-700 bg-gray-950/30 p-3">
-	              <div className="text-sm font-semibold">AI disclaimer and methodology</div>
-	              <div className="mt-1 text-xs text-gray-300">
-	                This tool uses a deterministic interpretation of 10th Edition / Combat Patrol attack sequencing. It does not replace official rules.
-	              </div>
-	              <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-	                <div className="rounded-lg border border-gray-700 bg-gray-900/30 p-2">
-	                  <div className="text-xs uppercase tracking-widest text-gray-300">Accuracy (rough)</div>
-	                  <ul className="mt-2 list-disc pl-5 text-gray-200 space-y-1">
-	                    <li>Combat Patrol: ~96–98% (± a few points depending on datasheet edge cases).</li>
-	                    <li>Full 40k: ~85–95% completeness (keyword interactions and exceptions vary by faction).</li>
-	                  </ul>
-	                </div>
-	                <div className="rounded-lg border border-gray-700 bg-gray-900/30 p-2">
-	                  <div className="text-xs uppercase tracking-widest text-gray-300">Development credit</div>
-	                  <div className="mt-2 text-gray-200">
-	                    Portions of this app were developed with assistance from OpenAI’s GPT-5.2 model. A human authored the project intent, verified behavior, debugged issues, refined UX, and added polish and easter eggs.
-	                  </div>
-	                </div>
-	              </div>
-	            </div>
-	          )}
 
           {showCheatSheet && (
             <div className="mt-4 rounded-xl border border-gray-700 bg-gray-950/30 p-3">
@@ -2182,15 +2452,42 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
 
 
 
-	          <div className="mt-6 text-center text-xs text-gray-400 space-y-1">
-	            <div className="flex items-center justify-center gap-3">
-  <img src="/dist/favicon-256.png" alt="NAPE" className="h-9 w-9 rounded-lg border border-gray-600 bg-gray-950/30 p-1" />
+            <div className="mt-6 text-center text-xs text-gray-400 space-y-1">
+              <div className="flex items-center justify-center gap-3">
+  <img src="/favicon-256.png" alt="NAPE" className="h-9 w-9 rounded-lg border border-gray-600 bg-gray-950/30 p-1" />
   <div className="font-semibold text-gray-300">{APP_NAME} · v{APP_VERSION}</div>
 </div>
-	            <div>Deterministic Combat Patrol-first rules interpretation. Manual dice entry. Not official rules.</div>
-	            <div>© {new Date().getFullYear()} Kyle. Warhammer 40,000 is a trademark of Games Workshop. Unofficial fan-made tool.</div>
-	            <div>AI credit: portions developed with assistance from OpenAI’s GPT-5.2 model.</div>
-	          </div>
+              <div>Deterministic Combat Patrol-first rules interpretation. Manual dice entry. Not official rules.</div>
+              <div>© {new Date().getFullYear()} Kyle. Warhammer 40,000 is a trademark of Games Workshop. Unofficial fan-made tool.</div>
+            </div>
+
+            {/* Wizard overlay */}
+            {showWizard && (
+              <WizardOverlay
+                theme={theme}
+                onClose={() => setShowWizard(false)}
+                attacksFixed={attacksFixed} setAttacksFixed={setAttacksFixed}
+                attacksValue={attacksValue} setAttacksValue={setAttacksValue}
+                attacksRolls={attacksRolls} setAttacksRolls={setAttacksRolls}
+                toHit={toHit} setToHit={setToHit}
+                strength={strength} setStrength={setStrength}
+                ap={ap} setAp={setAp}
+                damageFixed={damageFixed} setDamageFixed={setDamageFixed}
+                damageValue={damageValue} setDamageValue={setDamageValue}
+                toughness={toughness} setToughness={setToughness}
+                armorSave={armorSave} setArmorSave={setArmorSave}
+                hitRollsText={hitRollsText} setHitRollsText={setHitRollsText}
+                woundRollsText={woundRollsText} setWoundRollsText={setWoundRollsText}
+                saveRollsText={saveRollsText} setSaveRollsText={setSaveRollsText}
+                computed={computed}
+                hitNeeded={hitNeeded}
+                woundNeeded={woundNeeded}
+                saveNeeded={saveNeeded}
+                torrent={torrent}
+                fnp={fnp}
+                fnpEnabled={fnpEnabled}
+              />
+            )}
 
             {/* Dice sequencing reference modal */}
             {showDiceRef && (
@@ -2222,7 +2519,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                     </div>
                     <iframe
                       title="40k dice sequencing reference"
-                      src="/dist/40k_decoded_dice_sequence_v7_vertical_stack.html"
+                      src="/40k_decoded_dice_sequence_v7_vertical_stack.html"
                       className="w-full h-full flex-1 min-h-0 rounded-xl border border-gray-800 bg-black"
                     />
                   </div>
@@ -2230,29 +2527,29 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
               </div>
             )}
 
-	          <style>{`
-	            @keyframes napeMarquee {
-	              0% { transform: translateX(0); }
-	              100% { transform: translateX(-50%); }
-	            }
-	            .nape-marquee-row {
-	              display: flex;
-	              gap: 1.5rem;
-	              white-space: nowrap;
-	              font-size: 3.25rem;
-	              line-height: 1;
-	              padding: 1.25rem 1.25rem 0 1.25rem;
-	              animation: napeMarquee linear infinite;
-	              will-change: transform;
-	            }
-	            .nape-emoji-tile {display:flex; align-items:center; justify-content:center;}
+            <style>{`
+              @keyframes napeMarquee {
+                0% { transform: translateX(0); }
+                100% { transform: translateX(-50%); }
+              }
+              .nape-marquee-row {
+                display: flex;
+                gap: 1.5rem;
+                white-space: nowrap;
+                font-size: 3.25rem;
+                line-height: 1;
+                padding: 1.25rem 1.25rem 0 1.25rem;
+                animation: napeMarquee linear infinite;
+                will-change: transform;
+              }
+              .nape-emoji-tile {display:flex; align-items:center; justify-content:center;}
             .nape-emoji-tile-inner {font-size: 3.25rem; line-height:1.05; white-space: pre-wrap;}
             
             .nape-marquee-reverse {
-	              animation-direction: reverse;
-	              padding-top: 0.25rem;
-	            }
-	          `}</style>
+                animation-direction: reverse;
+                padding-top: 0.25rem;
+              }
+            `}</style>
         </div>
       </div>
       </div>
