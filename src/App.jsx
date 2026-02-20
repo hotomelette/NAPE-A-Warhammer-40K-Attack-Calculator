@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect, useRef } from "react";
 
 const APP_NAME = "NAPE – A Warhammer 40K Attack Calculator";
 const APP_VERSION = "5.12";
@@ -1247,6 +1247,13 @@ export default function AttackCalculator() {
     allocatePrecisionToLeader,
   ]);
 
+  // Freeze the last stable computed result during Roll All animation
+  // so the results panel doesn't thrash on every animation tick
+  const lastStableComputed = useRef(null);
+  const displayComputed = isRollingAll
+    ? (lastStableComputed.current || computed)
+    : (() => { lastStableComputed.current = computed; return computed; })();
+
   const easterEgg = (() => {
     const dmg = computed.totalPostFnp;
     const effort = computed.A; // attacks attempted (good proxy for "a lot of effort" in manual mode)
@@ -1269,10 +1276,10 @@ export default function AttackCalculator() {
   const saveEntered = parseDiceList(saveRollsText).length;
   const fnpEntered = parseDiceList(fnpRollsText).length;
 
-  const hitNeeded = torrent ? 0 : computed.A;
-  const woundNeeded = computed.woundRollPool;
-  const saveNeeded = computed.savableWounds;
-  const fnpNeeded = fnpEnabled && fnp !== "" ? computed.totalPreFnp : 0;
+  const hitNeeded = torrent ? 0 : displayComputed.A;
+  const woundNeeded = displayComputed.woundRollPool;
+  const saveNeeded = displayComputed.savableWounds;
+  const fnpNeeded = fnpEnabled && fnp !== "" ? displayComputed.totalPreFnp : 0;
 
   const hitRemaining = Math.max(0, hitNeeded - hitEntered);
   const woundRemaining = Math.max(0, woundNeeded - woundEntered);
@@ -1285,8 +1292,8 @@ export default function AttackCalculator() {
   const woundRerollEntered = parseDiceList(woundRerollRollsText).length;
 
   // Reroll eligibility is computed from the initial rolls in the memoized resolver.
-  const hitRerollNeeded = computed.hitRerollNeeded || 0;
-  const woundRerollNeeded = computed.woundRerollNeeded || 0;
+  const hitRerollNeeded = displayComputed.hitRerollNeeded || 0;
+  const woundRerollNeeded = displayComputed.woundRerollNeeded || 0;
   const hitRerollRemaining = Math.max(0, hitRerollNeeded - hitRerollEntered);
   const woundRerollRemaining = Math.max(0, woundRerollNeeded - woundRerollEntered);
 
@@ -1322,7 +1329,7 @@ export default function AttackCalculator() {
   const statsReady = missingWeapon.length === 0 && missingTarget.length === 0;
   const diceReady =
     statsReady &&
-    computed.errors.length === 0 &&
+    displayComputed.errors.length === 0 &&
     !hasHitCountError &&
     !hasWoundCountError &&
     !hasSaveCountError &&
@@ -1333,12 +1340,12 @@ export default function AttackCalculator() {
 
   const allowDamageTotals = !strictMode || diceReady;
 
-  const shownTotalPostFnp = allowDamageTotals ? (computed.totalPostFnp || 0) : 0;
-  const shownTotalPreFnp  = allowDamageTotals ? (computed.totalPreFnp  || 0) : 0;
-  const shownNormalDamage = allowDamageTotals ? (computed.normalDamage || 0) : 0;
-  const shownMortalDamage = allowDamageTotals ? (computed.mortalDamage || 0) : 0;
+  const shownTotalPostFnp = allowDamageTotals ? (displayComputed.totalPostFnp || 0) : 0;
+  const shownTotalPreFnp  = allowDamageTotals ? (displayComputed.totalPreFnp  || 0) : 0;
+  const shownNormalDamage = allowDamageTotals ? (displayComputed.normalDamage || 0) : 0;
+  const shownMortalDamage = allowDamageTotals ? (displayComputed.mortalDamage || 0) : 0;
   const shownIgnoredTotal =
-    allowDamageTotals ? ((computed.ignored || 0) + (computed.ignoredByRule || 0)) : 0;
+    allowDamageTotals ? ((displayComputed.ignored || 0) + (displayComputed.ignoredByRule || 0)) : 0;
 
   const viz = damageViz(shownTotalPostFnp);
   const ignoredTotal = shownIgnoredTotal;
@@ -1362,7 +1369,7 @@ export default function AttackCalculator() {
     theme === "dark" ? "bg-white/5 border-white/10" : "bg-white/70 border-gray-200";
   const dmgSubLabelClass = theme === "dark" ? "text-gray-300" : "text-gray-600";
 
-  const rawDmgStr = String(computed.totalPostFnp ?? "");
+  const rawDmgStr = String(displayComputed.totalPostFnp ?? "");
   const expandScientific = (s) => {
     // Expands simple positive scientific notation like "1.23e+6" into "1230000"
     // Intended for comedic large-number display. Does not change math.
@@ -1492,119 +1499,170 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
   // ── Roll All with slot-machine animation ──
   const [isRollingAll, setIsRollingAll] = useState(false);
 
-  const animateField = (setter, finalRolls, sides, delay) => {
-    return new Promise(resolve => {
-      setTimeout(() => {
-        const count = finalRolls.length;
-        if (count === 0) { resolve(); return; }
-        const duration = 600;
-        const interval = 60;
-        const steps = Math.floor(duration / interval);
-        let step = 0;
-        const ticker = setInterval(() => {
-          // Generate random-looking interim values
-          const fakeRolls = Array.from({ length: count }, () => Math.ceil(Math.random() * sides));
-          setter(fakeRolls.join(" "));
-          step++;
-          if (step >= steps) {
-            clearInterval(ticker);
-            setter(finalRolls.join(" "));
-            resolve();
-          }
-        }, interval);
-      }, delay);
-    });
-  };
-
   const rollAll = async () => {
     if (isRollingAll || !statsReady) return;
     setIsRollingAll(true);
 
-    // ── Step 1: Attack rolls (if random) ──
-    const attackSpec = parseDiceSpec(attacksValue);
-    let attackRollsFinal = [];
-    if (!attacksFixed && attackSpec.n > 0) {
-      attackRollsFinal = Array.from({ length: attackSpec.n }, () => Math.ceil(Math.random() * attackSpec.sides));
-      await animateField(setAttacksRolls, attackRollsFinal, attackSpec.sides, 0);
-      // small pause to let React recompute computed.A
-      await new Promise(r => setTimeout(r, 150));
-    }
-
-    // ── Step 2: Hit rolls ──
-    const hitCount = torrent ? 0 : computed.A;
-    let hitFinal = [];
-    if (hitCount > 0) {
-      hitFinal = Array.from({ length: hitCount }, () => Math.ceil(Math.random() * 6));
-      await animateField(setHitRollsText, hitFinal, 6, 0);
-      await new Promise(r => setTimeout(r, 150));
-    }
-
-    // We need to compute hit rerolls from the rolls we just made
-    // Parse hits to find reroll eligible dice
+    // Compute ALL values upfront synchronously from current state.
+    // Never rely on computed mid-animation — state updates are async
+    // and computed won't reflect new dice until React re-renders.
+    const attackSpecNow = parseDiceSpec(attacksValue);
     const toHitNum = Number(toHit);
-    let hitRerollFinal = [];
-    if (hitFinal.length > 0 && (rerollHitOnes || rerollHitFails)) {
-      const eligible = hitFinal.filter(d => rerollHitOnes ? d === 1 : d < toHitNum);
-      hitRerollFinal = eligible.map(() => Math.ceil(Math.random() * 6));
-      if (hitRerollFinal.length > 0) {
-        await animateField(setHitRerollRollsText, hitRerollFinal, 6, 0);
-        await new Promise(r => setTimeout(r, 150));
-      }
-    }
-
-    // ── Step 3: Wound rolls ──
-    // woundRollPool is computed from hits — use current computed value after hits settle
-    const woundCount = computed.woundRollPool;
-    let woundFinal = [];
-    if (woundCount > 0) {
-      woundFinal = Array.from({ length: woundCount }, () => Math.ceil(Math.random() * 6));
-      await animateField(setWoundRollsText, woundFinal, 6, 0);
-      await new Promise(r => setTimeout(r, 150));
-    }
-
-    // Wound rerolls
     const strengthNum = Number(strength);
     const toughnessNum = Number(toughness);
-    const woundTarget = strengthNum >= toughnessNum * 2 ? 2 : strengthNum > toughnessNum ? 3 : strengthNum === toughnessNum ? 4 : strengthNum * 2 <= toughnessNum ? 6 : 5;
-    let woundRerollFinal = [];
-    if (woundFinal.length > 0 && (rerollWoundOnes || rerollWoundFails || twinLinked)) {
-      const eligible = woundFinal.filter(d => (rerollWoundOnes || twinLinked) ? d === 1 : d < woundTarget);
-      woundRerollFinal = eligible.map(() => Math.ceil(Math.random() * 6));
-      if (woundRerollFinal.length > 0) {
-        await animateField(setWoundRerollRollsText, woundRerollFinal, 6, 0);
-        await new Promise(r => setTimeout(r, 150));
+    const armorSaveNum = Number(armorSave);
+    const apNum = Number(ap) || 0;
+    const critHitT = Number(critHitThreshold) || 6;
+    const critWoundT = Number(critWoundThreshold) || 6;
+
+    // Wound target
+    const woundTarget = strengthNum >= toughnessNum * 2 ? 2
+      : strengthNum > toughnessNum ? 3
+      : strengthNum === toughnessNum ? 4
+      : strengthNum * 2 <= toughnessNum ? 6 : 5;
+
+    // Save target (clamped 2–7; 7 = impossible)
+    const rawSave = armorSaveNum - apNum - (inCover ? 1 : 0);
+    const effectiveSave = ignoreAp ? armorSaveNum : rawSave;
+    const saveTarget = Math.min(7, Math.max(2, effectiveSave));
+
+    const animateField = (setter, finalRolls, sides) => new Promise(resolve => {
+      if (finalRolls.length === 0) { resolve(); return; }
+      const steps = 10;
+      let step = 0;
+      const ticker = setInterval(() => {
+        setter(Array.from({ length: finalRolls.length }, () => Math.ceil(Math.random() * sides)).join(" "));
+        step++;
+        if (step >= steps) {
+          clearInterval(ticker);
+          setter(finalRolls.join(" "));
+          resolve();
+        }
+      }, 60);
+    });
+
+    const pause = (ms) => new Promise(r => setTimeout(r, ms));
+
+    // ── Phase 1: Attacks (random) ──
+    let attacksTotal = attacksFixed ? (Number(attacksValue) || 0) : 0;
+    if (!attacksFixed && attackSpecNow.n > 0) {
+      const rolls = Array.from({ length: attackSpecNow.n }, () => Math.ceil(Math.random() * attackSpecNow.sides));
+      await animateField(setAttacksRolls, rolls, attackSpecNow.sides);
+      attacksTotal = rolls.reduce((s, d) => s + d, 0) + attackSpecNow.mod;
+      await pause(120);
+    }
+
+    if (attacksTotal <= 0) { setIsRollingAll(false); return; }
+
+    // ── Phase 2: Hit rolls ──
+    let normalHits = 0, critHits = 0, sustainedExtra = 0, lethalAutoWounds = 0;
+    let hitRolls = [];
+    if (!torrent) {
+      hitRolls = Array.from({ length: attacksTotal }, () => Math.ceil(Math.random() * 6));
+      await animateField(setHitRollsText, hitRolls, 6);
+
+      // Hit rerolls
+      let rerollable = [];
+      if (rerollHitOnes) rerollable = hitRolls.filter(d => d === 1);
+      else if (rerollHitFails) rerollable = hitRolls.filter(d => d < toHitNum);
+      if (rerollable.length > 0) {
+        const rerolled = Array.from({ length: rerollable.length }, () => Math.ceil(Math.random() * 6));
+        await pause(80);
+        await animateField(setHitRerollRollsText, rerolled, 6);
+        hitRolls = hitRolls.map(d => {
+          if ((rerollHitOnes && d === 1) || (rerollHitFails && d < toHitNum)) return rerolled.shift() ?? d;
+          return d;
+        });
+      }
+
+      for (const d of hitRolls) {
+        if (d >= critHitT) {
+          critHits++;
+          if (sustainedHits) sustainedExtra += Number(sustainedHitsX) || 1;
+          if (lethalHits) lethalAutoWounds++;
+          else normalHits++;
+        } else if (d >= toHitNum) {
+          normalHits++;
+        }
+      }
+      normalHits += sustainedExtra;
+    } else {
+      normalHits = attacksTotal;
+    }
+    await pause(120);
+
+    // ── Phase 3: Wound rolls ──
+    const woundPool = normalHits + (lethalHits ? 0 : 0); // lethalAutoWounds skip wounding
+    const woundRollCount = normalHits; // lethalAutoWounds already counted separately
+    let woundRolls = [];
+    let totalWounds = lethalAutoWounds, critWounds = 0, mortalWoundAttacks = 0;
+
+    if (woundRollCount > 0) {
+      woundRolls = Array.from({ length: woundRollCount }, () => Math.ceil(Math.random() * 6));
+      await animateField(setWoundRollsText, woundRolls, 6);
+
+      // Wound rerolls
+      let wrerollable = [];
+      if (twinLinked || rerollWoundOnes) wrerollable = woundRolls.filter(d => d === 1);
+      else if (rerollWoundFails) wrerollable = woundRolls.filter(d => d < woundTarget);
+      if (wrerollable.length > 0) {
+        const wrerolled = Array.from({ length: wrerollable.length }, () => Math.ceil(Math.random() * 6));
+        await pause(80);
+        await animateField(setWoundRerollRollsText, wrerolled, 6);
+        woundRolls = woundRolls.map(d => {
+          if ((twinLinked || rerollWoundOnes) && d === 1) return wrerolled.shift() ?? d;
+          if (rerollWoundFails && d < woundTarget) return wrerolled.shift() ?? d;
+          return d;
+        });
+      }
+
+      for (const d of woundRolls) {
+        if (d >= critWoundT) {
+          critWounds++;
+          if (devastatingWounds) mortalWoundAttacks++;
+          else totalWounds++;
+        } else if (d >= woundTarget) {
+          totalWounds++;
+        }
       }
     }
+    await pause(120);
 
-    // ── Step 4: Save rolls ──
-    const saveCount = computed.savableWounds;
-    let saveFinal = [];
-    if (saveCount > 0) {
-      saveFinal = Array.from({ length: saveCount }, () => Math.ceil(Math.random() * 6));
-      await animateField(setSaveRollsText, saveFinal, 6, 0);
-      await new Promise(r => setTimeout(r, 150));
+    // ── Phase 4: Save rolls ──
+    const savableWounds = totalWounds;
+    let failedSaves = 0;
+    let saveRolls = [];
+    if (savableWounds > 0) {
+      saveRolls = Array.from({ length: savableWounds }, () => Math.ceil(Math.random() * 6));
+      await animateField(setSaveRollsText, saveRolls, 6);
+      failedSaves = saveRolls.filter(d => d < saveTarget).length;
     }
+    await pause(120);
 
-    // ── Step 5: Variable damage ──
-    // failedSaves derived from saveFinal inline
-    if (!damageFixed && parseDiceSpec(damageValue).hasDie) {
-      const dmgSpec = parseDiceSpec(damageValue);
-      const saveTargetNum = computed.saveTarget;
-      const rawFailed = saveFinal.filter(d => d < saveTargetNum).length;
-      const effectiveFailed = Math.max(0, rawFailed - (ignoreFirstFailedSave ? 1 : 0));
-      const totalDmgDice = effectiveFailed + (devastatingWounds ? computed.mortalWoundAttacks : 0);
+    const failedSavesEffective = Math.max(0, failedSaves - (ignoreFirstFailedSave ? 1 : 0));
+
+    // ── Phase 5: Variable damage ──
+    const dmgSpec = parseDiceSpec(damageValue);
+    if (!damageFixed && dmgSpec.hasDie) {
+      const totalDmgDice = failedSavesEffective + mortalWoundAttacks;
       if (totalDmgDice > 0) {
-        const dmgFinal = Array.from({ length: totalDmgDice }, () => Math.ceil(Math.random() * dmgSpec.sides));
-        await animateField(setDamageRolls, dmgFinal, dmgSpec.sides, 0);
-        await new Promise(r => setTimeout(r, 150));
+        const dmgRolls = Array.from({ length: totalDmgDice }, () => Math.ceil(Math.random() * dmgSpec.sides));
+        await animateField(setDamageRolls, dmgRolls, dmgSpec.sides);
+        await pause(120);
       }
     }
 
-    // ── Step 6: FNP ──
-    const fnpCount = computed.totalPreFnp;
-    if (fnpEnabled && fnp !== "" && fnpCount > 0) {
-      const fnpFinal = Array.from({ length: fnpCount }, () => Math.ceil(Math.random() * 6));
-      await animateField(setFnpRollsText, fnpFinal, 6, 0);
+    // ── Phase 6: FNP ──
+    if (fnpEnabled && fnp !== "") {
+      // Approximate totalPreFnp from what we computed
+      const fixedD = damageFixed ? (Number(damageValue) || 0) : 0;
+      const approxDmg = damageFixed
+        ? (failedSavesEffective + mortalWoundAttacks) * fixedD
+        : 0; // variable damage FNP handled after damage rolls settle
+      if (approxDmg > 0) {
+        const fnpRolls = Array.from({ length: approxDmg }, () => Math.ceil(Math.random() * 6));
+        await animateField(setFnpRollsText, fnpRolls, 6);
+      }
     }
 
     setIsRollingAll(false);
@@ -1752,7 +1810,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                 </div>
 
                 <div className="mt-1 text-xs text-gray-300">
-                  Computed attacks this volley: <span className="font-semibold">{computed.A}</span>
+                  Computed attacks this volley: <span className="font-semibold">{displayComputed.A}</span>
                   {!attacksFixed && parseDiceSpec(attacksValue).mod > 0 ? (
                     <span className="ml-2 text-gray-400">(dice sum + {parseDiceSpec(attacksValue).mod} modifier)</span>
                   ) : null}
@@ -2064,7 +2122,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                     Allocate Precision-eligible attacks to leader
                   </label>
                 </div>
-                {computed.precisionNote ? <div className="text-xs text-gray-700 mt-1">{computed.precisionNote}</div> : null}
+                {displayComputed.precisionNote ? <div className="text-xs text-gray-700 mt-1">{displayComputed.precisionNote}</div> : null}
               </Field>
             </Section>
 
@@ -2082,7 +2140,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                                 type="button"
                                 onClick={rollAll}
                                 disabled={!statsReady || isRollingAll}
-                                title={statsReady ? "Roll all dice at once with animation" : "Enter weapon and target stats first"}
+                                title={statsReady ? "Roll all dice at once" : "Enter weapon and target stats first"}
                                 className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-extrabold border transition ${isRollingAll ? "bg-amber-600 border-amber-400 text-gray-950 animate-pulse cursor-wait" : statsReady ? "bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 border-amber-400/40 text-gray-950" : "bg-gray-800 border-gray-600 text-gray-500 cursor-not-allowed"}`}
                               >
                                 {isRollingAll ? "🎲 Rolling…" : "🎲 Roll all"}
@@ -2154,7 +2212,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
 
                             <Field
                               label={<CounterLabel prefix="Wound rolls" need={woundNeeded} entered={woundEntered} remaining={woundNeeded - woundEntered} />}
-                              hint={`Pool already accounts for Lethal and Sustained. Lethal auto-wounds this volley: ${computed.autoWoundsFromLethal}.`}
+                              hint={`Pool already accounts for Lethal and Sustained. Lethal auto-wounds this volley: ${displayComputed.autoWoundsFromLethal}.`}
                             >
                               <div className="flex gap-2">
                                 <input
@@ -2229,11 +2287,11 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                     <div className="text-xs">Fill the highlighted fields in Weapon and Target to get a valid preview.</div>
                     <div className="mt-2 text-xs">Missing: {[...missingWeapon, ...missingTarget].join(', ')}</div>
                   </div>
-                ) : computed.errors.length > 0 ? (
+                ) : displayComputed.errors.length > 0 ? (
                   <div className={`mt-3 rounded-xl border p-4 text-base ${theme === "dark" ? "border-red-600 bg-red-900/30 text-red-200" : "border-red-300 bg-red-50 text-red-800"}`}>
                     <div className="font-semibold mb-1">Input issues</div>
                     <ul className="list-disc pl-5 space-y-1">
-                      {computed.errors.map((e, idx) => (
+                      {displayComputed.errors.map((e, idx) => (
                         <li key={idx}>{e}</li>
                       ))}
                     </ul>
@@ -2319,26 +2377,26 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                 <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
                   <div className={`rounded-lg border p-2 ${theme === "dark" ? "bg-gray-900 border-gray-700 text-gray-100" : "bg-white border-gray-200 text-gray-900"}`}>
                     <div className="text-base font-extrabold">Attack math</div>
-                    <div className="mt-1">{computed.A} attacks</div>
-                    <div>Wound-roll pool: {computed.woundRollPool}</div>
-                    <div>Wound target: {computed.needed}+</div>
-                    <div>Save target: {computed.saveTarget}+ </div>
+                    <div className="mt-1">{displayComputed.A} attacks</div>
+                    <div>Wound-roll pool: {displayComputed.woundRollPool}</div>
+                    <div>Wound target: {displayComputed.needed}+</div>
+                    <div>Save target: {displayComputed.saveTarget}+ </div>
                   </div>
 
                   <div className={`rounded-lg border p-2 ${theme === "dark" ? "bg-gray-900 border-gray-700 text-gray-100" : "bg-white border-gray-200 text-gray-900"}`}>
                     <div className="text-base font-extrabold">Crit branches</div>
-                    <div className="mt-1">Crit hits: {computed.critHits}</div>
-                    <div>Sustained extra hits: {computed.sustainedExtraHits}</div>
-                    <div>Lethal auto-wounds: {computed.autoWoundsFromLethal}</div>
-                    <div>Crit wounds: {computed.critWounds}</div>
+                    <div className="mt-1">Crit hits: {displayComputed.critHits}</div>
+                    <div>Sustained extra hits: {displayComputed.sustainedExtraHits}</div>
+                    <div>Lethal auto-wounds: {displayComputed.autoWoundsFromLethal}</div>
+                    <div>Crit wounds: {displayComputed.critWounds}</div>
                   </div>
 
                   <div className={`rounded-lg border p-2 ${theme === "dark" ? "bg-gray-900 border-gray-700 text-gray-100" : "bg-white border-gray-200 text-gray-900"}`}>
                     <div className="text-base font-extrabold">Wounds and saves</div>
-                    <div className="mt-1">Total wounds: {computed.totalWounds}</div>
-                    <div>Dev Wounds conversions: {computed.mortalWoundAttacks}</div>
-                    <div>Savable wounds: {computed.savableWounds}</div>
-                    <div>Failed saves: {computed.failedSaves}</div>
+                    <div className="mt-1">Total wounds: {displayComputed.totalWounds}</div>
+                    <div>Dev Wounds conversions: {displayComputed.mortalWoundAttacks}</div>
+                    <div>Savable wounds: {displayComputed.savableWounds}</div>
+                    <div>Failed saves: {displayComputed.failedSaves}</div>
                   </div>
 
                     <div className={`rounded-xl border p-3 ${dmgSubWrapClass}`}>
@@ -2366,7 +2424,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                             <div className={`rounded-lg border p-2 ${dmgSubTileClass}`}>
                               <div className={`text-xs uppercase tracking-widest ${dmgSubLabelClass}`}>Ignored</div>
                               <div className={`text-3xl font-extrabold ${theme === "dark" ? "text-white" : "text-gray-900"}`}>{ignoredTotal}</div>
-                            {computed.ignoredByRule ? (
+                            {displayComputed.ignoredByRule ? (
                                 <div className={`text-xs mt-0.5 ${theme === "dark" ? "text-gray-300" : "text-gray-700"}`}>incl. ignore-first-failed-save</div>
                             ) : null}
                           </div>
@@ -2437,7 +2495,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                 </div>
                 {showLog && (
                   <ol className={`text-sm leading-relaxed list-decimal pl-5 space-y-1 ${theme === "dark" ? "text-gray-100" : "text-gray-800"}`}>
-                    {computed.log.map((line, idx) => (
+                    {displayComputed.log.map((line, idx) => (
                       <li key={idx}>{line}</li>
                     ))}
                   </ol>
