@@ -79,7 +79,6 @@ function Section({ title, theme, children, action }) {
     theme === "dark"
       ? "text-xl md:text-2xl font-extrabold tracking-wide border-b border-gray-700 pb-2 mb-3"
       : "text-xl md:text-2xl font-extrabold tracking-wide border-b border-gray-200 pb-2 mb-3";
-
   return (
     <div className={panelClass}>
       <div className={`flex items-center justify-between gap-2 ${titleClass}`}>
@@ -526,6 +525,7 @@ export default function AttackCalculator() {
 
   // Results UI
   const [showLog, setShowLog] = useState(false);
+  const [isRollingAll, setIsRollingAll] = useState(false);
   const [showLimitations, setShowLimitations] = useState(false);
   const [showCheatSheet, setShowCheatSheet] = useState(false);
 
@@ -1496,16 +1496,10 @@ export default function AttackCalculator() {
   : "px-3 py-2 rounded-lg border border-gray-300 bg-white text-sm font-semibold text-gray-900 hover:bg-gray-50 hover:border-gray-400 transition";
 const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font-semibold border border-gray-700 hover:bg-gray-800";
 
-  // ── Roll All with slot-machine animation ──
-  const [isRollingAll, setIsRollingAll] = useState(false);
-
   const rollAll = async () => {
     if (isRollingAll || !statsReady) return;
     setIsRollingAll(true);
 
-    // Compute ALL values upfront synchronously from current state.
-    // Never rely on computed mid-animation — state updates are async
-    // and computed won't reflect new dice until React re-renders.
     const attackSpecNow = parseDiceSpec(attacksValue);
     const toHitNum = Number(toHit);
     const strengthNum = Number(strength);
@@ -1514,36 +1508,21 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
     const apNum = Number(ap) || 0;
     const critHitT = Number(critHitThreshold) || 6;
     const critWoundT = Number(critWoundThreshold) || 6;
-
-    // Wound target
-    const woundTarget = strengthNum >= toughnessNum * 2 ? 2
-      : strengthNum > toughnessNum ? 3
-      : strengthNum === toughnessNum ? 4
-      : strengthNum * 2 <= toughnessNum ? 6 : 5;
-
-    // Save target (clamped 2–7; 7 = impossible)
+    const woundTarget = strengthNum >= toughnessNum * 2 ? 2 : strengthNum > toughnessNum ? 3 : strengthNum === toughnessNum ? 4 : strengthNum * 2 <= toughnessNum ? 6 : 5;
     const rawSave = armorSaveNum - apNum - (inCover ? 1 : 0);
-    const effectiveSave = ignoreAp ? armorSaveNum : rawSave;
-    const saveTarget = Math.min(7, Math.max(2, effectiveSave));
+    const saveTarget = Math.min(7, Math.max(2, ignoreAp ? armorSaveNum : rawSave));
 
     const animateField = (setter, finalRolls, sides) => new Promise(resolve => {
       if (finalRolls.length === 0) { resolve(); return; }
-      const steps = 10;
       let step = 0;
       const ticker = setInterval(() => {
         setter(Array.from({ length: finalRolls.length }, () => Math.ceil(Math.random() * sides)).join(" "));
-        step++;
-        if (step >= steps) {
-          clearInterval(ticker);
-          setter(finalRolls.join(" "));
-          resolve();
-        }
+        if (++step >= 10) { clearInterval(ticker); setter(finalRolls.join(" ")); resolve(); }
       }, 60);
     });
-
     const pause = (ms) => new Promise(r => setTimeout(r, ms));
 
-    // ── Phase 1: Attacks (random) ──
+    // Phase 1: Attacks
     let attacksTotal = attacksFixed ? (Number(attacksValue) || 0) : 0;
     if (!attacksFixed && attackSpecNow.n > 0) {
       const rolls = Array.from({ length: attackSpecNow.n }, () => Math.ceil(Math.random() * attackSpecNow.sides));
@@ -1551,39 +1530,29 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
       attacksTotal = rolls.reduce((s, d) => s + d, 0) + attackSpecNow.mod;
       await pause(120);
     }
-
     if (attacksTotal <= 0) { setIsRollingAll(false); return; }
 
-    // ── Phase 2: Hit rolls ──
-    let normalHits = 0, critHits = 0, sustainedExtra = 0, lethalAutoWounds = 0;
-    let hitRolls = [];
+    // Phase 2: Hits
+    let hitRollsFinal = [];
+    let normalHits = 0, lethalAutoWounds = 0, sustainedExtra = 0;
     if (!torrent) {
-      hitRolls = Array.from({ length: attacksTotal }, () => Math.ceil(Math.random() * 6));
-      await animateField(setHitRollsText, hitRolls, 6);
-
+      hitRollsFinal = Array.from({ length: attacksTotal }, () => Math.ceil(Math.random() * 6));
+      await animateField(setHitRollsText, hitRollsFinal, 6);
       // Hit rerolls
-      let rerollable = [];
-      if (rerollHitOnes) rerollable = hitRolls.filter(d => d === 1);
-      else if (rerollHitFails) rerollable = hitRolls.filter(d => d < toHitNum);
-      if (rerollable.length > 0) {
-        const rerolled = Array.from({ length: rerollable.length }, () => Math.ceil(Math.random() * 6));
-        await pause(80);
-        await animateField(setHitRerollRollsText, rerolled, 6);
-        hitRolls = hitRolls.map(d => {
-          if ((rerollHitOnes && d === 1) || (rerollHitFails && d < toHitNum)) return rerolled.shift() ?? d;
-          return d;
-        });
-      }
-
-      for (const d of hitRolls) {
-        if (d >= critHitT) {
-          critHits++;
-          if (sustainedHits) sustainedExtra += Number(sustainedHitsX) || 1;
-          if (lethalHits) lethalAutoWounds++;
-          else normalHits++;
-        } else if (d >= toHitNum) {
-          normalHits++;
+      if (rerollHitOnes || rerollHitFails) {
+        const eligible = hitRollsFinal.filter(d => rerollHitOnes ? d === 1 : d < toHitNum);
+        if (eligible.length > 0) {
+          const rr = Array.from({ length: eligible.length }, () => Math.ceil(Math.random() * 6));
+          await pause(80); await animateField(setHitRerollRollsText, rr, 6);
+          let ri = 0;
+          hitRollsFinal = hitRollsFinal.map(d => ((rerollHitOnes && d === 1) || (rerollHitFails && d < toHitNum)) ? (rr[ri++] ?? d) : d);
         }
+      }
+      for (const d of hitRollsFinal) {
+        if (d >= critHitT) {
+          if (sustainedHits) sustainedExtra += Number(sustainedHitsX) || 1;
+          if (lethalHits) lethalAutoWounds++; else normalHits++;
+        } else if (d >= toHitNum) normalHits++;
       }
       normalHits += sustainedExtra;
     } else {
@@ -1591,78 +1560,60 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
     }
     await pause(120);
 
-    // ── Phase 3: Wound rolls ──
-    const woundPool = normalHits + (lethalHits ? 0 : 0); // lethalAutoWounds skip wounding
-    const woundRollCount = normalHits; // lethalAutoWounds already counted separately
-    let woundRolls = [];
-    let totalWounds = lethalAutoWounds, critWounds = 0, mortalWoundAttacks = 0;
-
-    if (woundRollCount > 0) {
-      woundRolls = Array.from({ length: woundRollCount }, () => Math.ceil(Math.random() * 6));
-      await animateField(setWoundRollsText, woundRolls, 6);
-
-      // Wound rerolls
-      let wrerollable = [];
-      if (twinLinked || rerollWoundOnes) wrerollable = woundRolls.filter(d => d === 1);
-      else if (rerollWoundFails) wrerollable = woundRolls.filter(d => d < woundTarget);
-      if (wrerollable.length > 0) {
-        const wrerolled = Array.from({ length: wrerollable.length }, () => Math.ceil(Math.random() * 6));
-        await pause(80);
-        await animateField(setWoundRerollRollsText, wrerolled, 6);
-        woundRolls = woundRolls.map(d => {
-          if ((twinLinked || rerollWoundOnes) && d === 1) return wrerolled.shift() ?? d;
-          if (rerollWoundFails && d < woundTarget) return wrerolled.shift() ?? d;
-          return d;
-        });
-      }
-
-      for (const d of woundRolls) {
-        if (d >= critWoundT) {
-          critWounds++;
-          if (devastatingWounds) mortalWoundAttacks++;
-          else totalWounds++;
-        } else if (d >= woundTarget) {
-          totalWounds++;
+    // Phase 3: Wounds
+    let woundRollsFinal = [];
+    let totalWounds = lethalAutoWounds, mortalWoundAttacks = 0;
+    if (normalHits > 0) {
+      woundRollsFinal = Array.from({ length: normalHits }, () => Math.ceil(Math.random() * 6));
+      await animateField(setWoundRollsText, woundRollsFinal, 6);
+      if (twinLinked || rerollWoundOnes || rerollWoundFails) {
+        const eligible = woundRollsFinal.filter(d => (twinLinked || rerollWoundOnes) ? d === 1 : d < woundTarget);
+        if (eligible.length > 0) {
+          const rr = Array.from({ length: eligible.length }, () => Math.ceil(Math.random() * 6));
+          await pause(80); await animateField(setWoundRerollRollsText, rr, 6);
+          let ri = 0;
+          woundRollsFinal = woundRollsFinal.map(d => ((twinLinked || rerollWoundOnes) && d === 1) || (rerollWoundFails && d < woundTarget) ? (rr[ri++] ?? d) : d);
         }
       }
+      for (const d of woundRollsFinal) {
+        if (d >= critWoundT) { if (devastatingWounds) mortalWoundAttacks++; else totalWounds++; }
+        else if (d >= woundTarget) totalWounds++;
+      }
     }
     await pause(120);
 
-    // ── Phase 4: Save rolls ──
-    const savableWounds = totalWounds;
+    // Phase 4: Saves
+    let saveRollsFinal = [];
     let failedSaves = 0;
-    let saveRolls = [];
-    if (savableWounds > 0) {
-      saveRolls = Array.from({ length: savableWounds }, () => Math.ceil(Math.random() * 6));
-      await animateField(setSaveRollsText, saveRolls, 6);
-      failedSaves = saveRolls.filter(d => d < saveTarget).length;
+    if (totalWounds > 0) {
+      saveRollsFinal = Array.from({ length: totalWounds }, () => Math.ceil(Math.random() * 6));
+      await animateField(setSaveRollsText, saveRollsFinal, 6);
+      failedSaves = saveRollsFinal.filter(d => d < saveTarget).length;
     }
     await pause(120);
 
-    const failedSavesEffective = Math.max(0, failedSaves - (ignoreFirstFailedSave ? 1 : 0));
+    const failedEffective = Math.max(0, failedSaves - (ignoreFirstFailedSave ? 1 : 0));
 
-    // ── Phase 5: Variable damage ──
+    // Phase 5: Variable damage
     const dmgSpec = parseDiceSpec(damageValue);
+    let totalDmg = 0;
     if (!damageFixed && dmgSpec.hasDie) {
-      const totalDmgDice = failedSavesEffective + mortalWoundAttacks;
+      const totalDmgDice = failedEffective + mortalWoundAttacks;
       if (totalDmgDice > 0) {
-        const dmgRolls = Array.from({ length: totalDmgDice }, () => Math.ceil(Math.random() * dmgSpec.sides));
-        await animateField(setDamageRolls, dmgRolls, dmgSpec.sides);
+        const rolls = Array.from({ length: totalDmgDice }, () => Math.ceil(Math.random() * dmgSpec.sides));
+        await animateField(setDamageRolls, rolls, dmgSpec.sides);
+        totalDmg = rolls.reduce((s, d) => s + d + dmgSpec.mod, 0);
         await pause(120);
       }
+    } else if (damageFixed) {
+      const d = Number(damageValue) || 0;
+      totalDmg = (failedEffective + mortalWoundAttacks) * d;
     }
 
-    // ── Phase 6: FNP ──
-    if (fnpEnabled && fnp !== "") {
-      // Approximate totalPreFnp from what we computed
-      const fixedD = damageFixed ? (Number(damageValue) || 0) : 0;
-      const approxDmg = damageFixed
-        ? (failedSavesEffective + mortalWoundAttacks) * fixedD
-        : 0; // variable damage FNP handled after damage rolls settle
-      if (approxDmg > 0) {
-        const fnpRolls = Array.from({ length: approxDmg }, () => Math.ceil(Math.random() * 6));
-        await animateField(setFnpRollsText, fnpRolls, 6);
-      }
+    // Phase 6: FNP
+    if (fnpEnabled && fnp !== "" && totalDmg > 0) {
+      const fnpRolls = Array.from({ length: totalDmg }, () => Math.ceil(Math.random() * 6));
+      await animateField(setFnpRollsText, fnpRolls, 6);
     }
 
     setIsRollingAll(false);
@@ -2136,13 +2087,9 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
               style={{ height: "100vh", overflowY: "auto", overflowX: "visible" }}
             >
                             <Section theme={theme} title="Manual dice entry" action={
-                              <button
-                                type="button"
-                                onClick={rollAll}
-                                disabled={!statsReady || isRollingAll}
+                              <button type="button" onClick={rollAll} disabled={!statsReady || isRollingAll}
                                 title={statsReady ? "Roll all dice at once" : "Enter weapon and target stats first"}
-                                className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-extrabold border transition ${isRollingAll ? "bg-amber-600 border-amber-400 text-gray-950 animate-pulse cursor-wait" : statsReady ? "bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 border-amber-400/40 text-gray-950" : "bg-gray-800 border-gray-600 text-gray-500 cursor-not-allowed"}`}
-                              >
+                                className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-extrabold border transition ${isRollingAll ? "bg-amber-600 border-amber-400 text-gray-950 animate-pulse cursor-wait" : statsReady ? "bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 border-amber-400/40 text-gray-950" : "bg-gray-800 border-gray-600 text-gray-500 cursor-not-allowed"}`}>
                                 {isRollingAll ? "🎲 Rolling…" : "🎲 Roll all"}
                               </button>
                             }>
