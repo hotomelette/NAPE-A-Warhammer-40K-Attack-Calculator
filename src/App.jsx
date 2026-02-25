@@ -10,6 +10,21 @@ const APP_VERSION = "5.12";
    Helpers — see calculatorUtils.js
 ========================= */
 
+function RollAllButton({ onClick, disabled, isRolling, isReady }) {
+  const cls = isRolling
+    ? "flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-extrabold border transition bg-amber-600 border-amber-400 text-gray-950 animate-pulse cursor-wait"
+    : isReady
+      ? "flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-extrabold border transition bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 border-amber-400/40 text-gray-950"
+      : "flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-extrabold border transition bg-transparent border-gray-500 text-gray-400 cursor-not-allowed opacity-60";
+  return (
+    <button type="button" onClick={onClick} disabled={disabled}
+      title={isReady ? "Roll all dice at once" : "Enter weapon and target stats first"}
+      className={cls}>
+      {isRolling ? "🎲 Rolling…" : "🎲 Roll all"}
+    </button>
+  );
+}
+
 function Section({ title, theme, children, action }) {
   const panelClass =
     theme === "dark"
@@ -852,12 +867,19 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
     const rawSave = armorSaveNum - apNum - (inCover ? 1 : 0);
     const saveTarget = Math.min(7, Math.max(2, ignoreAp ? armorSaveNum : rawSave));
 
+    // Use flushSync to force React to render each animation tick synchronously.
+    // Without this, React 18 batches all dispatch calls in async functions and
+    // only renders the final value — killing the slot-machine animation.
+    const { flushSync } = await import("react-dom");
+
     const animateField = (setter, finalRolls, sides) => new Promise(resolve => {
       if (finalRolls.length === 0) { resolve(); return; }
       let step = 0;
       const ticker = setInterval(() => {
-        setter(Array.from({ length: finalRolls.length }, () => Math.ceil(Math.random() * sides)).join(" "));
-        if (++step >= 10) { clearInterval(ticker); setter(finalRolls.join(" ")); resolve(); }
+        flushSync(() => {
+          setter(Array.from({ length: finalRolls.length }, () => Math.ceil(Math.random() * sides)).join(" "));
+        });
+        if (++step >= 10) { clearInterval(ticker); flushSync(() => setter(finalRolls.join(" "))); resolve(); }
       }, 60);
     });
     const pause = (ms) => new Promise(r => setTimeout(r, ms));
@@ -1426,11 +1448,12 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
               style={{ height: "100vh", overflowY: "auto", overflowX: "visible" }}
             >
                             <Section theme={theme} title="Manual dice entry" action={
-                              <button type="button" onClick={rollAll} disabled={!statsReady || isRollingAll}
-                                title={statsReady ? "Roll all dice at once" : "Enter weapon and target stats first"}
-                                className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-extrabold border transition ${isRollingAll ? "bg-amber-600 border-amber-400 text-gray-950 animate-pulse cursor-wait" : statsReady ? "bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 border-amber-400/40 text-gray-950" : "bg-gray-800 border-gray-600 text-gray-500 cursor-not-allowed"}`}>
-                                {isRollingAll ? "🎲 Rolling…" : "🎲 Roll all"}
-                              </button>
+                              <RollAllButton
+                                onClick={rollAll}
+                                disabled={!statsReady || isRollingAll}
+                                isRolling={isRollingAll}
+                                isReady={statsReady}
+                              />
                             }>
               {!attacksFixed ? (
                               <Field
