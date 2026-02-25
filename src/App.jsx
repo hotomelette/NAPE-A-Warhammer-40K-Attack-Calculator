@@ -581,6 +581,9 @@ export default function AttackCalculator() {
   const loadExample = () => dispatch({ type: "LOAD_EXAMPLE" });
 
 
+  // Transient animation state — declared early because displayComputed depends on it
+  const [isRollingAll, setIsRollingAll] = useState(false);
+
   const computed = useCalculator({
     attacksFixed, attacksValue, attacksRolls,
     rapidFire, rapidFireX, halfRange,
@@ -848,9 +851,7 @@ export default function AttackCalculator() {
   : "px-3 py-2 rounded-lg border border-gray-300 bg-white text-sm font-semibold text-gray-900 hover:bg-gray-50 hover:border-gray-400 transition";
 const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font-semibold border border-gray-700 hover:bg-gray-800";
 
-  // ── Roll All — transient animation state (not persisted, not part of reducer) ──
-  const [isRollingAll, setIsRollingAll] = useState(false);
-
+  // ── Roll All ──
   const rollAll = async () => {
     if (isRollingAll || !statsReady) return;
     setIsRollingAll(true);
