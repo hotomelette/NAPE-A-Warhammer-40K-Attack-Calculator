@@ -1,27 +1,30 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useReducer, useState, useEffect, useRef } from "react";
 import { useCalculator } from "./useCalculator.js";
 import { parseDiceList, parseDiceSpec, clampModPlusMinusOne, rollDice } from "./calculatorUtils.js";
+import { appReducer, initialState } from "./appReducer.js";
 
 const APP_NAME = "NAPE – A Warhammer 40K Attack Calculator";
 const APP_VERSION = "5.12";
 
 /* =========================
-   Helpers (see calculatorUtils.js)
+   Helpers — see calculatorUtils.js
 ========================= */
 
-function Section({ title, theme, children }) {
+function Section({ title, theme, children, action }) {
   const panelClass =
     theme === "dark"
       ? "rounded-2xl bg-slate-900 shadow p-4 border border-gray-700 text-gray-100"
       : "rounded-2xl bg-white shadow p-4 border border-gray-200 text-gray-900";
   const titleClass =
     theme === "dark"
-      ? "text-xl md:text-2xl font-extrabold tracking-wide mb-3 border-b border-gray-700 pb-2"
-      : "text-xl md:text-2xl font-extrabold tracking-wide mb-3 border-b border-gray-200 pb-2";
-
+      ? "text-xl md:text-2xl font-extrabold tracking-wide border-b border-gray-700 pb-2 mb-3"
+      : "text-xl md:text-2xl font-extrabold tracking-wide border-b border-gray-200 pb-2 mb-3";
   return (
     <div className={panelClass}>
-      <div className={titleClass}>{title}</div>
+      <div className={`flex items-center justify-between gap-2 ${titleClass}`}>
+        <span>{title}</span>
+        {action && <div className="shrink-0">{action}</div>}
+      </div>
       <div className="space-y-4">{children}</div>
     </div>
   );
@@ -188,7 +191,7 @@ function damageViz(total) {
 /* =========================
    Roll helpers
 ========================= */
-// rollDice — see calculatorUtils.js
+// rollDice — imported from calculatorUtils.js
 
 /* =========================
    WizardOverlay
@@ -436,284 +439,132 @@ function WizardOverlay({
 export default function AttackCalculator() {
 
   // Theme (dark default, manual toggle)
-  const [theme, setTheme] = useState(() => {
-    try {
-      return localStorage.getItem("theme") || "dark";
-    } catch {
-      return "dark";
-    }
-  });
+  // ─────────────────────────────────────────
+  // State — consolidated via useReducer
+  // ─────────────────────────────────────────
+  const [state, dispatch] = useReducer(appReducer, initialState);
+  const { weapon, target, dice, rerolls, ui, easter } = state;
 
-  useEffect(() => {
-    document.documentElement.dataset.theme = theme;
-    try {
-      localStorage.setItem("theme", theme);
-    } catch {}
-  }, [theme]);
+  // ── Destructure slices for direct use ──
+  const {
+    attacksFixed, attacksValue, attacksRolls,
+    toHit, strength, ap,
+    damageFixed, damageValue, damageRolls,
+    critHitThreshold, critWoundThreshold,
+    rapidFire, rapidFireX, halfRange,
+    torrent, lethalHits, sustainedHits, sustainedHitsN,
+    devastatingWounds, precision,
+    hitMod, woundMod,
+  } = weapon;
 
-  const toggleTheme = () => setTheme((t) => (t === "dark" ? "light" : "dark"));
+  const {
+    toughness, armorSave, invulnSave,
+    fnpEnabled, fnp,
+    inCover, ignoreAp,
+    ignoreFirstFailedSave, minusOneDamage, halfDamage,
+    saveMod,
+    hasLeaderAttached, allocatePrecisionToLeader,
+  } = target;
 
-  // Weapon
-  const [attacksFixed, setAttacksFixed] = useState(true);
-  const [attacksValue, setAttacksValue] = useState("");
-  const [attacksRolls, setAttacksRolls] = useState("");
+  const {
+    hitRollsText, woundRollsText, saveRollsText, fnpRollsText,
+    hitRerollRollsText, woundRerollRollsText,
+  } = dice;
 
-  // Results UI
-  const [showLog, setShowLog] = useState(false);
-  const [showLimitations, setShowLimitations] = useState(false);
-  const [showCheatSheet, setShowCheatSheet] = useState(false);
+  const {
+    rerollHitOnes, rerollHitFails,
+    rerollWoundOnes, rerollWoundFails,
+    twinLinked, showRerolls,
+  } = rerolls;
 
-  const [toHit, setToHit] = useState("");
-  const [strength, setStrength] = useState("");
-  const [ap, setAp] = useState("");
+  const {
+    theme, showLog, showLimitations, showCheatSheet,
+    showDiceRef, showWizard, strictMode, preserveHooks,
+  } = ui;
 
-  const [damageFixed, setDamageFixed] = useState(true);
-  const [damageValue, setDamageValue] = useState("");
-  const [damageRolls, setDamageRolls] = useState("");
+  const {
+    secretClicks, emperorToast, clearAllTapCount, lastClearAllTapMs,
+  } = easter;
 
-  // Target
-  const [toughness, setToughness] = useState("");
-  const [armorSave, setArmorSave] = useState("");
-  const [invulnSave, setInvulnSave] = useState("");
-  const [fnpEnabled, setFnpEnabled] = useState(false);
-  const [fnp, setFnp] = useState("");
+  // ── Dispatch shims — same API as before, zero JSX changes needed ──
+  // Weapon fields
+  const setAttacksFixed  = v => dispatch({ type: "SET_WEAPON_FIELD", field: "attacksFixed",  value: v });
+  const setAttacksValue  = v => dispatch({ type: "SET_WEAPON_FIELD", field: "attacksValue",  value: v });
+  const setAttacksRolls  = v => dispatch({ type: "SET_WEAPON_FIELD", field: "attacksRolls",  value: v });
+  const setToHit         = v => dispatch({ type: "SET_WEAPON_FIELD", field: "toHit",         value: v });
+  const setStrength      = v => dispatch({ type: "SET_WEAPON_FIELD", field: "strength",      value: v });
+  const setAp            = v => dispatch({ type: "SET_WEAPON_FIELD", field: "ap",            value: v });
+  const setDamageFixed   = v => dispatch({ type: "SET_WEAPON_FIELD", field: "damageFixed",   value: v });
+  const setDamageValue   = v => dispatch({ type: "SET_WEAPON_FIELD", field: "damageValue",   value: v });
+  const setDamageRolls   = v => dispatch({ type: "SET_WEAPON_FIELD", field: "damageRolls",   value: v });
+  const setCritHitThreshold   = v => dispatch({ type: "SET_WEAPON_FIELD", field: "critHitThreshold",   value: v });
+  const setCritWoundThreshold = v => dispatch({ type: "SET_WEAPON_FIELD", field: "critWoundThreshold", value: v });
+  const setRapidFire     = v => dispatch({ type: "SET_WEAPON_FIELD", field: "rapidFire",     value: v });
+  const setRapidFireX    = v => dispatch({ type: "SET_WEAPON_FIELD", field: "rapidFireX",    value: v });
+  const setHalfRange     = v => dispatch({ type: "SET_WEAPON_FIELD", field: "halfRange",     value: v });
+  const setTorrent       = v => dispatch({ type: "SET_WEAPON_FIELD", field: "torrent",       value: v });
+  const setLethalHits    = v => dispatch({ type: "SET_WEAPON_FIELD", field: "lethalHits",    value: v });
+  const setSustainedHits = v => dispatch({ type: "SET_WEAPON_FIELD", field: "sustainedHits", value: v });
+  const setSustainedHitsN= v => dispatch({ type: "SET_WEAPON_FIELD", field: "sustainedHitsN",value: v });
+  const setDevastatingWounds = v => dispatch({ type: "SET_WEAPON_FIELD", field: "devastatingWounds", value: v });
+  const setPrecision     = v => dispatch({ type: "SET_WEAPON_FIELD", field: "precision",     value: v });
+  const setHitMod        = v => dispatch({ type: "SET_WEAPON_FIELD", field: "hitMod",        value: v });
+  const setWoundMod      = v => dispatch({ type: "SET_WEAPON_FIELD", field: "woundMod",      value: v });
 
-  // Target defensive modifiers (Combat Patrol completeness)
-  const [inCover, setInCover] = useState(false);
-  const [ignoreAp, setIgnoreAp] = useState(false);
-  const [ignoreFirstFailedSave, setIgnoreFirstFailedSave] = useState(false);
-  const [minusOneDamage, setMinusOneDamage] = useState(false);
-  const [halfDamage, setHalfDamage] = useState(false);
+  // Target fields
+  const setToughness     = v => dispatch({ type: "SET_TARGET_FIELD", field: "toughness",     value: v });
+  const setArmorSave     = v => dispatch({ type: "SET_TARGET_FIELD", field: "armorSave",     value: v });
+  const setInvulnSave    = v => dispatch({ type: "SET_TARGET_FIELD", field: "invulnSave",    value: v });
+  const setFnpEnabled    = v => dispatch({ type: "SET_TARGET_FIELD", field: "fnpEnabled",    value: v });
+  const setFnp           = v => dispatch({ type: "SET_TARGET_FIELD", field: "fnp",           value: v });
+  const setInCover       = v => dispatch({ type: "SET_TARGET_FIELD", field: "inCover",       value: v });
+  const setIgnoreAp      = v => dispatch({ type: "SET_TARGET_FIELD", field: "ignoreAp",      value: v });
+  const setIgnoreFirstFailedSave = v => dispatch({ type: "SET_TARGET_FIELD", field: "ignoreFirstFailedSave", value: v });
+  const setMinusOneDamage= v => dispatch({ type: "SET_TARGET_FIELD", field: "minusOneDamage",value: v });
+  const setHalfDamage    = v => dispatch({ type: "SET_TARGET_FIELD", field: "halfDamage",    value: v });
+  const setSaveMod       = v => dispatch({ type: "SET_TARGET_FIELD", field: "saveMod",       value: v });
+  const setHasLeaderAttached         = v => dispatch({ type: "SET_TARGET_FIELD", field: "hasLeaderAttached",         value: v });
+  const setAllocatePrecisionToLeader = v => dispatch({ type: "SET_TARGET_FIELD", field: "allocatePrecisionToLeader", value: v });
 
-  // Modifiers (hooks)
-  const [hitMod, setHitMod] = useState(0);
-  const [woundMod, setWoundMod] = useState(0);
-  const [saveMod, setSaveMod] = useState(0);
+  // Dice fields
+  const setHitRollsText        = v => dispatch({ type: "SET_DICE_FIELD", field: "hitRollsText",        value: v });
+  const setWoundRollsText      = v => dispatch({ type: "SET_DICE_FIELD", field: "woundRollsText",      value: v });
+  const setSaveRollsText       = v => dispatch({ type: "SET_DICE_FIELD", field: "saveRollsText",       value: v });
+  const setFnpRollsText        = v => dispatch({ type: "SET_DICE_FIELD", field: "fnpRollsText",        value: v });
+  const setHitRerollRollsText  = v => dispatch({ type: "SET_DICE_FIELD", field: "hitRerollRollsText",  value: v });
+  const setWoundRerollRollsText= v => dispatch({ type: "SET_DICE_FIELD", field: "woundRerollRollsText",value: v });
 
-  // Keywords
-  const [torrent, setTorrent] = useState(false);
-  const [lethalHits, setLethalHits] = useState(false);
-  const [sustainedHits, setSustainedHits] = useState(false);
-  const [sustainedHitsN, setSustainedHitsN] = useState(1);
-  const [devastatingWounds, setDevastatingWounds] = useState(false);
-  const [precision, setPrecision] = useState(false);
+  // Reroll fields
+  const setRerollHitOnes   = v => dispatch({ type: "SET_REROLL_FIELD", field: "rerollHitOnes",   value: v });
+  const setRerollHitFails  = v => dispatch({ type: "SET_REROLL_FIELD", field: "rerollHitFails",  value: v });
+  const setRerollWoundOnes = v => dispatch({ type: "SET_REROLL_FIELD", field: "rerollWoundOnes", value: v });
+  const setRerollWoundFails= v => dispatch({ type: "SET_REROLL_FIELD", field: "rerollWoundFails",value: v });
+  const setTwinLinked      = v => dispatch({ type: "SET_REROLL_FIELD", field: "twinLinked",      value: v });
+  const setShowRerolls     = v => dispatch({ type: "SET_REROLL_FIELD", field: "showRerolls",     value: v });
 
-  // Rapid Fire
-  // Matches the rules: Rapid Fire X adds X attacks at half range.
-  // We keep an explicit toggle (like Sustained Hits) so the UI can mirror datasheets cleanly.
-  const [rapidFire, setRapidFire] = useState(false);
-  const [rapidFireX, setRapidFireX] = useState(0);
-  const [halfRange, setHalfRange] = useState(false);
+  // UI fields
+  const setShowLog         = v => dispatch({ type: "SET_UI_FIELD", field: "showLog",         value: v });
+  const setShowLimitations = v => dispatch({ type: "SET_UI_FIELD", field: "showLimitations", value: v });
+  const setShowCheatSheet  = v => dispatch({ type: "SET_UI_FIELD", field: "showCheatSheet",  value: v });
+  const setShowDiceRef     = v => dispatch({ type: "SET_UI_FIELD", field: "showDiceRef",     value: v });
+  const setShowWizard      = v => dispatch({ type: "SET_UI_FIELD", field: "showWizard",      value: v });
+  const setStrictMode      = v => dispatch({ type: "SET_UI_FIELD", field: "strictMode",      value: v });
+  const setPreserveHooks   = v => dispatch({ type: "SET_UI_FIELD", field: "preserveHooks",   value: v });
+  const toggleTheme        = () => dispatch({ type: "TOGGLE_THEME" });
 
-  const [critHitThreshold, setCritHitThreshold] = useState(6);
-  const [critWoundThreshold, setCritWoundThreshold] = useState(6);
+  // Easter egg fields
+  const setSecretClicks     = v => dispatch({ type: "SET_EASTER_FIELD", field: "secretClicks",     value: v });
+  const setEmperorToast     = v => dispatch({ type: "SET_EASTER_FIELD", field: "emperorToast",     value: v });
+  const setClearAllTapCount = v => dispatch({ type: "SET_EASTER_FIELD", field: "clearAllTapCount", value: v });
+  const setLastClearAllTapMs= v => dispatch({ type: "SET_EASTER_FIELD", field: "lastClearAllTapMs",value: v });
 
-  // Dice inputs
-  const [hitRollsText, setHitRollsText] = useState("");
-  const [woundRollsText, setWoundRollsText] = useState("");
-  const [saveRollsText, setSaveRollsText] = useState("");
-  const [fnpRollsText, setFnpRollsText] = useState("");
+  // ── Compound actions ──
+  const clearDice   = () => dispatch({ type: "CLEAR_DICE" });
+  const clearWeapon = () => dispatch({ type: "CLEAR_WEAPON" });
+  const clearTarget = () => dispatch({ type: "CLEAR_TARGET" });
+  const clearAll    = () => dispatch({ type: "CLEAR_ALL" });
+  const loadExample = () => dispatch({ type: "LOAD_EXAMPLE" });
 
-  // Rerolls (manual resolution UI placeholders; logic wiring pending)
-  const [showRerolls, setShowRerolls] = useState(true);
-
-  const [rerollHitOnes, setRerollHitOnes] = useState(false);
-  const [rerollHitFails, setRerollHitFails] = useState(false);
-  const [rerollWoundOnes, setRerollWoundOnes] = useState(false);
-  const [rerollWoundFails, setRerollWoundFails] = useState(false);
-  const [twinLinked, setTwinLinked] = useState(false);
-
-  const [hitRerollRollsText, setHitRerollRollsText] = useState("");
-  const [woundRerollRollsText, setWoundRerollRollsText] = useState("");
-
-  // Allocation hook (advisory only)
-  const [hasLeaderAttached, setHasLeaderAttached] = useState(false);
-  const [allocatePrecisionToLeader, setAllocatePrecisionToLeader] = useState(false);
-
-  // Clear behavior
-  const [preserveHooks, setPreserveHooks] = useState(false);
-
-  const [strictMode, setStrictMode] = useState(false);
-  const [showDiceRef, setShowDiceRef] = useState(false);
-
-  // Wizard
-  const [showWizard, setShowWizard] = useState(false);
-  const [wizardStep, setWizardStep] = useState(0);
-
-  useEffect(() => {
-    if (!showDiceRef) return;
-    const onKeyDown = (e) => {
-      if (e.key === "Escape") setShowDiceRef(false);
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [showDiceRef]);
-
-  // ===== Easter Eggs (visual only) =====
-  const [secretClicks, setSecretClicks] = useState(0);
-
-  const [emperorToast, setEmperorToast] = useState(false);
-  const [clearAllTapCount, setClearAllTapCount] = useState(0);
-  const [lastClearAllTapMs, setLastClearAllTapMs] = useState(0);
-
-  const triggerEmperorToast = () => {
-    setEmperorToast(true);
-    window.setTimeout(() => setEmperorToast(false), 5000);
-  };
-
-  const handleClearAllEaster = () => {
-    const now = Date.now();
-    const within = now - lastClearAllTapMs <= 1200;
-    const next = within ? clearAllTapCount + 1 : 1;
-    setLastClearAllTapMs(now);
-    setClearAllTapCount(next);
-    if (next >= 5) {
-      setClearAllTapCount(0);
-      setLastClearAllTapMs(0);
-      triggerEmperorToast();
-    }
-  };
-
-  function clearDice() {
-    if (!attacksFixed) setAttacksRolls("");
-    setHitRollsText("");
-    setWoundRollsText("");
-    setSaveRollsText("");
-    setFnpRollsText("");
-    if (!damageFixed) setDamageRolls("");
-  }
-
-  function clearWeapon() {
-    setAttacksFixed(true);
-    setAttacksValue("");
-    setAttacksRolls("");
-
-    setToHit("");
-    setStrength("");
-    setAp("");
-
-    setDamageFixed(true);
-    setDamageValue("");
-    setDamageRolls("");
-
-    if (!preserveHooks) {
-      setHitMod(0);
-      setWoundMod(0);
-    }
-
-    setTorrent(false);
-    setLethalHits(false);
-    setSustainedHits(false);
-    setSustainedHitsN(1);
-    setDevastatingWounds(false);
-    setPrecision(false);
-    setRapidFire(false);
-    setRapidFireX(0);
-    setHalfRange(false);
-
-    setCritHitThreshold(6);
-    setCritWoundThreshold(6);
-
-    if (!preserveHooks) {
-      setHasLeaderAttached(false);
-      setAllocatePrecisionToLeader(false);
-    }
-  }
-
-  function clearTarget() {
-    setToughness("");
-    setArmorSave("");
-    setInvulnSave("");
-    setFnp("");
-    if (!preserveHooks) setSaveMod(0);
-
-    setInCover(false);
-    setIgnoreAp(false);
-    setIgnoreFirstFailedSave(false);
-    setMinusOneDamage(false);
-    setHalfDamage(false);
-
-    if (!preserveHooks) {
-      setHasLeaderAttached(false);
-      setAllocatePrecisionToLeader(false);
-    }
-  }
-
-  function clearAll() {
-    if (!preserveHooks) {
-      clearWeapon();
-      clearTarget();
-      clearDice();
-      return;
-    }
-
-    // Preserve modifier hooks and precision allocation hooks.
-    const keep = {
-      hitMod,
-      woundMod,
-      saveMod,
-      hasLeaderAttached,
-      allocatePrecisionToLeader,
-    };
-
-    clearWeapon();
-    clearTarget();
-    clearDice();
-
-    setHitMod(keep.hitMod);
-    setWoundMod(keep.woundMod);
-    setSaveMod(keep.saveMod);
-    setHasLeaderAttached(keep.hasLeaderAttached);
-    setAllocatePrecisionToLeader(keep.allocatePrecisionToLeader);
-  }
-
-  function loadExample() {
-    // Example volley: 10 attacks, 3+ to hit, S5 AP-1 D2 into T4 3+.
-    setAttacksFixed(true);
-    setAttacksValue("10");
-    setAttacksRolls("");
-
-    setToHit("3");
-    setStrength("5");
-    setAp("-1");
-
-    setDamageFixed(true);
-    setDamageValue("2");
-    setDamageRolls("");
-
-    setToughness("4");
-    setArmorSave("3");
-    setInvulnSave("");
-    setFnp("");
-    if (!preserveHooks) {
-      setHitMod(0);
-      setWoundMod(0);
-      setSaveMod(0);
-    }
-
-    setTorrent(false);
-    setLethalHits(false);
-    setSustainedHits(false);
-    setSustainedHitsN(1);
-    setDevastatingWounds(false);
-    setPrecision(false);
-
-        setRapidFireX(0);
-    setHalfRange(false);
-
-
-    setCritHitThreshold(6);
-    setCritWoundThreshold(6);
-    if (!preserveHooks) {
-      setHasLeaderAttached(false);
-      setAllocatePrecisionToLeader(false);
-    }
-
-    setHitRollsText("6 5 5 4 4 3 2 2 1 6");
-    setWoundRollsText("6 5 4 3 2 1 6");
-    setSaveRollsText("1 2 4 5 6");
-    setFnpRollsText("");
-  }
 
   const computed = useCalculator({
     attacksFixed, attacksValue, attacksRolls,
@@ -734,9 +585,15 @@ export default function AttackCalculator() {
     hasLeaderAttached, allocatePrecisionToLeader,
   });
 
+  // Freeze display during Roll All animation to prevent UI thrash
+  const lastStableComputed = useRef(null);
+  const displayComputed = isRollingAll
+    ? (lastStableComputed.current || computed)
+    : (() => { lastStableComputed.current = computed; return computed; })();
+
   const easterEgg = (() => {
-    const dmg = computed.totalPostFnp;
-    const effort = computed.A; // attacks attempted (good proxy for "a lot of effort" in manual mode)
+    const dmg = displayComputed.totalPostFnp;
+    const effort = displayComputed.A; // attacks attempted (good proxy for "a lot of effort" in manual mode)
 
     if (dmg >= 9001) {
       return { title: "IT'S OVER 9000", emoji: "🐉⚡💥", note: null, style: "dbz" };
@@ -756,10 +613,10 @@ export default function AttackCalculator() {
   const saveEntered = parseDiceList(saveRollsText).length;
   const fnpEntered = parseDiceList(fnpRollsText).length;
 
-  const hitNeeded = torrent ? 0 : computed.A;
-  const woundNeeded = computed.woundRollPool;
-  const saveNeeded = computed.savableWounds;
-  const fnpNeeded = fnpEnabled && fnp !== "" ? computed.totalPreFnp : 0;
+  const hitNeeded = torrent ? 0 : displayComputed.A;
+  const woundNeeded = displayComputed.woundRollPool;
+  const saveNeeded = displayComputed.savableWounds;
+  const fnpNeeded = fnpEnabled && fnp !== "" ? displayComputed.totalPreFnp : 0;
 
   const hitRemaining = Math.max(0, hitNeeded - hitEntered);
   const woundRemaining = Math.max(0, woundNeeded - woundEntered);
@@ -772,8 +629,8 @@ export default function AttackCalculator() {
   const woundRerollEntered = parseDiceList(woundRerollRollsText).length;
 
   // Reroll eligibility is computed from the initial rolls in the memoized resolver.
-  const hitRerollNeeded = computed.hitRerollNeeded || 0;
-  const woundRerollNeeded = computed.woundRerollNeeded || 0;
+  const hitRerollNeeded = displayComputed.hitRerollNeeded || 0;
+  const woundRerollNeeded = displayComputed.woundRerollNeeded || 0;
   const hitRerollRemaining = Math.max(0, hitRerollNeeded - hitRerollEntered);
   const woundRerollRemaining = Math.max(0, woundRerollNeeded - woundRerollEntered);
 
@@ -809,7 +666,7 @@ export default function AttackCalculator() {
   const statsReady = missingWeapon.length === 0 && missingTarget.length === 0;
   const diceReady =
     statsReady &&
-    computed.errors.length === 0 &&
+    displayComputed.errors.length === 0 &&
     !hasHitCountError &&
     !hasWoundCountError &&
     !hasSaveCountError &&
@@ -820,12 +677,12 @@ export default function AttackCalculator() {
 
   const allowDamageTotals = !strictMode || diceReady;
 
-  const shownTotalPostFnp = allowDamageTotals ? (computed.totalPostFnp || 0) : 0;
-  const shownTotalPreFnp  = allowDamageTotals ? (computed.totalPreFnp  || 0) : 0;
-  const shownNormalDamage = allowDamageTotals ? (computed.normalDamage || 0) : 0;
-  const shownMortalDamage = allowDamageTotals ? (computed.mortalDamage || 0) : 0;
+  const shownTotalPostFnp = allowDamageTotals ? (displayComputed.totalPostFnp || 0) : 0;
+  const shownTotalPreFnp  = allowDamageTotals ? (displayComputed.totalPreFnp  || 0) : 0;
+  const shownNormalDamage = allowDamageTotals ? (displayComputed.normalDamage || 0) : 0;
+  const shownMortalDamage = allowDamageTotals ? (displayComputed.mortalDamage || 0) : 0;
   const shownIgnoredTotal =
-    allowDamageTotals ? ((computed.ignored || 0) + (computed.ignoredByRule || 0)) : 0;
+    allowDamageTotals ? ((displayComputed.ignored || 0) + (displayComputed.ignoredByRule || 0)) : 0;
 
   const viz = damageViz(shownTotalPostFnp);
   const ignoredTotal = shownIgnoredTotal;
@@ -849,7 +706,7 @@ export default function AttackCalculator() {
     theme === "dark" ? "bg-white/5 border-white/10" : "bg-white/70 border-gray-200";
   const dmgSubLabelClass = theme === "dark" ? "text-gray-300" : "text-gray-600";
 
-  const rawDmgStr = String(computed.totalPostFnp ?? "");
+  const rawDmgStr = String(displayComputed.totalPostFnp ?? "");
   const expandScientific = (s) => {
     // Expands simple positive scientific notation like "1.23e+6" into "1230000"
     // Intended for comedic large-number display. Does not change math.
@@ -975,6 +832,131 @@ export default function AttackCalculator() {
   ? "px-3 py-2 rounded-lg border border-gray-700 bg-gray-900/40 text-sm font-semibold text-gray-100 hover:bg-gray-900/60 hover:border-gray-500 transition"
   : "px-3 py-2 rounded-lg border border-gray-300 bg-white text-sm font-semibold text-gray-900 hover:bg-gray-50 hover:border-gray-400 transition";
 const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font-semibold border border-gray-700 hover:bg-gray-800";
+
+  // ── Roll All — transient animation state (not persisted, not part of reducer) ──
+  const [isRollingAll, setIsRollingAll] = useState(false);
+
+  const rollAll = async () => {
+    if (isRollingAll || !statsReady) return;
+    setIsRollingAll(true);
+
+    const attackSpecNow = parseDiceSpec(attacksValue);
+    const toHitNum = Number(toHit);
+    const strengthNum = Number(strength);
+    const toughnessNum = Number(toughness);
+    const armorSaveNum = Number(armorSave);
+    const apNum = Number(ap) || 0;
+    const critHitT = Number(critHitThreshold) || 6;
+    const critWoundT = Number(critWoundThreshold) || 6;
+    const woundTarget = strengthNum >= toughnessNum * 2 ? 2 : strengthNum > toughnessNum ? 3 : strengthNum === toughnessNum ? 4 : strengthNum * 2 <= toughnessNum ? 6 : 5;
+    const rawSave = armorSaveNum - apNum - (inCover ? 1 : 0);
+    const saveTarget = Math.min(7, Math.max(2, ignoreAp ? armorSaveNum : rawSave));
+
+    const animateField = (setter, finalRolls, sides) => new Promise(resolve => {
+      if (finalRolls.length === 0) { resolve(); return; }
+      let step = 0;
+      const ticker = setInterval(() => {
+        setter(Array.from({ length: finalRolls.length }, () => Math.ceil(Math.random() * sides)).join(" "));
+        if (++step >= 10) { clearInterval(ticker); setter(finalRolls.join(" ")); resolve(); }
+      }, 60);
+    });
+    const pause = (ms) => new Promise(r => setTimeout(r, ms));
+
+    // Phase 1: Attacks
+    let attacksTotal = attacksFixed ? (Number(attacksValue) || 0) : 0;
+    if (!attacksFixed && attackSpecNow.n > 0) {
+      const rolls = Array.from({ length: attackSpecNow.n }, () => Math.ceil(Math.random() * attackSpecNow.sides));
+      await animateField(setAttacksRolls, rolls, attackSpecNow.sides);
+      attacksTotal = rolls.reduce((s, d) => s + d, 0) + attackSpecNow.mod;
+      await pause(120);
+    }
+    if (attacksTotal <= 0) { setIsRollingAll(false); return; }
+
+    // Phase 2: Hits
+    let hitRollsFinal = [];
+    let normalHits = 0, lethalAutoWounds = 0, sustainedExtra = 0;
+    if (!torrent) {
+      hitRollsFinal = Array.from({ length: attacksTotal }, () => Math.ceil(Math.random() * 6));
+      await animateField(setHitRollsText, hitRollsFinal, 6);
+      if (rerollHitOnes || rerollHitFails) {
+        const eligible = hitRollsFinal.filter(d => rerollHitOnes ? d === 1 : d < toHitNum);
+        if (eligible.length > 0) {
+          const rr = Array.from({ length: eligible.length }, () => Math.ceil(Math.random() * 6));
+          await pause(80); await animateField(setHitRerollRollsText, rr, 6);
+          let ri = 0;
+          hitRollsFinal = hitRollsFinal.map(d => ((rerollHitOnes && d === 1) || (rerollHitFails && d < toHitNum)) ? (rr[ri++] ?? d) : d);
+        }
+      }
+      for (const d of hitRollsFinal) {
+        if (d >= critHitT) {
+          if (sustainedHits) sustainedExtra += Number(sustainedHitsN) || 1;
+          if (lethalHits) lethalAutoWounds++; else normalHits++;
+        } else if (d >= toHitNum) normalHits++;
+      }
+      normalHits += sustainedExtra;
+    } else {
+      normalHits = attacksTotal;
+    }
+    await pause(120);
+
+    // Phase 3: Wounds
+    let woundRollsFinal = [];
+    let totalWounds = lethalAutoWounds, mortalWoundAttacks = 0;
+    if (normalHits > 0) {
+      woundRollsFinal = Array.from({ length: normalHits }, () => Math.ceil(Math.random() * 6));
+      await animateField(setWoundRollsText, woundRollsFinal, 6);
+      if (twinLinked || rerollWoundOnes || rerollWoundFails) {
+        const eligible = woundRollsFinal.filter(d => (twinLinked || rerollWoundOnes) ? d === 1 : d < woundTarget);
+        if (eligible.length > 0) {
+          const rr = Array.from({ length: eligible.length }, () => Math.ceil(Math.random() * 6));
+          await pause(80); await animateField(setWoundRerollRollsText, rr, 6);
+          let ri = 0;
+          woundRollsFinal = woundRollsFinal.map(d => ((twinLinked || rerollWoundOnes) && d === 1) || (rerollWoundFails && d < woundTarget) ? (rr[ri++] ?? d) : d);
+        }
+      }
+      for (const d of woundRollsFinal) {
+        if (d >= critWoundT) { if (devastatingWounds) mortalWoundAttacks++; else totalWounds++; }
+        else if (d >= woundTarget) totalWounds++;
+      }
+    }
+    await pause(120);
+
+    // Phase 4: Saves
+    let saveRollsFinal = [];
+    let failedSaves = 0;
+    if (totalWounds > 0) {
+      saveRollsFinal = Array.from({ length: totalWounds }, () => Math.ceil(Math.random() * 6));
+      await animateField(setSaveRollsText, saveRollsFinal, 6);
+      failedSaves = saveRollsFinal.filter(d => d < saveTarget).length;
+    }
+    await pause(120);
+
+    const failedEffective = Math.max(0, failedSaves - (ignoreFirstFailedSave ? 1 : 0));
+
+    // Phase 5: Variable damage
+    const dmgSpec = parseDiceSpec(damageValue);
+    let totalDmg = 0;
+    if (!damageFixed && dmgSpec.hasDie) {
+      const totalDmgDice = failedEffective + mortalWoundAttacks;
+      if (totalDmgDice > 0) {
+        const rolls = Array.from({ length: totalDmgDice }, () => Math.ceil(Math.random() * dmgSpec.sides));
+        await animateField(setDamageRolls, rolls, dmgSpec.sides);
+        totalDmg = rolls.reduce((s, d) => s + d + dmgSpec.mod, 0);
+        await pause(120);
+      }
+    } else if (damageFixed) {
+      const d = Number(damageValue) || 0;
+      totalDmg = (failedEffective + mortalWoundAttacks) * d;
+    }
+
+    // Phase 6: FNP
+    if (fnpEnabled && fnp !== "" && totalDmg > 0) {
+      const fnpRolls = Array.from({ length: totalDmg }, () => Math.ceil(Math.random() * 6));
+      await animateField(setFnpRollsText, fnpRolls, 6);
+    }
+
+    setIsRollingAll(false);
+  };
 
   return (
     <div className={`min-h-screen ${viz.pageBg || "bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950"} p-4 relative overflow-hidden`}>
@@ -1118,7 +1100,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                 </div>
 
                 <div className="mt-1 text-xs text-gray-300">
-                  Computed attacks this volley: <span className="font-semibold">{computed.A}</span>
+                  Computed attacks this volley: <span className="font-semibold">{displayComputed.A}</span>
                   {!attacksFixed && parseDiceSpec(attacksValue).mod > 0 ? (
                     <span className="ml-2 text-gray-400">(dice sum + {parseDiceSpec(attacksValue).mod} modifier)</span>
                   ) : null}
@@ -1430,7 +1412,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                     Allocate Precision-eligible attacks to leader
                   </label>
                 </div>
-                {computed.precisionNote ? <div className="text-xs text-gray-700 mt-1">{computed.precisionNote}</div> : null}
+                {displayComputed.precisionNote ? <div className="text-xs text-gray-700 mt-1">{displayComputed.precisionNote}</div> : null}
               </Field>
             </Section>
 
@@ -1443,7 +1425,13 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
               className={`rounded-2xl shadow-xl p-1 overflow-visible ${theme === "dark" ? "bg-gradient-to-br from-slate-950 via-gray-950 to-slate-900 border border-gray-700" : "bg-gradient-to-br from-amber-100 via-gray-50 to-red-100 border border-gray-300"}`}
               style={{ height: "100vh", overflowY: "auto", overflowX: "visible" }}
             >
-                            <Section theme={theme} title="Manual dice entry">
+                            <Section theme={theme} title="Manual dice entry" action={
+                              <button type="button" onClick={rollAll} disabled={!statsReady || isRollingAll}
+                                title={statsReady ? "Roll all dice at once" : "Enter weapon and target stats first"}
+                                className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-extrabold border transition ${isRollingAll ? "bg-amber-600 border-amber-400 text-gray-950 animate-pulse cursor-wait" : statsReady ? "bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 border-amber-400/40 text-gray-950" : "bg-gray-800 border-gray-600 text-gray-500 cursor-not-allowed"}`}>
+                                {isRollingAll ? "🎲 Rolling…" : "🎲 Roll all"}
+                              </button>
+                            }>
               {!attacksFixed ? (
                               <Field
                                 label={
@@ -1510,7 +1498,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
 
                             <Field
                               label={<CounterLabel prefix="Wound rolls" need={woundNeeded} entered={woundEntered} remaining={woundNeeded - woundEntered} />}
-                              hint={`Pool already accounts for Lethal and Sustained. Lethal auto-wounds this volley: ${computed.autoWoundsFromLethal}.`}
+                              hint={`Pool already accounts for Lethal and Sustained. Lethal auto-wounds this volley: ${displayComputed.autoWoundsFromLethal}.`}
                             >
                               <div className="flex gap-2">
                                 <input
@@ -1585,11 +1573,11 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                     <div className="text-xs">Fill the highlighted fields in Weapon and Target to get a valid preview.</div>
                     <div className="mt-2 text-xs">Missing: {[...missingWeapon, ...missingTarget].join(', ')}</div>
                   </div>
-                ) : computed.errors.length > 0 ? (
+                ) : displayComputed.errors.length > 0 ? (
                   <div className={`mt-3 rounded-xl border p-4 text-base ${theme === "dark" ? "border-red-600 bg-red-900/30 text-red-200" : "border-red-300 bg-red-50 text-red-800"}`}>
                     <div className="font-semibold mb-1">Input issues</div>
                     <ul className="list-disc pl-5 space-y-1">
-                      {computed.errors.map((e, idx) => (
+                      {displayComputed.errors.map((e, idx) => (
                         <li key={idx}>{e}</li>
                       ))}
                     </ul>
@@ -1675,26 +1663,26 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                 <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
                   <div className={`rounded-lg border p-2 ${theme === "dark" ? "bg-gray-900 border-gray-700 text-gray-100" : "bg-white border-gray-200 text-gray-900"}`}>
                     <div className="text-base font-extrabold">Attack math</div>
-                    <div className="mt-1">{computed.A} attacks</div>
-                    <div>Wound-roll pool: {computed.woundRollPool}</div>
-                    <div>Wound target: {computed.needed}+</div>
-                    <div>Save target: {computed.saveTarget}+ </div>
+                    <div className="mt-1">{displayComputed.A} attacks</div>
+                    <div>Wound-roll pool: {displayComputed.woundRollPool}</div>
+                    <div>Wound target: {displayComputed.needed}+</div>
+                    <div>Save target: {displayComputed.saveTarget}+ </div>
                   </div>
 
                   <div className={`rounded-lg border p-2 ${theme === "dark" ? "bg-gray-900 border-gray-700 text-gray-100" : "bg-white border-gray-200 text-gray-900"}`}>
                     <div className="text-base font-extrabold">Crit branches</div>
-                    <div className="mt-1">Crit hits: {computed.critHits}</div>
-                    <div>Sustained extra hits: {computed.sustainedExtraHits}</div>
-                    <div>Lethal auto-wounds: {computed.autoWoundsFromLethal}</div>
-                    <div>Crit wounds: {computed.critWounds}</div>
+                    <div className="mt-1">Crit hits: {displayComputed.critHits}</div>
+                    <div>Sustained extra hits: {displayComputed.sustainedExtraHits}</div>
+                    <div>Lethal auto-wounds: {displayComputed.autoWoundsFromLethal}</div>
+                    <div>Crit wounds: {displayComputed.critWounds}</div>
                   </div>
 
                   <div className={`rounded-lg border p-2 ${theme === "dark" ? "bg-gray-900 border-gray-700 text-gray-100" : "bg-white border-gray-200 text-gray-900"}`}>
                     <div className="text-base font-extrabold">Wounds and saves</div>
-                    <div className="mt-1">Total wounds: {computed.totalWounds}</div>
-                    <div>Dev Wounds conversions: {computed.mortalWoundAttacks}</div>
-                    <div>Savable wounds: {computed.savableWounds}</div>
-                    <div>Failed saves: {computed.failedSaves}</div>
+                    <div className="mt-1">Total wounds: {displayComputed.totalWounds}</div>
+                    <div>Dev Wounds conversions: {displayComputed.mortalWoundAttacks}</div>
+                    <div>Savable wounds: {displayComputed.savableWounds}</div>
+                    <div>Failed saves: {displayComputed.failedSaves}</div>
                   </div>
 
                     <div className={`rounded-xl border p-3 ${dmgSubWrapClass}`}>
@@ -1722,7 +1710,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                             <div className={`rounded-lg border p-2 ${dmgSubTileClass}`}>
                               <div className={`text-xs uppercase tracking-widest ${dmgSubLabelClass}`}>Ignored</div>
                               <div className={`text-3xl font-extrabold ${theme === "dark" ? "text-white" : "text-gray-900"}`}>{ignoredTotal}</div>
-                            {computed.ignoredByRule ? (
+                            {displayComputed.ignoredByRule ? (
                                 <div className={`text-xs mt-0.5 ${theme === "dark" ? "text-gray-300" : "text-gray-700"}`}>incl. ignore-first-failed-save</div>
                             ) : null}
                           </div>
@@ -1793,7 +1781,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                 </div>
                 {showLog && (
                   <ol className={`text-sm leading-relaxed list-decimal pl-5 space-y-1 ${theme === "dark" ? "text-gray-100" : "text-gray-800"}`}>
-                    {computed.log.map((line, idx) => (
+                    {displayComputed.log.map((line, idx) => (
                       <li key={idx}>{line}</li>
                     ))}
                   </ol>
