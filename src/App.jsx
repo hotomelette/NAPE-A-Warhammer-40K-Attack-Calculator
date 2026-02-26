@@ -717,8 +717,8 @@ export default function AttackCalculator() {
     totalPreFnp: splitA.totalPreFnp,
     ignored: splitA.ignored,
     totalPostFnp: splitA.totalPostFnp,
-    errors: [...activeComputed.errors.filter(e => !e.includes("Save rolls") && !e.includes("Damage rolls") && !e.includes("FNP")), ...(splitA.errors || []), ...(splitB ? splitB.errors : [])],
-    log: [...activeComputed.log, ...(splitA.log || []), ...(splitB ? splitB.log : [])],
+    errors: [...displayComputed.errors.filter(e => !e.includes("Save rolls") && !e.includes("Damage rolls") && !e.includes("FNP")), ...(splitA.errors || []), ...(splitB ? splitB.errors : [])],
+    log: [...displayComputed.log, ...(splitA.log || []), ...(splitB ? splitB.log : [])],
   } : displayComputed;
 
   const easterEgg = (() => {
