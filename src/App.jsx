@@ -11,6 +11,27 @@ const APP_VERSION = "5.12";
    Helpers — see calculatorUtils.js
 ========================= */
 
+function DiceEntryTooltip({ theme }) {
+  const [show, setShow] = React.useState(false);
+  return (
+    <span className="relative" style={{ overflow: "visible" }}>
+      <span
+        onMouseEnter={() => setShow(true)}
+        onMouseLeave={() => setShow(false)}
+        className={`cursor-help text-xs font-normal px-1.5 py-0.5 rounded border select-none ${theme === "dark" ? "border-gray-600 text-gray-400 hover:text-gray-200" : "border-gray-300 text-gray-500 hover:text-gray-700"}`}
+      >?</span>
+      {show && (
+        <span
+          className={`absolute left-0 top-7 z-[9999] w-64 rounded-lg border p-2.5 text-xs font-normal shadow-2xl ${theme === "dark" ? "bg-gray-900 border-gray-600 text-gray-200" : "bg-white border-gray-300 text-gray-700"}`}
+          style={{ position: "absolute", pointerEvents: "none" }}
+        >
+          Manually enter dice results below. Use the 🎲 buttons to auto-roll each step.
+        </span>
+      )}
+    </span>
+  );
+}
+
 function RollAllButton({ onClick, disabled, isRolling, isReady }) {
   const cls = isRolling
     ? "flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-extrabold border transition bg-amber-600 border-amber-400 text-gray-950 animate-pulse cursor-wait"
@@ -29,15 +50,15 @@ function RollAllButton({ onClick, disabled, isRolling, isReady }) {
 function Section({ title, theme, children, action }) {
   const panelClass =
     theme === "dark"
-      ? "rounded-2xl bg-slate-900 shadow p-4 border border-gray-700 text-gray-100"
-      : "rounded-2xl bg-white shadow p-4 border border-gray-200 text-gray-900";
+      ? "rounded-2xl bg-slate-900 shadow p-4 border border-gray-700 text-gray-100 overflow-visible"
+      : "rounded-2xl bg-white shadow p-4 border border-gray-200 text-gray-900 overflow-visible";
   const titleClass =
     theme === "dark"
       ? "text-xl md:text-2xl font-extrabold tracking-wide border-b border-gray-700 pb-2 mb-3"
       : "text-xl md:text-2xl font-extrabold tracking-wide border-b border-gray-200 pb-2 mb-3";
   return (
     <div className={panelClass}>
-      <div className={`flex items-center justify-between gap-2 ${titleClass}`}>
+      <div className={`flex items-center justify-between gap-2 overflow-visible ${titleClass}`}>
         <span>{title}</span>
         {action && <div className="shrink-0">{action}</div>}
       </div>
@@ -1093,7 +1114,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
   };
 
   return (
-    <div className={`min-h-screen ${viz.pageBg || "bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950"} p-4 relative overflow-hidden`}>
+    <div className={`min-h-screen ${viz.pageBg || "bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950"} p-4 relative overflow-x-hidden`}>
       {/* Animated page-wide emoji backdrop synced to total damage tier */}
       <div className="pointer-events-none absolute inset-0 opacity-20 mix-blend-screen">
         {diceReady ? (
@@ -1590,12 +1611,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                             <Section theme={theme} title={
                               <span className="flex items-center gap-2">
                                 Dice entry
-                                <span className="group relative cursor-help">
-                                  <span className={`text-xs font-normal px-1.5 py-0.5 rounded border ${theme === "dark" ? "border-gray-600 text-gray-400" : "border-gray-300 text-gray-500"}`}>?</span>
-                                  <span className={`pointer-events-none absolute left-0 top-6 z-50 w-64 rounded-lg border p-2 text-xs font-normal opacity-0 group-hover:opacity-100 transition-opacity ${theme === "dark" ? "bg-gray-900 border-gray-700 text-gray-200" : "bg-white border-gray-200 text-gray-700"} shadow-xl`}>
-                                    Manually enter dice results below. Use the 🎲 buttons on the right to auto-roll each step.
-                                  </span>
-                                </span>
+                                <DiceEntryTooltip theme={theme} />
                               </span>
                             } action={
                               <RollAllButton
