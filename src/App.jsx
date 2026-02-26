@@ -5,7 +5,7 @@ import { parseDiceList, parseDiceSpec, clampModPlusMinusOne, rollDice } from "./
 import { appReducer, initialState } from "./appReducer.js";
 
 const APP_NAME = "NAPE – A Warhammer 40K Attack Calculator";
-const APP_VERSION = "5.13";
+const APP_VERSION = "5.14";
 
 /* =========================
    Helpers — see calculatorUtils.js
