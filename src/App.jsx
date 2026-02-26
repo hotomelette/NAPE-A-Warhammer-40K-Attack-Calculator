@@ -472,7 +472,7 @@ function WizardOverlay({
 
 
 
-export default function AttackCalculator() {
+function AttackCalculator() {
 
   // Theme (dark default, manual toggle)
   // ─────────────────────────────────────────
@@ -2321,3 +2321,5 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
     </div>
   );
 }
+
+export default AttackCalculator;
