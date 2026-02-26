@@ -64,14 +64,17 @@ export const initialRerolls = {
   rerollWoundOnes: false,
   rerollWoundFails: false,
   twinLinked: false,
-  showRerolls: true,
+  showRerolls: false,
 };
 
 export const initialUI = {
   theme: (() => {
     try { return localStorage.getItem("nape-theme") || "dark"; } catch { return "dark"; }
   })(),
-  showLog: false,
+  simpleMode: (() => {
+    try { return localStorage.getItem("nape-simple-mode") === "true"; } catch { return false; }
+  })(),
+  showLog: true,
   showLimitations: false,
   showCheatSheet: false,
   showDiceRef: false,
@@ -87,7 +90,8 @@ export const initialEaster = {
   lastClearAllTapMs: 0,
 };
 
-export const initialTargetB = {
+// A single extra target entry (used in splitTargets array)
+export const initialSplitTarget = {
   toughness: "",
   armorSave: "",
   invulnSave: "",
@@ -99,9 +103,7 @@ export const initialTargetB = {
   minusOneDamage: false,
   halfDamage: false,
   saveMod: 0,
-};
-
-export const initialDiceB = {
+  wounds: "",           // how many savable wounds are allocated here (string for input)
   saveRollsText: "",
   damageRolls: "",
   fnpRollsText: "",
@@ -109,7 +111,9 @@ export const initialDiceB = {
 
 export const initialSplit = {
   enabled: false,
-  woundsToA: "",  // how many savable wounds go to Target A (string for input)
+  // splitTargets[0] is always Target 1 allocation (rest of wounds go here auto)
+  // Additional entries are extra split targets (Target 2, 3, 4...)
+  extraTargets: [],  // array of initialSplitTarget
 };
 
 export const initialState = {
@@ -119,13 +123,11 @@ export const initialState = {
   rerolls: initialRerolls,
   ui: initialUI,
   easter: initialEaster,
-  targetB: initialTargetB,
-  diceB: initialDiceB,
   split: initialSplit,
 };
 
 // ─────────────────────────────────────────
-// Example preset (replaces loadExample)
+// Example preset
 // ─────────────────────────────────────────
 
 export const EXAMPLE_WEAPON = {
@@ -217,6 +219,11 @@ function uiReducer(state, action) {
       try { localStorage.setItem("nape-theme", next); } catch {}
       return { ...state, theme: next };
     }
+    case "TOGGLE_SIMPLE_MODE": {
+      const next = !state.simpleMode;
+      try { localStorage.setItem("nape-simple-mode", String(next)); } catch {}
+      return { ...state, simpleMode: next };
+    }
     default:
       return state;
   }
@@ -231,38 +238,29 @@ function easterReducer(state, action) {
   }
 }
 
-function targetBReducer(state, action) {
-  switch (action.type) {
-    case "SET_TARGET_B_FIELD":
-      return { ...state, [action.field]: action.value };
-    case "CLEAR_TARGET_B":
-      return { ...initialTargetB };
-    case "LOAD_TARGET_B":
-      return { ...initialTargetB, ...action.target };
-    default:
-      return state;
-  }
-}
-
-function diceBReducer(state, action) {
-  switch (action.type) {
-    case "SET_DICE_B_FIELD":
-      return { ...state, [action.field]: action.value };
-    case "CLEAR_DICE_B":
-      return { ...initialDiceB };
-    default:
-      return state;
-  }
-}
-
 function splitReducer(state, action) {
   switch (action.type) {
-    case "SET_SPLIT_FIELD":
-      return { ...state, [action.field]: action.value };
     case "TOGGLE_SPLIT":
-      return { ...state, enabled: !state.enabled, woundsToA: "" };
+      return { ...initialSplit, enabled: !state.enabled };
     case "CLEAR_SPLIT":
       return { ...initialSplit };
+    case "ADD_SPLIT_TARGET": {
+      // Max 3 extra targets (so Target 1 + up to 3 extras = 4 total)
+      if (state.extraTargets.length >= 3) return state;
+      return { ...state, extraTargets: [...state.extraTargets, { ...initialSplitTarget }] };
+    }
+    case "REMOVE_SPLIT_TARGET": {
+      const next = state.extraTargets.filter((_, i) => i !== action.index);
+      return { ...state, extraTargets: next };
+    }
+    case "SET_SPLIT_TARGET_FIELD": {
+      const next = state.extraTargets.map((t, i) =>
+        i === action.index ? { ...t, [action.field]: action.value } : t
+      );
+      return { ...state, extraTargets: next };
+    }
+    case "SET_TARGET1_WOUNDS":
+      return { ...state, woundsToTarget1: action.value };
     default:
       return state;
   }
@@ -295,8 +293,6 @@ export function appReducer(state, action) {
           ? { ...initialTarget, saveMod: savedHooks.saveMod, hasLeaderAttached: savedHooks.hasLeaderAttached, allocatePrecisionToLeader: savedHooks.allocatePrecisionToLeader }
           : { ...initialTarget },
         dice: { ...initialDice },
-        targetB: { ...initialTargetB },
-        diceB: { ...initialDiceB },
         split: { ...initialSplit },
       };
     }
@@ -345,23 +341,18 @@ export function appReducer(state, action) {
 
     case "SET_UI_FIELD":
     case "TOGGLE_THEME":
+    case "TOGGLE_SIMPLE_MODE":
       return { ...state, ui: uiReducer(state.ui, action) };
 
     case "SET_EASTER_FIELD":
       return { ...state, easter: easterReducer(state.easter, action) };
 
-    case "SET_TARGET_B_FIELD":
-    case "CLEAR_TARGET_B":
-    case "LOAD_TARGET_B":
-      return { ...state, targetB: targetBReducer(state.targetB, action) };
-
-    case "SET_DICE_B_FIELD":
-    case "CLEAR_DICE_B":
-      return { ...state, diceB: diceBReducer(state.diceB, action) };
-
-    case "SET_SPLIT_FIELD":
     case "TOGGLE_SPLIT":
     case "CLEAR_SPLIT":
+    case "ADD_SPLIT_TARGET":
+    case "REMOVE_SPLIT_TARGET":
+    case "SET_SPLIT_TARGET_FIELD":
+    case "SET_TARGET1_WOUNDS":
       return { ...state, split: splitReducer(state.split, action) };
 
     default:

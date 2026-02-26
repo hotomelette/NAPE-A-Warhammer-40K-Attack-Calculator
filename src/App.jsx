@@ -5,7 +5,7 @@ import { parseDiceList, parseDiceSpec, clampModPlusMinusOne, rollDice } from "./
 import { appReducer, initialState } from "./appReducer.js";
 
 const APP_NAME = "NAPE – A Warhammer 40K Attack Calculator";
-const APP_VERSION = "5.14";
+const APP_VERSION = "5.16";
 
 /* =========================
    Helpers — see calculatorUtils.js
@@ -29,6 +29,31 @@ function DiceEntryTooltip({ theme }) {
         </span>
       )}
     </span>
+  );
+}
+
+function StatLabel({ label, full, example, required, theme }) {
+  const [show, setShow] = React.useState(false);
+  return (
+    <div className={`text-xs font-semibold mb-1 flex items-center gap-1.5 ${required ? "text-red-400" : ""}`}>
+      <span>{label}</span>
+      <span className="relative" style={{ overflow: "visible" }}>
+        <span
+          onMouseEnter={() => setShow(true)}
+          onMouseLeave={() => setShow(false)}
+          className={`cursor-help px-1 py-0.5 rounded border select-none ${theme === "dark" ? "border-gray-600 text-gray-400 hover:text-gray-200" : "border-gray-300 text-gray-500 hover:text-gray-700"}`}
+          style={{ fontSize: "10px" }}
+        >?</span>
+        {show && (
+          <span
+            className={`absolute left-0 top-6 z-[9999] w-52 rounded-lg border p-2 text-xs font-normal shadow-2xl ${theme === "dark" ? "bg-gray-900 border-gray-600 text-gray-200" : "bg-white border-gray-300 text-gray-700"}`}
+            style={{ position: "absolute", pointerEvents: "none", whiteSpace: "normal" }}
+          >
+            <span className="font-bold">{full}</span>{example ? ` — ${example}` : ""}
+          </span>
+        )}
+      </span>
+    </div>
   );
 }
 
@@ -515,7 +540,7 @@ function AttackCalculator() {
   } = rerolls;
 
   const {
-    theme, showLog, showLimitations, showCheatSheet,
+    theme, simpleMode, showLog, showLimitations, showCheatSheet,
     showDiceRef, showWizard, strictMode, preserveHooks,
   } = ui;
 
@@ -524,45 +549,14 @@ function AttackCalculator() {
   } = easter;
 
   // ── Split volley state ──
-  const { targetB, diceB, split } = state;
-  const {
-    toughness: toughnessB, armorSave: armorSaveB, invulnSave: invulnSaveB,
-    fnpEnabled: fnpEnabledB, fnp: fnpB,
-    inCover: inCoverB, ignoreAp: ignoreApB,
-    ignoreFirstFailedSave: ignoreFirstFailedSaveB,
-    minusOneDamage: minusOneDamageB, halfDamage: halfDamageB,
-    saveMod: saveModB,
-  } = targetB;
+  const { split } = state;
+  const { enabled: splitEnabled, extraTargets = [] } = split;
 
-  const {
-    saveRollsText: saveRollsTextB,
-    damageRolls: damageRollsB,
-    fnpRollsText: fnpRollsTextB,
-  } = diceB;
-
-  const { enabled: splitEnabled, woundsToA } = split;
-
-  // Target B shims
-  const setToughnessB    = v => dispatch({ type: "SET_TARGET_B_FIELD", field: "toughness",    value: v });
-  const setArmorSaveB    = v => dispatch({ type: "SET_TARGET_B_FIELD", field: "armorSave",    value: v });
-  const setInvulnSaveB   = v => dispatch({ type: "SET_TARGET_B_FIELD", field: "invulnSave",   value: v });
-  const setFnpEnabledB   = v => dispatch({ type: "SET_TARGET_B_FIELD", field: "fnpEnabled",   value: v });
-  const setFnpB          = v => dispatch({ type: "SET_TARGET_B_FIELD", field: "fnp",          value: v });
-  const setInCoverB      = v => dispatch({ type: "SET_TARGET_B_FIELD", field: "inCover",      value: v });
-  const setIgnoreApB     = v => dispatch({ type: "SET_TARGET_B_FIELD", field: "ignoreAp",     value: v });
-  const setIgnoreFirstFailedSaveB = v => dispatch({ type: "SET_TARGET_B_FIELD", field: "ignoreFirstFailedSave", value: v });
-  const setMinusOneDamageB = v => dispatch({ type: "SET_TARGET_B_FIELD", field: "minusOneDamage", value: v });
-  const setHalfDamageB   = v => dispatch({ type: "SET_TARGET_B_FIELD", field: "halfDamage",   value: v });
-  const setSaveModB      = v => dispatch({ type: "SET_TARGET_B_FIELD", field: "saveMod",      value: v });
-
-  // Dice B shims
-  const setSaveRollsTextB = v => dispatch({ type: "SET_DICE_B_FIELD", field: "saveRollsText", value: v });
-  const setDamageRollsB   = v => dispatch({ type: "SET_DICE_B_FIELD", field: "damageRolls",   value: v });
-  const setFnpRollsTextB  = v => dispatch({ type: "SET_DICE_B_FIELD", field: "fnpRollsText",  value: v });
-
-  // Split shims
-  const toggleSplit   = () => dispatch({ type: "TOGGLE_SPLIT" });
-  const setWoundsToA  = v => dispatch({ type: "SET_SPLIT_FIELD", field: "woundsToA", value: v });
+  // Split dispatch helpers
+  const toggleSplit         = () => dispatch({ type: "TOGGLE_SPLIT" });
+  const addSplitTarget      = () => dispatch({ type: "ADD_SPLIT_TARGET" });
+  const removeSplitTarget   = (i) => dispatch({ type: "REMOVE_SPLIT_TARGET", index: i });
+  const setSplitTargetField = (i, field, value) => dispatch({ type: "SET_SPLIT_TARGET_FIELD", index: i, field, value });
 
   // ── Dispatch shims — same API as before, zero JSX changes needed ──
   // Weapon fields
@@ -629,6 +623,7 @@ function AttackCalculator() {
   const setStrictMode      = v => dispatch({ type: "SET_UI_FIELD", field: "strictMode",      value: v });
   const setPreserveHooks   = v => dispatch({ type: "SET_UI_FIELD", field: "preserveHooks",   value: v });
   const toggleTheme        = () => dispatch({ type: "TOGGLE_THEME" });
+  const toggleSimpleMode   = () => dispatch({ type: "TOGGLE_SIMPLE_MODE" });
 
   // Easter egg fields
   const setSecretClicks     = v => dispatch({ type: "SET_EASTER_FIELD", field: "secretClicks",     value: v });
@@ -666,6 +661,9 @@ function AttackCalculator() {
   // Transient animation state — declared early because displayComputed depends on it
   const [isRollingAll, setIsRollingAll] = useState(false);
 
+  // In split mode, useCalculator only needs to run through the wound phase.
+  // Passes empty strings for save/damage/fnp so it doesn't error on counts —
+  // those phases are handled by useCalculatorSplit per target instead.
   const computed = useCalculator({
     attacksFixed, attacksValue, attacksRolls,
     rapidFire, rapidFireX, halfRange,
@@ -681,7 +679,8 @@ function AttackCalculator() {
     inCover, ignoreAp, woundMod, saveMod,
     ignoreFirstFailedSave, minusOneDamage, halfDamage,
     fnp, fnpEnabled, fnpRollsText,
-    hitRollsText, woundRollsText, saveRollsText,
+    hitRollsText, woundRollsText,
+    saveRollsText: splitEnabled ? "" : saveRollsText,
     hasLeaderAttached, allocatePrecisionToLeader,
   });
 
@@ -692,42 +691,33 @@ function AttackCalculator() {
     : (() => { lastStableComputed.current = computed; return computed; })();
 
   // ── Split volley calculations ──
-  // Wound pool from shared phase, allocated to each target
+  // Wound pool from shared phase, dynamically allocated across all targets
   const totalSavableWounds = displayComputed.savableWounds || 0;
   const totalMortalWounds = displayComputed.mortalWoundAttacks || 0;
-  const woundsToANum = Math.min(totalSavableWounds, Math.max(0, parseInt(woundsToA) || 0));
-  const woundsToBNum = Math.max(0, totalSavableWounds - woundsToANum);
-  // Mortal wounds split proportionally (simplification: all go to A if not split)
-  const mortalToA = splitEnabled ? totalMortalWounds : totalMortalWounds;
-  const mortalToB = splitEnabled ? 0 : 0;
 
-  const splitA = useCalculatorSplit({
-    woundsAllocated: splitEnabled ? woundsToANum : totalSavableWounds,
-    mortalWoundsAllocated: splitEnabled ? mortalToA : totalMortalWounds,
-    armorSave, invulnSave, inCover, ignoreAp, saveMod,
-    ignoreFirstFailedSave, minusOneDamage, halfDamage,
-    fnp, fnpEnabled,
-    ap, damageFixed, damageValue, devastatingWounds,
-    saveRollsText, damageRolls, fnpRollsText,
-    label: "A",
-    enabled: true,
-  });
+  // Target 1 gets remainder after extra targets claim their wounds
+  const extraWoundsSum = extraTargets.reduce((s, t) => s + Math.max(0, parseInt(t.wounds) || 0), 0);
+  const target1Wounds = Math.max(0, totalSavableWounds - Math.min(extraWoundsSum, totalSavableWounds));
 
-  const splitB = useCalculatorSplit({
-    woundsAllocated: woundsToBNum,
-    mortalWoundsAllocated: mortalToB,
-    armorSave: armorSaveB, invulnSave: invulnSaveB,
-    inCover: inCoverB, ignoreAp: ignoreApB, saveMod: saveModB,
-    ignoreFirstFailedSave: ignoreFirstFailedSaveB,
-    minusOneDamage: minusOneDamageB, halfDamage: halfDamageB,
-    fnp: fnpB, fnpEnabled: fnpEnabledB,
-    ap, damageFixed, damageValue, devastatingWounds,
-    saveRollsText: saveRollsTextB, damageRolls: damageRollsB, fnpRollsText: fnpRollsTextB,
-    label: "B",
-    enabled: splitEnabled,
-  });
+  // Shared weapon props passed to every split target
+  const sharedWeaponProps = { ap, damageFixed, damageValue, devastatingWounds };
 
-  // In split mode, override the main computed totals with splitA results
+  // Build blank disabled params (used when slot has no target)
+  const disabledSlot = { woundsAllocated: 0, mortalWoundsAllocated: 0, armorSave: "", invulnSave: "", inCover: false, ignoreAp: false, saveMod: 0, ignoreFirstFailedSave: false, minusOneDamage: false, halfDamage: false, fnp: "", fnpEnabled: false, saveRollsText: "", damageRolls: "", fnpRollsText: "", ...sharedWeaponProps, enabled: false };
+
+  // Always call 4 hooks (rules of hooks — must be unconditional)
+  const splitResults = [
+    useCalculatorSplit({ woundsAllocated: splitEnabled ? target1Wounds : totalSavableWounds, mortalWoundsAllocated: totalMortalWounds, armorSave, invulnSave, inCover, ignoreAp, saveMod, ignoreFirstFailedSave, minusOneDamage, halfDamage, fnp, fnpEnabled, saveRollsText, damageRolls, fnpRollsText, ...sharedWeaponProps, label: "1", enabled: true }),
+    useCalculatorSplit(extraTargets[0] ? { woundsAllocated: Math.max(0, parseInt(extraTargets[0].wounds) || 0), mortalWoundsAllocated: 0, armorSave: extraTargets[0].armorSave, invulnSave: extraTargets[0].invulnSave, inCover: extraTargets[0].inCover, ignoreAp: extraTargets[0].ignoreAp, saveMod: extraTargets[0].saveMod || 0, ignoreFirstFailedSave: extraTargets[0].ignoreFirstFailedSave, minusOneDamage: extraTargets[0].minusOneDamage, halfDamage: extraTargets[0].halfDamage, fnp: extraTargets[0].fnp, fnpEnabled: extraTargets[0].fnpEnabled, saveRollsText: extraTargets[0].saveRollsText, damageRolls: extraTargets[0].damageRolls, fnpRollsText: extraTargets[0].fnpRollsText, ...sharedWeaponProps, label: "2", enabled: splitEnabled } : { ...disabledSlot, label: "2" }),
+    useCalculatorSplit(extraTargets[1] ? { woundsAllocated: Math.max(0, parseInt(extraTargets[1].wounds) || 0), mortalWoundsAllocated: 0, armorSave: extraTargets[1].armorSave, invulnSave: extraTargets[1].invulnSave, inCover: extraTargets[1].inCover, ignoreAp: extraTargets[1].ignoreAp, saveMod: extraTargets[1].saveMod || 0, ignoreFirstFailedSave: extraTargets[1].ignoreFirstFailedSave, minusOneDamage: extraTargets[1].minusOneDamage, halfDamage: extraTargets[1].halfDamage, fnp: extraTargets[1].fnp, fnpEnabled: extraTargets[1].fnpEnabled, saveRollsText: extraTargets[1].saveRollsText, damageRolls: extraTargets[1].damageRolls, fnpRollsText: extraTargets[1].fnpRollsText, ...sharedWeaponProps, label: "3", enabled: splitEnabled } : { ...disabledSlot, label: "3" }),
+    useCalculatorSplit(extraTargets[2] ? { woundsAllocated: Math.max(0, parseInt(extraTargets[2].wounds) || 0), mortalWoundsAllocated: 0, armorSave: extraTargets[2].armorSave, invulnSave: extraTargets[2].invulnSave, inCover: extraTargets[2].inCover, ignoreAp: extraTargets[2].ignoreAp, saveMod: extraTargets[2].saveMod || 0, ignoreFirstFailedSave: extraTargets[2].ignoreFirstFailedSave, minusOneDamage: extraTargets[2].minusOneDamage, halfDamage: extraTargets[2].halfDamage, fnp: extraTargets[2].fnp, fnpEnabled: extraTargets[2].fnpEnabled, saveRollsText: extraTargets[2].saveRollsText, damageRolls: extraTargets[2].damageRolls, fnpRollsText: extraTargets[2].fnpRollsText, ...sharedWeaponProps, label: "4", enabled: splitEnabled } : { ...disabledSlot, label: "4" }),
+  ];
+
+  const splitA = splitResults[0];
+  const splitB = splitResults[1];
+
+  // In split mode, override totals with Target 1 results; merge all errors/logs
+  const activeSplitResults = splitResults.filter((_, i) => i === 0 || (splitEnabled && extraTargets[i - 1]));
   const activeComputed = (splitEnabled && splitA) ? {
     ...displayComputed,
     saveTarget: splitA.saveTarget,
@@ -738,8 +728,11 @@ function AttackCalculator() {
     totalPreFnp: splitA.totalPreFnp,
     ignored: splitA.ignored,
     totalPostFnp: splitA.totalPostFnp,
-    errors: [...displayComputed.errors.filter(e => !e.includes("Save rolls") && !e.includes("Damage rolls") && !e.includes("FNP")), ...(splitA.errors || []), ...(splitB ? splitB.errors : [])],
-    log: [...displayComputed.log, ...(splitA.log || []), ...(splitB ? splitB.log : [])],
+    errors: [
+      ...displayComputed.errors.filter(e => !e.includes("Save rolls") && !e.includes("Damage rolls") && !e.includes("FNP")),
+      ...activeSplitResults.flatMap(r => r ? r.errors || [] : []),
+    ],
+    log: [...displayComputed.log, ...activeSplitResults.flatMap(r => r ? r.log || [] : [])],
   } : displayComputed;
 
   const easterEgg = (() => {
@@ -766,7 +759,7 @@ function AttackCalculator() {
 
   const hitNeeded = torrent ? 0 : activeComputed.A;
   const woundNeeded = activeComputed.woundRollPool;
-  const saveNeeded = splitEnabled ? woundsToANum : (activeComputed.savableWounds || 0);
+  const saveNeeded = splitEnabled ? target1Wounds : (activeComputed.savableWounds || 0);
   const fnpNeeded = fnpEnabled && fnp !== "" ? activeComputed.totalPreFnp : 0;
 
   const hitRemaining = Math.max(0, hitNeeded - hitEntered);
@@ -1199,13 +1192,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
 
             {/* Header action buttons */}
             <div className="flex flex-wrap gap-2 mt-3">
-              <button
-                type="button"
-                className="rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-gray-950 px-4 py-2 text-sm font-extrabold border border-amber-400/40 transition flex items-center gap-2"
-                onClick={() => setShowWizard(true)}
-              >
-                🧙 Quick Wizard
-              </button>
+
               <button
                 type="button"
                 className="rounded-lg bg-gray-900 text-gray-100 px-4 py-2 text-sm font-semibold border border-gray-700 hover:bg-gray-800 transition"
@@ -1223,7 +1210,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
           <div className="lg:col-span-6 space-y-4">
             <Section theme={theme} title="Weapon">
               <Field
-                label="Attacks"
+                label={<StatLabel label="A" full="Attacks" example="e.g. 6 (fixed) or D6+1 (random)" theme={theme} />}
                 hint="Fixed: enter A. Random: uncheck Fixed, enter a dice expression (e.g. D6+1, 2D6, D3+2), then enter the rolled dice in Manual dice entry → Attack rolls. The +N modifier is added automatically."
               >
                 <div className="flex flex-col md:flex-row md:items-center gap-2">
@@ -1264,13 +1251,13 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
               </Field>
 
               <div className="grid grid-cols-2 gap-3">
-                <Field label="BS/WS" hint="Target number needed to hit. 4 means 4+.">
-                  <input className={`w-full rounded border p-2 text-lg font-semibold ${!isNum(toHit) ? "border-red-500 ring-2 ring-red-200" : ""}`} type="number" value={toHit} onChange={(e) => setToHit(e.target.value)} placeholder="required" />
+                <Field label={<StatLabel label="BS / WS" full="Ballistic / Weapon Skill" example="e.g. 4 = roll 4+ to hit" required={!isNum(toHit)} theme={theme} />} hint="">
+                  <input className={`w-full rounded border p-2 text-lg font-semibold ${!isNum(toHit) ? "border-red-500 ring-2 ring-red-200" : ""}`} type="number" value={toHit} onChange={(e) => setToHit(e.target.value)} placeholder="e.g. 4" />
                 </Field>
-                <Field label="Strength" hint="Weapon Strength characteristic.">
-                  <input className={`w-full rounded border p-2 text-lg font-semibold ${!isNum(strength) ? "border-red-500 ring-2 ring-red-200" : ""}`} type="number" value={strength} onChange={(e) => setStrength(e.target.value)} placeholder="required" />
+                <Field label={<StatLabel label="S" full="Strength" example="e.g. 5 — compared to target T" required={!isNum(strength)} theme={theme} />} hint="">
+                  <input className={`w-full rounded border p-2 text-lg font-semibold ${!isNum(strength) ? "border-red-500 ring-2 ring-red-200" : ""}`} type="number" value={strength} onChange={(e) => setStrength(e.target.value)} placeholder="e.g. 5" />
                 </Field>
-                <Field label="AP" hint="Always 0 or negative (e.g. -1, -2). Enter the number and it will auto-negate.">
+                <Field label={<StatLabel label="AP" full="Armour Penetration" example="e.g. -1 or -2 (auto-negated)" theme={theme} />} hint="">
                   <input
                     className={`w-full rounded border p-2 text-lg font-semibold ${!isNum(ap) ? "border-red-500 ring-2 ring-red-200" : ""}`}
                     type="number"
@@ -1281,11 +1268,11 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                       const n = parseFloat(raw);
                       if (!isNaN(n)) setAp(String(Math.min(0, -Math.abs(n))));
                     }}
-                    placeholder="e.g. -1"
+                    placeholder="AP e.g. -1"
                   />
                 </Field>
 
-                <Field label="Damage" hint="Fixed: enter a number. Variable: enter a dice expression (e.g. D3, D6, D3+1), then roll one die per failed save and enter results.">
+                <Field label={<StatLabel label="D" full="Damage" example="e.g. 2 (fixed) or D3, D6 (variable)" theme={theme} />} hint="">
                   <div className="flex flex-col gap-2">
                     <div className="flex items-center gap-2">
                       <label className="flex items-center gap-2 text-sm">
@@ -1293,7 +1280,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                         Fixed
                       </label>
                       {damageFixed ? (
-                        <input className={`flex-1 rounded border p-2 text-lg font-semibold ${damageFixed && !isNum(damageValue) ? "border-red-500 ring-2 ring-red-200" : ""}`} type="number" value={damageValue} onChange={(e) => setDamageValue(e.target.value)} placeholder="required" />
+                        <input className={`flex-1 rounded border p-2 text-lg font-semibold ${damageFixed && !isNum(damageValue) ? "border-red-500 ring-2 ring-red-200" : ""}`} type="number" value={damageValue} onChange={(e) => setDamageValue(e.target.value)} placeholder="D e.g. 2" />
                       ) : (
                         <input
                           className={`flex-1 rounded border p-2 text-lg font-semibold`}
@@ -1327,6 +1314,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                 </Field>
               </div>
 
+              {!simpleMode && (
               <div className="grid grid-cols-2 gap-3 mt-2">
                 <Field label="Critical Hit threshold" hint="Default 6. If crit hits 5+, set 5.">
                   <input className="w-full rounded border p-2 text-lg font-semibold" type="number" value={critHitThreshold} onChange={(e) => setCritHitThreshold(e.target.value)} />
@@ -1335,7 +1323,9 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                   <input className="w-full rounded border p-2 text-lg font-semibold" type="number" value={critWoundThreshold} onChange={(e) => setCritWoundThreshold(e.target.value)} />
                 </Field>
               </div>
+              )}
 
+              {!simpleMode && (
               <Field label="Keywords / Effects" hint="Enable only what is active for the current weapon/turn.">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-2 gap-y-2 text-sm items-start">
 
@@ -1431,88 +1421,43 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                   </label>
                 </div>
               </Field>
-              <div className="mt-3 rounded-xl border border-gray-700/60 bg-slate-950/20 p-3">
-                <div className="flex items-center justify-between gap-3 self-start">
-                  <div className="flex items-center gap-2 min-w-0 self-start">
-                    <div className="text-base font-extrabold">Rerolls</div>
-                    <div className="inline-flex items-center text-xs font-semibold text-amber-200 bg-amber-900/40 border border-amber-700/50 rounded-full px-2 py-0.5">EXPERIMENTAL</div>
-                  </div>
-                  <button
-                    type="button"
-                    className={mainToggleBtnClass}
-                    onClick={() => setShowRerolls(!showRerolls)}
-                  >
-                    {showRerolls ? "Hide" : "Show"}
-                  </button>
-                </div>
-{showRerolls ? (
-                  <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                    <label className="flex items-center gap-2">
-                      <input type="checkbox" checked={rerollHitOnes} onChange={(e) => setRerollHitOnes(e.target.checked)} />
-                      Reroll hit rolls of 1
-                    </label>
-                    <label className="flex items-center gap-2">
-                      <input type="checkbox" checked={rerollHitFails} onChange={(e) => setRerollHitFails(e.target.checked)} />
-                      Reroll failed hits
-                    </label>
-
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={rerollWoundOnes}
-                        onChange={(e) => setRerollWoundOnes(e.target.checked)}
-                      />
-                      Reroll wound rolls of 1
-                    </label>
-
-                    <label className={`flex items-center gap-2 ${twinLinked ? "opacity-75" : ""}`}>
-                      <input
-                        type="checkbox"
-                        checked={rerollWoundFails || twinLinked}
-                        disabled={twinLinked}
-                        onChange={(e) => setRerollWoundFails(e.target.checked)}
-                      />
-                      Reroll failed wounds {twinLinked ? <span className="text-xs text-gray-600">(enabled by Twin-linked)</span> : null}
-                    </label>
-                  </div>
-                ) : null}
-              </div>
+              )}
 
             </Section>
 
-            <Section theme={theme} title="Target">
+            <Section theme={theme} title="Target 1">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <div className={`text-xs font-semibold mb-1 ${!isNum(toughness) ? "text-red-400" : ""}`}>Toughness *</div>
+                  <StatLabel label="T" full="Toughness" example="e.g. 4" required={!isNum(toughness)} theme={theme} />
                   <input type="text" inputMode="numeric" value={toughness} onChange={e => setToughness(e.target.value)}
-                    placeholder="required"
+                    placeholder="T e.g. 4"
                     className={`w-full rounded border p-2 font-bold text-lg ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300 text-gray-900"} ${!isNum(toughness) ? "border-red-500 ring-2 ring-red-200" : ""}`} />
                 </div>
                 <div>
-                  <div className={`text-xs font-semibold mb-1 ${!isNum(armorSave) ? "text-red-400" : ""}`}>Armour Save *</div>
+                  <StatLabel label="Sv+" full="Armour Save" example="e.g. 3 (means 3+)" required={!isNum(armorSave)} theme={theme} />
                   <input type="text" inputMode="numeric" value={armorSave} onChange={e => setArmorSave(e.target.value)}
-                    placeholder="required"
+                    placeholder="Sv+ e.g. 3"
                     className={`w-full rounded border p-2 font-bold text-lg ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300 text-gray-900"} ${!isNum(armorSave) ? "border-red-500 ring-2 ring-red-200" : ""}`} />
                 </div>
                 <div>
-                  <div className="text-xs font-semibold mb-1">Invuln Save</div>
+                  <StatLabel label="Inv+" full="Invuln Save" example="e.g. 5 (means 5+)" theme={theme} />
                   <input type="text" inputMode="numeric" value={invulnSave} onChange={e => setInvulnSave(e.target.value)}
-                    placeholder="e.g. 4"
+                    placeholder="Inv+ e.g. 5"
                     className={`w-full rounded border p-2 font-bold text-lg ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300 text-gray-900"}`} />
                 </div>
                 <div>
-                  <div className="text-xs font-semibold mb-1">FNP</div>
+                  <StatLabel label="FNP+" full="Feel No Pain" example="e.g. 5 (means 5+)" theme={theme} />
                   <div className="flex items-center gap-2">
                     <input type="checkbox" checked={fnpEnabled} className="h-4 w-4 accent-amber-400"
                       onChange={e => { const on = e.target.checked; setFnpEnabled(on); if (!on) { setFnp(""); setFnpRollsText(""); } }} />
                     <input type="text" inputMode="numeric" value={fnp} onChange={e => setFnp(e.target.value)}
-                      disabled={!fnpEnabled} placeholder="e.g. 5"
+                      disabled={!fnpEnabled} placeholder="FNP+ e.g. 5"
                       className={`flex-1 rounded border p-2 font-bold text-lg disabled:opacity-40 ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300 text-gray-900"}`} />
                   </div>
                 </div>
               </div>
               <div className="mt-3 flex flex-wrap gap-3 text-sm">
-                <label className="flex items-center gap-2"><input type="checkbox" checked={inCover} onChange={e => setInCover(e.target.checked)} className="accent-amber-400" /> Cover (+1 sv)</label>
+                <label className="flex items-center gap-2"><input type="checkbox" checked={inCover} onChange={e => setInCover(e.target.checked)} className="accent-amber-400" /> Cover (+1 Sv)</label>
                 <label className="flex items-center gap-2"><input type="checkbox" checked={ignoreAp} onChange={e => setIgnoreAp(e.target.checked)} className="accent-amber-400" /> Ignore AP</label>
                 <label className="flex items-center gap-2"><input type="checkbox" checked={ignoreFirstFailedSave} onChange={e => setIgnoreFirstFailedSave(e.target.checked)} className="accent-amber-400" /> Ignore 1st failed save</label>
                 <label className="flex items-center gap-2"><input type="checkbox" checked={minusOneDamage} onChange={e => setMinusOneDamage(e.target.checked)} className="accent-amber-400" /> -1 Damage</label>
@@ -1521,6 +1466,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
             </Section>
 
             {/* ── Split Volley Toggle ── */}
+            {!simpleMode && (
             <div className={`rounded-2xl p-4 border ${theme === "dark" ? "bg-slate-900 border-gray-700" : "bg-white border-gray-200"}`}>
               <div className="flex items-center justify-between">
                 <div>
@@ -1537,73 +1483,87 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
 
               {splitEnabled && (
                 <div className="mt-4 space-y-4">
-                  {/* Wound allocation */}
+
+                  {/* Wound allocation summary */}
                   <div className={`rounded-xl p-3 border ${theme === "dark" ? "bg-gray-900/60 border-gray-700" : "bg-gray-50 border-gray-200"}`}>
-                    <div className="text-sm font-semibold mb-2">Wound allocation</div>
-                    <div className="flex items-center gap-3 flex-wrap">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm">🎯 Target A:</span>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="text-sm font-semibold">Wound allocation</div>
+                      <div className={`text-xs font-bold ${extraWoundsSum <= totalSavableWounds ? "text-green-400" : "text-red-400"}`}>
+                        {Math.min(extraWoundsSum, totalSavableWounds) + target1Wounds}/{totalSavableWounds} allocated
+                      </div>
+                    </div>
+                    {/* Target 1 — auto-calculated remainder */}
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-sm w-20">🎯 Target 1:</span>
+                      <span className={`w-14 rounded border p-1.5 text-center font-bold text-base ${theme === "dark" ? "bg-gray-900/20 border-gray-700 text-amber-400" : "bg-gray-50 border-gray-200 text-amber-600"}`}>{target1Wounds}</span>
+                      <span className="text-xs text-gray-400">wounds (remainder)</span>
+                    </div>
+                    {/* Extra targets — each editable */}
+                    {extraTargets.map((t, i) => (
+                      <div key={i} className="flex items-center gap-2 mb-2">
+                        <span className="text-sm w-20">🎯 Target {i + 2}:</span>
                         <input type="text" inputMode="numeric"
-                          value={woundsToA}
-                          onChange={e => setWoundsToA(e.target.value.replace(/[^0-9]/g, ""))}
-                          className={`w-16 rounded border p-1.5 text-center font-bold text-lg ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300 text-gray-900"}`}
+                          value={t.wounds}
+                          onChange={e => setSplitTargetField(i, "wounds", e.target.value.replace(/[^0-9]/g, ""))}
+                          className={`w-14 rounded border p-1.5 text-center font-bold text-base ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300 text-gray-900"}`}
                           placeholder="0"
                         />
                         <span className="text-xs text-gray-400">wounds</span>
+                        <button type="button" onClick={() => removeSplitTarget(i)} className="ml-auto text-xs text-red-400 hover:text-red-300 px-2 py-1 rounded border border-red-800/40 hover:bg-red-900/20">✕ Remove</button>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm">🎯 Target B:</span>
-                        <span className={`w-16 rounded border p-1.5 text-center font-bold text-lg ${theme === "dark" ? "bg-gray-900/20 border-gray-700 text-amber-400" : "bg-gray-50 border-gray-200 text-amber-600"}`}>
-                          {woundsToBNum}
-                        </span>
-                        <span className="text-xs text-gray-400">wounds</span>
-                      </div>
-                      <div className={`text-xs ${woundsToANum + woundsToBNum === totalSavableWounds ? "text-green-400" : "text-red-400"}`}>
-                        {woundsToANum + woundsToBNum}/{totalSavableWounds} allocated
-                      </div>
-                    </div>
+                    ))}
+                    {/* Add target button — max 4 total, only if wounds available */}
+                    {extraTargets.length < 3 && totalSavableWounds > 0 && (
+                      <button type="button" onClick={addSplitTarget}
+                        className={`mt-1 text-xs px-3 py-1.5 rounded border font-semibold transition ${theme === "dark" ? "border-amber-700/60 text-amber-300 hover:bg-amber-900/20" : "border-amber-400 text-amber-700 hover:bg-amber-50"}`}>
+                        + Add Target {extraTargets.length + 2}
+                      </button>
+                    )}
                   </div>
 
-                  {/* Target B stats */}
-                  <div>
-                    <div className="text-sm font-extrabold mb-3 text-amber-400">🎯 Target B — Stats</div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <div className="text-xs font-semibold mb-1">Toughness</div>
-                        <input type="text" inputMode="numeric" value={toughnessB} onChange={e => setToughnessB(e.target.value)}
-                          placeholder="T" className={`w-full rounded border p-2 font-bold ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300"}`} />
-                      </div>
-                      <div>
-                        <div className="text-xs font-semibold mb-1">Armour Save</div>
-                        <input type="text" inputMode="numeric" value={armorSaveB} onChange={e => setArmorSaveB(e.target.value)}
-                          placeholder="Sv+" className={`w-full rounded border p-2 font-bold ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300"}`} />
-                      </div>
-                      <div>
-                        <div className="text-xs font-semibold mb-1">Invuln Save</div>
-                        <input type="text" inputMode="numeric" value={invulnSaveB} onChange={e => setInvulnSaveB(e.target.value)}
-                          placeholder="Inv+" className={`w-full rounded border p-2 font-bold ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300"}`} />
-                      </div>
-                      <div>
-                        <div className="text-xs font-semibold mb-1">FNP</div>
-                        <div className="flex items-center gap-2">
-                          <input type="checkbox" checked={fnpEnabledB} onChange={e => setFnpEnabledB(e.target.checked)} className="h-4 w-4 accent-amber-400" />
-                          <input type="text" inputMode="numeric" value={fnpB} onChange={e => setFnpB(e.target.value)}
-                            disabled={!fnpEnabledB} placeholder="e.g. 5"
-                            className={`flex-1 rounded border p-2 font-bold disabled:opacity-40 ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300"}`} />
+                  {/* Extra target stats panels */}
+                  {extraTargets.map((t, i) => (
+                    <div key={i} className={`rounded-xl p-3 border ${theme === "dark" ? "bg-gray-900/40 border-gray-700" : "bg-gray-50 border-gray-200"}`}>
+                      <div className="text-sm font-extrabold mb-3 text-amber-400">🎯 Target {i + 2} — Stats</div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <StatLabel label="T" full="Toughness" example="e.g. 4" required={!t.toughness} theme={theme} />
+                          <input type="text" inputMode="numeric" value={t.toughness} onChange={e => setSplitTargetField(i, "toughness", e.target.value)}
+                            placeholder="T e.g. 4" className={`w-full rounded border p-2 font-bold ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300"} ${!t.toughness ? "border-red-500/60" : ""}`} />
+                        </div>
+                        <div>
+                          <StatLabel label="Sv+" full="Armour Save" example="e.g. 3 (means 3+)" required={!t.armorSave} theme={theme} />
+                          <input type="text" inputMode="numeric" value={t.armorSave} onChange={e => setSplitTargetField(i, "armorSave", e.target.value)}
+                            placeholder="Sv+ e.g. 3" className={`w-full rounded border p-2 font-bold ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300"} ${!t.armorSave ? "border-red-500/60" : ""}`} />
+                        </div>
+                        <div>
+                          <StatLabel label="Inv+" full="Invuln Save" example="e.g. 5 (means 5+)" theme={theme} />
+                          <input type="text" inputMode="numeric" value={t.invulnSave} onChange={e => setSplitTargetField(i, "invulnSave", e.target.value)}
+                            placeholder="Inv+ e.g. 5" className={`w-full rounded border p-2 font-bold ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300"}`} />
+                        </div>
+                        <div>
+                          <StatLabel label="FNP+" full="Feel No Pain" example="e.g. 5 (means 5+)" theme={theme} />
+                          <div className="flex items-center gap-2">
+                            <input type="checkbox" checked={t.fnpEnabled} onChange={e => setSplitTargetField(i, "fnpEnabled", e.target.checked)} className="h-4 w-4 accent-amber-400" />
+                            <input type="text" inputMode="numeric" value={t.fnp} onChange={e => setSplitTargetField(i, "fnp", e.target.value)}
+                              disabled={!t.fnpEnabled} placeholder="FNP+ e.g. 5"
+                              className={`flex-1 rounded border p-2 font-bold disabled:opacity-40 ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300"}`} />
+                          </div>
                         </div>
                       </div>
+                      <div className="mt-3 flex flex-wrap gap-3 text-sm">
+                        <label className="flex items-center gap-2"><input type="checkbox" checked={t.inCover} onChange={e => setSplitTargetField(i, "inCover", e.target.checked)} className="accent-amber-400" /> Cover (+1 Sv)</label>
+                        <label className="flex items-center gap-2"><input type="checkbox" checked={t.ignoreAp} onChange={e => setSplitTargetField(i, "ignoreAp", e.target.checked)} className="accent-amber-400" /> Ignore AP</label>
+                        <label className="flex items-center gap-2"><input type="checkbox" checked={t.ignoreFirstFailedSave} onChange={e => setSplitTargetField(i, "ignoreFirstFailedSave", e.target.checked)} className="accent-amber-400" /> Ignore 1st failed save</label>
+                        <label className="flex items-center gap-2"><input type="checkbox" checked={t.minusOneDamage} onChange={e => setSplitTargetField(i, "minusOneDamage", e.target.checked)} className="accent-amber-400" /> -1 Damage</label>
+                        <label className="flex items-center gap-2"><input type="checkbox" checked={t.halfDamage} onChange={e => setSplitTargetField(i, "halfDamage", e.target.checked)} className="accent-amber-400" /> Half Damage</label>
+                      </div>
                     </div>
-                    <div className="mt-3 flex flex-wrap gap-3 text-sm">
-                      <label className="flex items-center gap-2"><input type="checkbox" checked={inCoverB} onChange={e => setInCoverB(e.target.checked)} className="accent-amber-400" /> Cover</label>
-                      <label className="flex items-center gap-2"><input type="checkbox" checked={ignoreApB} onChange={e => setIgnoreApB(e.target.checked)} className="accent-amber-400" /> Ignore AP</label>
-                      <label className="flex items-center gap-2"><input type="checkbox" checked={ignoreFirstFailedSaveB} onChange={e => setIgnoreFirstFailedSaveB(e.target.checked)} className="accent-amber-400" /> Ignore 1st failed save</label>
-                      <label className="flex items-center gap-2"><input type="checkbox" checked={minusOneDamageB} onChange={e => setMinusOneDamageB(e.target.checked)} className="accent-amber-400" /> -1 Damage</label>
-                      <label className="flex items-center gap-2"><input type="checkbox" checked={halfDamageB} onChange={e => setHalfDamageB(e.target.checked)} className="accent-amber-400" /> Half Damage</label>
-                    </div>
-                  </div>
+                  ))}
                 </div>
               )}
             </div>
+            )}
 
           </div>
 
@@ -1622,6 +1582,31 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                                 isReady={statsReady}
                               />
                             }>
+
+                            {/* ── Rerolls (collapsed by default) ── */}
+                            <div className={`rounded-xl border p-3 ${theme === "dark" ? "border-gray-700/60 bg-slate-950/20" : "border-gray-200 bg-gray-50"}`}>
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <div className="text-sm font-extrabold">Rerolls</div>
+                                  <div className="inline-flex items-center text-xs font-semibold text-amber-200 bg-amber-900/40 border border-amber-700/50 rounded-full px-2 py-0.5">EXPERIMENTAL</div>
+                                </div>
+                                <button type="button" className={mainToggleBtnClass} onClick={() => setShowRerolls(!showRerolls)}>
+                                  {showRerolls ? "Hide" : "Show"}
+                                </button>
+                              </div>
+                              {showRerolls && (
+                                <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+                                  <label className="flex items-center gap-2"><input type="checkbox" checked={rerollHitOnes} onChange={e => setRerollHitOnes(e.target.checked)} /> Reroll hit 1s</label>
+                                  <label className="flex items-center gap-2"><input type="checkbox" checked={rerollHitFails} onChange={e => setRerollHitFails(e.target.checked)} /> Reroll failed hits</label>
+                                  <label className="flex items-center gap-2"><input type="checkbox" checked={rerollWoundOnes} onChange={e => setRerollWoundOnes(e.target.checked)} /> Reroll wound 1s</label>
+                                  <label className={`flex items-center gap-2 ${twinLinked ? "opacity-75" : ""}`}>
+                                    <input type="checkbox" checked={rerollWoundFails || twinLinked} disabled={twinLinked} onChange={e => setRerollWoundFails(e.target.checked)} />
+                                    Reroll failed wounds {twinLinked ? <span className="text-xs text-gray-500">(Twin-linked)</span> : null}
+                                  </label>
+                                </div>
+                              )}
+                            </div>
+
               {!attacksFixed ? (
                               <Field
                                 label={
@@ -2091,6 +2076,18 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
               <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
               <button
                 type="button"
+                className={`rounded-lg px-3 py-2 text-sm font-extrabold border w-full md:w-auto ${
+                  simpleMode
+                    ? "bg-gradient-to-r from-emerald-600/80 to-teal-600/80 text-white border-emerald-400/30 hover:from-emerald-500/90 hover:to-teal-500/90"
+                    : "bg-gray-900 text-gray-100 border-gray-700 hover:bg-gray-800"
+                }`}
+                onClick={toggleSimpleMode}
+                title="Simple mode hides keywords, crit thresholds, and split volley for quick table use."
+              >
+                {simpleMode ? "⚔️ Simple mode" : "⚔️ Simple mode"}
+              </button>
+              <button
+                type="button"
                   className="rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font-semibold border border-gray-700 hover:bg-gray-800 w-full md:w-auto"
                 onClick={toggleTheme}
                 title="Toggle light/dark theme"
@@ -2148,7 +2145,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
             <Chip>Lethal Hits</Chip>
             <Chip>Sustained Hits</Chip>
             <Chip>Devastating Wounds</Chip>
-            <Chip>Precision</Chip>
+            
             <Chip>Cover</Chip>
             <Chip>Ignore AP</Chip>
             <Chip>Ignore first failed save</Chip>
