@@ -436,7 +436,6 @@ function WizardOverlay({
               )}
               {computed.failedSaves > 0 && <div className="text-xs text-red-400 -mt-2">❌ {computed.failedSaves} failed save{computed.failedSaves !== 1 ? "s" : ""}</div>}
 
-            </div>
           </div>
 
         </div>
@@ -1586,13 +1585,19 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
 
           </div>
 
-          {/* RIGHT: Results - full height, sticky, scroll inside */}
-          <div className="lg:col-span-6 lg:sticky lg:top-0 self-start overflow-visible" style={{ height: "100vh" }}>
-            <div
-              className={`rounded-2xl shadow-xl p-1 overflow-visible ${theme === "dark" ? "bg-gradient-to-br from-slate-950 via-gray-950 to-slate-900 border border-gray-700" : "bg-gradient-to-br from-amber-100 via-gray-50 to-red-100 border border-gray-300"}`}
-              style={{ height: "100vh", overflowY: "auto", overflowX: "visible" }}
-            >
-                            <Section theme={theme} title="Manual dice entry" action={
+          {/* RIGHT: Results */}
+          <div className="lg:col-span-6 space-y-4">
+                            <Section theme={theme} title={
+                              <span className="flex items-center gap-2">
+                                Dice entry
+                                <span className="group relative cursor-help">
+                                  <span className={`text-xs font-normal px-1.5 py-0.5 rounded border ${theme === "dark" ? "border-gray-600 text-gray-400" : "border-gray-300 text-gray-500"}`}>?</span>
+                                  <span className={`pointer-events-none absolute left-0 top-6 z-50 w-64 rounded-lg border p-2 text-xs font-normal opacity-0 group-hover:opacity-100 transition-opacity ${theme === "dark" ? "bg-gray-900 border-gray-700 text-gray-200" : "bg-white border-gray-200 text-gray-700"} shadow-xl`}>
+                                    Manually enter dice results below. Use the 🎲 buttons on the right to auto-roll each step.
+                                  </span>
+                                </span>
+                              </span>
+                            } action={
                               <RollAllButton
                                 onClick={rollAll}
                                 disabled={!statsReady || isRollingAll}
@@ -2054,7 +2059,6 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                   </ol>
                 )}
               </Section>
-            </div>
           </div>
 
         </div>
