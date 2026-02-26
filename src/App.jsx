@@ -478,7 +478,7 @@ function AttackCalculator() {
   // ─────────────────────────────────────────
   // State — consolidated via useReducer
   // ─────────────────────────────────────────
-  const [state, dispatch] = useReducer(appReducer, initialState);
+  const {state, dispatch} = useReducer(appReducer, initialState);
   const { weapon, target, dice, rerolls, ui, easter } = state;
 
   // ── Destructure slices for direct use ──
