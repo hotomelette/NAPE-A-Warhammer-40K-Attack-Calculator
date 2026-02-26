@@ -1,5 +1,6 @@
 import React, { useReducer, useState, useEffect, useRef } from "react";
 import { useCalculator } from "./useCalculator.js";
+import { useCalculatorSplit } from "./useCalculatorSplit.js";
 import { parseDiceList, parseDiceSpec, clampModPlusMinusOne, rollDice } from "./calculatorUtils.js";
 import { appReducer, initialState } from "./appReducer.js";
 
@@ -501,6 +502,47 @@ export default function AttackCalculator() {
     secretClicks, emperorToast, clearAllTapCount, lastClearAllTapMs,
   } = easter;
 
+  // ── Split volley state ──
+  const { targetB, diceB, split } = state;
+  const {
+    toughness: toughnessB, armorSave: armorSaveB, invulnSave: invulnSaveB,
+    fnpEnabled: fnpEnabledB, fnp: fnpB,
+    inCover: inCoverB, ignoreAp: ignoreApB,
+    ignoreFirstFailedSave: ignoreFirstFailedSaveB,
+    minusOneDamage: minusOneDamageB, halfDamage: halfDamageB,
+    saveMod: saveModB,
+  } = targetB;
+
+  const {
+    saveRollsText: saveRollsTextB,
+    damageRolls: damageRollsB,
+    fnpRollsText: fnpRollsTextB,
+  } = diceB;
+
+  const { enabled: splitEnabled, woundsToA } = split;
+
+  // Target B shims
+  const setToughnessB    = v => dispatch({ type: "SET_TARGET_B_FIELD", field: "toughness",    value: v });
+  const setArmorSaveB    = v => dispatch({ type: "SET_TARGET_B_FIELD", field: "armorSave",    value: v });
+  const setInvulnSaveB   = v => dispatch({ type: "SET_TARGET_B_FIELD", field: "invulnSave",   value: v });
+  const setFnpEnabledB   = v => dispatch({ type: "SET_TARGET_B_FIELD", field: "fnpEnabled",   value: v });
+  const setFnpB          = v => dispatch({ type: "SET_TARGET_B_FIELD", field: "fnp",          value: v });
+  const setInCoverB      = v => dispatch({ type: "SET_TARGET_B_FIELD", field: "inCover",      value: v });
+  const setIgnoreApB     = v => dispatch({ type: "SET_TARGET_B_FIELD", field: "ignoreAp",     value: v });
+  const setIgnoreFirstFailedSaveB = v => dispatch({ type: "SET_TARGET_B_FIELD", field: "ignoreFirstFailedSave", value: v });
+  const setMinusOneDamageB = v => dispatch({ type: "SET_TARGET_B_FIELD", field: "minusOneDamage", value: v });
+  const setHalfDamageB   = v => dispatch({ type: "SET_TARGET_B_FIELD", field: "halfDamage",   value: v });
+  const setSaveModB      = v => dispatch({ type: "SET_TARGET_B_FIELD", field: "saveMod",      value: v });
+
+  // Dice B shims
+  const setSaveRollsTextB = v => dispatch({ type: "SET_DICE_B_FIELD", field: "saveRollsText", value: v });
+  const setDamageRollsB   = v => dispatch({ type: "SET_DICE_B_FIELD", field: "damageRolls",   value: v });
+  const setFnpRollsTextB  = v => dispatch({ type: "SET_DICE_B_FIELD", field: "fnpRollsText",  value: v });
+
+  // Split shims
+  const toggleSplit   = () => dispatch({ type: "TOGGLE_SPLIT" });
+  const setWoundsToA  = v => dispatch({ type: "SET_SPLIT_FIELD", field: "woundsToA", value: v });
+
   // ── Dispatch shims — same API as before, zero JSX changes needed ──
   // Weapon fields
   const setAttacksFixed  = v => dispatch({ type: "SET_WEAPON_FIELD", field: "attacksFixed",  value: v });
@@ -609,9 +651,60 @@ export default function AttackCalculator() {
     ? (lastStableComputed.current || computed)
     : (() => { lastStableComputed.current = computed; return computed; })();
 
+  // ── Split volley calculations ──
+  // Wound pool from shared phase, allocated to each target
+  const totalSavableWounds = displayComputed.savableWounds || 0;
+  const totalMortalWounds = displayComputed.mortalWoundAttacks || 0;
+  const woundsToANum = Math.min(totalSavableWounds, Math.max(0, parseInt(woundsToA) || 0));
+  const woundsToBNum = Math.max(0, totalSavableWounds - woundsToANum);
+  // Mortal wounds split proportionally (simplification: all go to A if not split)
+  const mortalToA = splitEnabled ? totalMortalWounds : totalMortalWounds;
+  const mortalToB = splitEnabled ? 0 : 0;
+
+  const splitA = useCalculatorSplit({
+    woundsAllocated: splitEnabled ? woundsToANum : totalSavableWounds,
+    mortalWoundsAllocated: splitEnabled ? mortalToA : totalMortalWounds,
+    armorSave, invulnSave, inCover, ignoreAp, saveMod,
+    ignoreFirstFailedSave, minusOneDamage, halfDamage,
+    fnp, fnpEnabled,
+    ap, damageFixed, damageValue, devastatingWounds,
+    saveRollsText, damageRolls, fnpRollsText,
+    label: "A",
+    enabled: true,
+  });
+
+  const splitB = useCalculatorSplit({
+    woundsAllocated: woundsToBNum,
+    mortalWoundsAllocated: mortalToB,
+    armorSave: armorSaveB, invulnSave: invulnSaveB,
+    inCover: inCoverB, ignoreAp: ignoreApB, saveMod: saveModB,
+    ignoreFirstFailedSave: ignoreFirstFailedSaveB,
+    minusOneDamage: minusOneDamageB, halfDamage: halfDamageB,
+    fnp: fnpB, fnpEnabled: fnpEnabledB,
+    ap, damageFixed, damageValue, devastatingWounds,
+    saveRollsText: saveRollsTextB, damageRolls: damageRollsB, fnpRollsText: fnpRollsTextB,
+    label: "B",
+    enabled: splitEnabled,
+  });
+
+  // In split mode, override the main computed totals with splitA results
+  const activeComputed = (splitEnabled && splitA) ? {
+    ...displayComputed,
+    saveTarget: splitA.saveTarget,
+    failedSaves: splitA.failedSaves,
+    failedSavesEffective: splitA.failedSavesEffective,
+    normalDamage: splitA.normalDamage,
+    mortalDamage: splitA.mortalDamage,
+    totalPreFnp: splitA.totalPreFnp,
+    ignored: splitA.ignored,
+    totalPostFnp: splitA.totalPostFnp,
+    errors: [...activeComputed.errors.filter(e => !e.includes("Save rolls") && !e.includes("Damage rolls") && !e.includes("FNP")), ...(splitA.errors || []), ...(splitB ? splitB.errors : [])],
+    log: [...activeComputed.log, ...(splitA.log || []), ...(splitB ? splitB.log : [])],
+  } : displayComputed;
+
   const easterEgg = (() => {
-    const dmg = displayComputed.totalPostFnp;
-    const effort = displayComputed.A; // attacks attempted (good proxy for "a lot of effort" in manual mode)
+    const dmg = activeComputed.totalPostFnp;
+    const effort = activeComputed.A; // attacks attempted (good proxy for "a lot of effort" in manual mode)
 
     if (dmg >= 9001) {
       return { title: "IT'S OVER 9000", emoji: "🐉⚡💥", note: null, style: "dbz" };
@@ -631,10 +724,10 @@ export default function AttackCalculator() {
   const saveEntered = parseDiceList(saveRollsText).length;
   const fnpEntered = parseDiceList(fnpRollsText).length;
 
-  const hitNeeded = torrent ? 0 : displayComputed.A;
-  const woundNeeded = displayComputed.woundRollPool;
-  const saveNeeded = displayComputed.savableWounds;
-  const fnpNeeded = fnpEnabled && fnp !== "" ? displayComputed.totalPreFnp : 0;
+  const hitNeeded = torrent ? 0 : activeComputed.A;
+  const woundNeeded = activeComputed.woundRollPool;
+  const saveNeeded = activeComputed.savableWounds;
+  const fnpNeeded = fnpEnabled && fnp !== "" ? activeComputed.totalPreFnp : 0;
 
   const hitRemaining = Math.max(0, hitNeeded - hitEntered);
   const woundRemaining = Math.max(0, woundNeeded - woundEntered);
@@ -647,8 +740,8 @@ export default function AttackCalculator() {
   const woundRerollEntered = parseDiceList(woundRerollRollsText).length;
 
   // Reroll eligibility is computed from the initial rolls in the memoized resolver.
-  const hitRerollNeeded = displayComputed.hitRerollNeeded || 0;
-  const woundRerollNeeded = displayComputed.woundRerollNeeded || 0;
+  const hitRerollNeeded = activeComputed.hitRerollNeeded || 0;
+  const woundRerollNeeded = activeComputed.woundRerollNeeded || 0;
   const hitRerollRemaining = Math.max(0, hitRerollNeeded - hitRerollEntered);
   const woundRerollRemaining = Math.max(0, woundRerollNeeded - woundRerollEntered);
 
@@ -684,7 +777,7 @@ export default function AttackCalculator() {
   const statsReady = missingWeapon.length === 0 && missingTarget.length === 0;
   const diceReady =
     statsReady &&
-    displayComputed.errors.length === 0 &&
+    activeComputed.errors.length === 0 &&
     !hasHitCountError &&
     !hasWoundCountError &&
     !hasSaveCountError &&
@@ -695,12 +788,12 @@ export default function AttackCalculator() {
 
   const allowDamageTotals = !strictMode || diceReady;
 
-  const shownTotalPostFnp = allowDamageTotals ? (displayComputed.totalPostFnp || 0) : 0;
-  const shownTotalPreFnp  = allowDamageTotals ? (displayComputed.totalPreFnp  || 0) : 0;
-  const shownNormalDamage = allowDamageTotals ? (displayComputed.normalDamage || 0) : 0;
-  const shownMortalDamage = allowDamageTotals ? (displayComputed.mortalDamage || 0) : 0;
+  const shownTotalPostFnp = allowDamageTotals ? (activeComputed.totalPostFnp || 0) : 0;
+  const shownTotalPreFnp  = allowDamageTotals ? (activeComputed.totalPreFnp  || 0) : 0;
+  const shownNormalDamage = allowDamageTotals ? (activeComputed.normalDamage || 0) : 0;
+  const shownMortalDamage = allowDamageTotals ? (activeComputed.mortalDamage || 0) : 0;
   const shownIgnoredTotal =
-    allowDamageTotals ? ((displayComputed.ignored || 0) + (displayComputed.ignoredByRule || 0)) : 0;
+    allowDamageTotals ? ((activeComputed.ignored || 0) + (activeComputed.ignoredByRule || 0)) : 0;
 
   const viz = damageViz(shownTotalPostFnp);
   const ignoredTotal = shownIgnoredTotal;
@@ -724,7 +817,7 @@ export default function AttackCalculator() {
     theme === "dark" ? "bg-white/5 border-white/10" : "bg-white/70 border-gray-200";
   const dmgSubLabelClass = theme === "dark" ? "text-gray-300" : "text-gray-600";
 
-  const rawDmgStr = String(displayComputed.totalPostFnp ?? "");
+  const rawDmgStr = String(activeComputed.totalPostFnp ?? "");
   const expandScientific = (s) => {
     // Expands simple positive scientific notation like "1.23e+6" into "1230000"
     // Intended for comedic large-number display. Does not change math.
@@ -1123,7 +1216,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                 </div>
 
                 <div className="mt-1 text-xs text-gray-300">
-                  Computed attacks this volley: <span className="font-semibold">{displayComputed.A}</span>
+                  Computed attacks this volley: <span className="font-semibold">{activeComputed.A}</span>
                   {!attacksFixed && parseDiceSpec(attacksValue).mod > 0 ? (
                     <span className="ml-2 text-gray-400">(dice sum + {parseDiceSpec(attacksValue).mod} modifier)</span>
                   ) : null}
@@ -1435,11 +1528,95 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                     Allocate Precision-eligible attacks to leader
                   </label>
                 </div>
-                {displayComputed.precisionNote ? <div className="text-xs text-gray-700 mt-1">{displayComputed.precisionNote}</div> : null}
+                {activeComputed.precisionNote ? <div className="text-xs text-gray-700 mt-1">{activeComputed.precisionNote}</div> : null}
               </Field>
             </Section>
 
-            
+            {/* ── Split Volley Toggle ── */}
+            <div className={`rounded-2xl p-4 border ${theme === "dark" ? "bg-slate-900 border-gray-700" : "bg-white border-gray-200"}`}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="font-extrabold text-lg">Split Volley</div>
+                  <div className={`text-xs mt-0.5 ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>
+                    Split wounds across two targets after the wound phase. Rules-accurate: one weapon, two targets.
+                  </div>
+                </div>
+                <button type="button" onClick={toggleSplit}
+                  className={`rounded-lg px-4 py-2 text-sm font-extrabold border transition ${splitEnabled ? "bg-gradient-to-r from-amber-500 to-orange-500 border-amber-400/40 text-gray-950" : theme === "dark" ? "bg-gray-800 border-gray-600 text-gray-300 hover:bg-gray-700" : "bg-gray-100 border-gray-300 text-gray-700 hover:bg-gray-200"}`}>
+                  {splitEnabled ? "⚔️ Split ON" : "Split OFF"}
+                </button>
+              </div>
+
+              {splitEnabled && (
+                <div className="mt-4 space-y-4">
+                  {/* Wound allocation */}
+                  <div className={`rounded-xl p-3 border ${theme === "dark" ? "bg-gray-900/60 border-gray-700" : "bg-gray-50 border-gray-200"}`}>
+                    <div className="text-sm font-semibold mb-2">Wound allocation</div>
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm">🎯 Target A:</span>
+                        <input type="text" inputMode="numeric"
+                          value={woundsToA}
+                          onChange={e => setWoundsToA(e.target.value.replace(/[^0-9]/g, ""))}
+                          className={`w-16 rounded border p-1.5 text-center font-bold text-lg ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300 text-gray-900"}`}
+                          placeholder="0"
+                        />
+                        <span className="text-xs text-gray-400">wounds</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm">🎯 Target B:</span>
+                        <span className={`w-16 rounded border p-1.5 text-center font-bold text-lg ${theme === "dark" ? "bg-gray-900/20 border-gray-700 text-amber-400" : "bg-gray-50 border-gray-200 text-amber-600"}`}>
+                          {woundsToBNum}
+                        </span>
+                        <span className="text-xs text-gray-400">wounds</span>
+                      </div>
+                      <div className={`text-xs ${woundsToANum + woundsToBNum === totalSavableWounds ? "text-green-400" : "text-red-400"}`}>
+                        {woundsToANum + woundsToBNum}/{totalSavableWounds} allocated
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Target B stats */}
+                  <div>
+                    <div className="text-sm font-extrabold mb-3 text-amber-400">🎯 Target B — Stats</div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <div className="text-xs font-semibold mb-1">Toughness</div>
+                        <input type="text" inputMode="numeric" value={toughnessB} onChange={e => setToughnessB(e.target.value)}
+                          placeholder="T" className={`w-full rounded border p-2 font-bold ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300"}`} />
+                      </div>
+                      <div>
+                        <div className="text-xs font-semibold mb-1">Armour Save</div>
+                        <input type="text" inputMode="numeric" value={armorSaveB} onChange={e => setArmorSaveB(e.target.value)}
+                          placeholder="Sv+" className={`w-full rounded border p-2 font-bold ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300"}`} />
+                      </div>
+                      <div>
+                        <div className="text-xs font-semibold mb-1">Invuln Save</div>
+                        <input type="text" inputMode="numeric" value={invulnSaveB} onChange={e => setInvulnSaveB(e.target.value)}
+                          placeholder="Inv+" className={`w-full rounded border p-2 font-bold ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300"}`} />
+                      </div>
+                      <div>
+                        <div className="text-xs font-semibold mb-1">FNP</div>
+                        <div className="flex items-center gap-2">
+                          <input type="checkbox" checked={fnpEnabledB} onChange={e => setFnpEnabledB(e.target.checked)} className="h-4 w-4 accent-amber-400" />
+                          <input type="text" inputMode="numeric" value={fnpB} onChange={e => setFnpB(e.target.value)}
+                            disabled={!fnpEnabledB} placeholder="e.g. 5"
+                            className={`flex-1 rounded border p-2 font-bold disabled:opacity-40 ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300"}`} />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-3 text-sm">
+                      <label className="flex items-center gap-2"><input type="checkbox" checked={inCoverB} onChange={e => setInCoverB(e.target.checked)} className="accent-amber-400" /> Cover</label>
+                      <label className="flex items-center gap-2"><input type="checkbox" checked={ignoreApB} onChange={e => setIgnoreApB(e.target.checked)} className="accent-amber-400" /> Ignore AP</label>
+                      <label className="flex items-center gap-2"><input type="checkbox" checked={ignoreFirstFailedSaveB} onChange={e => setIgnoreFirstFailedSaveB(e.target.checked)} className="accent-amber-400" /> Ignore 1st failed save</label>
+                      <label className="flex items-center gap-2"><input type="checkbox" checked={minusOneDamageB} onChange={e => setMinusOneDamageB(e.target.checked)} className="accent-amber-400" /> -1 Damage</label>
+                      <label className="flex items-center gap-2"><input type="checkbox" checked={halfDamageB} onChange={e => setHalfDamageB(e.target.checked)} className="accent-amber-400" /> Half Damage</label>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
           </div>
 
           {/* RIGHT: Results - full height, sticky, scroll inside */}
@@ -1522,7 +1699,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
 
                             <Field
                               label={<CounterLabel prefix="Wound rolls" need={woundNeeded} entered={woundEntered} remaining={woundNeeded - woundEntered} />}
-                              hint={`Pool already accounts for Lethal and Sustained. Lethal auto-wounds this volley: ${displayComputed.autoWoundsFromLethal}.`}
+                              hint={`Pool already accounts for Lethal and Sustained. Lethal auto-wounds this volley: ${activeComputed.autoWoundsFromLethal}.`}
                             >
                               <div className="flex gap-2">
                                 <input
@@ -1589,6 +1766,74 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
 
                           </Section>
 
+                          {splitEnabled && (
+                            <Section theme={theme} title="🎯 Target B — Dice">
+                              <div className={`text-xs mb-2 ${theme === "dark" ? "text-amber-400" : "text-amber-600"}`}>
+                                {woundsToBNum} wounds allocated → Target B saves
+                              </div>
+
+                              <Field
+                                label={<CounterLabel prefix="Save rolls (B)" need={woundsToBNum} entered={parseDiceList(saveRollsTextB).length} remaining={woundsToBNum - parseDiceList(saveRollsTextB).length} theme={theme} />}
+                                hint={splitB ? `Save target: ${splitB.saveTarget}+` : "Enter Target B stats first."}
+                                theme={theme}
+                              >
+                                <div className="flex gap-2">
+                                  <input
+                                    className={`flex-1 rounded border p-2 text-lg font-semibold ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100 placeholder:text-gray-500" : "bg-white border-gray-300 text-gray-900"} ${parseDiceList(saveRollsTextB).length !== woundsToBNum && woundsToBNum > 0 ? "border-red-500 ring-2 ring-red-200" : ""}`}
+                                    value={saveRollsTextB}
+                                    onChange={e => setSaveRollsTextB(e.target.value)}
+                                    placeholder="e.g. 5 2 6 ..."
+                                  />
+                                  <button type="button" title="Roll for me" disabled={woundsToBNum === 0}
+                                    onClick={() => setSaveRollsTextB(rollDice(woundsToBNum, 6))}
+                                    className="rounded-lg bg-amber-500 hover:bg-amber-400 disabled:opacity-30 text-gray-950 px-3 font-bold text-lg transition">🎲</button>
+                                </div>
+                              </Field>
+
+                              {!damageFixed && (
+                                <Field
+                                  label={<CounterLabel prefix="Damage rolls (B)" need={splitB ? splitB.failedSavesEffective : 0} entered={parseDiceList(damageRollsB).length} remaining={(splitB ? splitB.failedSavesEffective : 0) - parseDiceList(damageRollsB).length} theme={theme} />}
+                                  hint="One die per failed save. Modifier auto-added."
+                                  theme={theme}
+                                >
+                                  <div className="flex gap-2">
+                                    <input
+                                      className={`flex-1 rounded border p-2 text-lg font-semibold ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100 placeholder:text-gray-500" : "bg-white border-gray-300 text-gray-900"}`}
+                                      value={damageRollsB}
+                                      onChange={e => setDamageRollsB(e.target.value)}
+                                      placeholder="e.g. 3 5 2 ..."
+                                    />
+                                    <button type="button" title="Roll for me"
+                                      disabled={!splitB || splitB.failedSavesEffective === 0}
+                                      onClick={() => { const sp = parseDiceSpec(damageValue); setDamageRollsB(rollDice(splitB.failedSavesEffective, sp.sides)); }}
+                                      className="rounded-lg bg-amber-500 hover:bg-amber-400 disabled:opacity-30 text-gray-950 px-3 font-bold text-lg transition">🎲</button>
+                                  </div>
+                                </Field>
+                              )}
+
+                              {(fnpEnabledB && fnpB !== "") && (
+                                <Field
+                                  label={<CounterLabel prefix="FNP rolls (B)" need={splitB ? splitB.fnpNeeded : 0} entered={parseDiceList(fnpRollsTextB).length} remaining={(splitB ? splitB.fnpNeeded : 0) - parseDiceList(fnpRollsTextB).length} theme={theme} />}
+                                  hint="One die per point of damage on Target B."
+                                  theme={theme}
+                                >
+                                  <div className="flex gap-2">
+                                    <input
+                                      className={`flex-1 rounded border p-2 text-lg font-semibold ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100 placeholder:text-gray-500" : "bg-white border-gray-300 text-gray-900"}`}
+                                      value={fnpRollsTextB}
+                                      onChange={e => setFnpRollsTextB(e.target.value)}
+                                      placeholder="e.g. 1 5 6 ..."
+                                    />
+                                    <button type="button" title="Roll for me"
+                                      disabled={!splitB || splitB.fnpNeeded === 0}
+                                      onClick={() => setFnpRollsTextB(rollDice(splitB.fnpNeeded, 6))}
+                                      className="rounded-lg bg-amber-500 hover:bg-amber-400 disabled:opacity-30 text-gray-950 px-3 font-bold text-lg transition">🎲</button>
+                                  </div>
+                                </Field>
+                              )}
+                            </Section>
+                          )}
+
 <Section theme={theme} title="Results">
 
                 {!statsReady ? (
@@ -1597,11 +1842,11 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                     <div className="text-xs">Fill the highlighted fields in Weapon and Target to get a valid preview.</div>
                     <div className="mt-2 text-xs">Missing: {[...missingWeapon, ...missingTarget].join(', ')}</div>
                   </div>
-                ) : displayComputed.errors.length > 0 ? (
+                ) : activeComputed.errors.length > 0 ? (
                   <div className={`mt-3 rounded-xl border p-4 text-base ${theme === "dark" ? "border-red-600 bg-red-900/30 text-red-200" : "border-red-300 bg-red-50 text-red-800"}`}>
                     <div className="font-semibold mb-1">Input issues</div>
                     <ul className="list-disc pl-5 space-y-1">
-                      {displayComputed.errors.map((e, idx) => (
+                      {activeComputed.errors.map((e, idx) => (
                         <li key={idx}>{e}</li>
                       ))}
                     </ul>
@@ -1687,26 +1932,26 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                 <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
                   <div className={`rounded-lg border p-2 ${theme === "dark" ? "bg-gray-900 border-gray-700 text-gray-100" : "bg-white border-gray-200 text-gray-900"}`}>
                     <div className="text-base font-extrabold">Attack math</div>
-                    <div className="mt-1">{displayComputed.A} attacks</div>
-                    <div>Wound-roll pool: {displayComputed.woundRollPool}</div>
-                    <div>Wound target: {displayComputed.needed}+</div>
-                    <div>Save target: {displayComputed.saveTarget}+ </div>
+                    <div className="mt-1">{activeComputed.A} attacks</div>
+                    <div>Wound-roll pool: {activeComputed.woundRollPool}</div>
+                    <div>Wound target: {activeComputed.needed}+</div>
+                    <div>Save target: {activeComputed.saveTarget}+ </div>
                   </div>
 
                   <div className={`rounded-lg border p-2 ${theme === "dark" ? "bg-gray-900 border-gray-700 text-gray-100" : "bg-white border-gray-200 text-gray-900"}`}>
                     <div className="text-base font-extrabold">Crit branches</div>
-                    <div className="mt-1">Crit hits: {displayComputed.critHits}</div>
-                    <div>Sustained extra hits: {displayComputed.sustainedExtraHits}</div>
-                    <div>Lethal auto-wounds: {displayComputed.autoWoundsFromLethal}</div>
-                    <div>Crit wounds: {displayComputed.critWounds}</div>
+                    <div className="mt-1">Crit hits: {activeComputed.critHits}</div>
+                    <div>Sustained extra hits: {activeComputed.sustainedExtraHits}</div>
+                    <div>Lethal auto-wounds: {activeComputed.autoWoundsFromLethal}</div>
+                    <div>Crit wounds: {activeComputed.critWounds}</div>
                   </div>
 
                   <div className={`rounded-lg border p-2 ${theme === "dark" ? "bg-gray-900 border-gray-700 text-gray-100" : "bg-white border-gray-200 text-gray-900"}`}>
                     <div className="text-base font-extrabold">Wounds and saves</div>
-                    <div className="mt-1">Total wounds: {displayComputed.totalWounds}</div>
-                    <div>Dev Wounds conversions: {displayComputed.mortalWoundAttacks}</div>
-                    <div>Savable wounds: {displayComputed.savableWounds}</div>
-                    <div>Failed saves: {displayComputed.failedSaves}</div>
+                    <div className="mt-1">Total wounds: {activeComputed.totalWounds}</div>
+                    <div>Dev Wounds conversions: {activeComputed.mortalWoundAttacks}</div>
+                    <div>Savable wounds: {activeComputed.savableWounds}</div>
+                    <div>Failed saves: {activeComputed.failedSaves}</div>
                   </div>
 
                     <div className={`rounded-xl border p-3 ${dmgSubWrapClass}`}>
@@ -1734,13 +1979,44 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                             <div className={`rounded-lg border p-2 ${dmgSubTileClass}`}>
                               <div className={`text-xs uppercase tracking-widest ${dmgSubLabelClass}`}>Ignored</div>
                               <div className={`text-3xl font-extrabold ${theme === "dark" ? "text-white" : "text-gray-900"}`}>{ignoredTotal}</div>
-                            {displayComputed.ignoredByRule ? (
+                            {activeComputed.ignoredByRule ? (
                                 <div className={`text-xs mt-0.5 ${theme === "dark" ? "text-gray-300" : "text-gray-700"}`}>incl. ignore-first-failed-save</div>
                             ) : null}
                           </div>
                         </div>
 
                 </div>
+
+                {/* ── Split Volley Results ── */}
+                {splitEnabled && splitB && (
+                  <div className={`mt-4 rounded-xl border p-3 ${theme === "dark" ? "border-amber-700/50 bg-amber-900/20" : "border-amber-300 bg-amber-50"}`}>
+                    <div className={`text-xs font-extrabold uppercase tracking-widest mb-3 ${theme === "dark" ? "text-amber-400" : "text-amber-700"}`}>
+                      ⚔️ Split Volley Summary
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 text-center">
+                      <div className={`rounded-lg p-2 border ${theme === "dark" ? "bg-slate-900 border-gray-700" : "bg-white border-gray-200"}`}>
+                        <div className="text-xs uppercase tracking-widest text-gray-400 mb-1">🎯 Target A</div>
+                        <div className="text-2xl font-black text-amber-400">{allowDamageTotals ? (splitA ? splitA.totalPostFnp : 0) : "–"}</div>
+                        <div className="text-xs text-gray-400">dmg</div>
+                      </div>
+                      <div className={`rounded-lg p-2 border ${theme === "dark" ? "bg-slate-900 border-gray-700" : "bg-white border-gray-200"}`}>
+                        <div className="text-xs uppercase tracking-widest text-gray-400 mb-1">🎯 Target B</div>
+                        <div className="text-2xl font-black text-orange-400">{allowDamageTotals ? splitB.totalPostFnp : "–"}</div>
+                        <div className="text-xs text-gray-400">dmg</div>
+                      </div>
+                      <div className={`rounded-lg p-2 border ${theme === "dark" ? "bg-amber-900/40 border-amber-700/50" : "bg-amber-100 border-amber-300"}`}>
+                        <div className="text-xs uppercase tracking-widest text-amber-400 mb-1">Total</div>
+                        <div className="text-2xl font-black text-amber-300">{allowDamageTotals ? (splitA ? splitA.totalPostFnp : 0) + splitB.totalPostFnp : "–"}</div>
+                        <div className="text-xs text-gray-400">dmg</div>
+                      </div>
+                    </div>
+                    {splitB.errors.length > 0 && (
+                      <div className="mt-2 text-xs text-red-400 space-y-0.5">
+                        {splitB.errors.map((e, i) => <div key={i}>⚠ {e}</div>)}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <div className="mt-3">
                   <div className="space-y-2">
@@ -1805,7 +2081,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                 </div>
                 {showLog && (
                   <ol className={`text-sm leading-relaxed list-decimal pl-5 space-y-1 ${theme === "dark" ? "text-gray-100" : "text-gray-800"}`}>
-                    {displayComputed.log.map((line, idx) => (
+                    {activeComputed.log.map((line, idx) => (
                       <li key={idx}>{line}</li>
                     ))}
                   </ol>

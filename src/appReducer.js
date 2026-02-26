@@ -87,6 +87,31 @@ export const initialEaster = {
   lastClearAllTapMs: 0,
 };
 
+export const initialTargetB = {
+  toughness: "",
+  armorSave: "",
+  invulnSave: "",
+  fnpEnabled: false,
+  fnp: "",
+  inCover: false,
+  ignoreAp: false,
+  ignoreFirstFailedSave: false,
+  minusOneDamage: false,
+  halfDamage: false,
+  saveMod: 0,
+};
+
+export const initialDiceB = {
+  saveRollsText: "",
+  damageRolls: "",
+  fnpRollsText: "",
+};
+
+export const initialSplit = {
+  enabled: false,
+  woundsToA: "",  // how many savable wounds go to Target A (string for input)
+};
+
 export const initialState = {
   weapon: initialWeapon,
   target: initialTarget,
@@ -94,6 +119,9 @@ export const initialState = {
   rerolls: initialRerolls,
   ui: initialUI,
   easter: initialEaster,
+  targetB: initialTargetB,
+  diceB: initialDiceB,
+  split: initialSplit,
 };
 
 // ─────────────────────────────────────────
@@ -203,6 +231,43 @@ function easterReducer(state, action) {
   }
 }
 
+function targetBReducer(state, action) {
+  switch (action.type) {
+    case "SET_TARGET_B_FIELD":
+      return { ...state, [action.field]: action.value };
+    case "CLEAR_TARGET_B":
+      return { ...initialTargetB };
+    case "LOAD_TARGET_B":
+      return { ...initialTargetB, ...action.target };
+    default:
+      return state;
+  }
+}
+
+function diceBReducer(state, action) {
+  switch (action.type) {
+    case "SET_DICE_B_FIELD":
+      return { ...state, [action.field]: action.value };
+    case "CLEAR_DICE_B":
+      return { ...initialDiceB };
+    default:
+      return state;
+  }
+}
+
+function splitReducer(state, action) {
+  switch (action.type) {
+    case "SET_SPLIT_FIELD":
+      return { ...state, [action.field]: action.value };
+    case "TOGGLE_SPLIT":
+      return { ...state, enabled: !state.enabled, woundsToA: "" };
+    case "CLEAR_SPLIT":
+      return { ...initialSplit };
+    default:
+      return state;
+  }
+}
+
 // ─────────────────────────────────────────
 // Root reducer
 // ─────────────────────────────────────────
@@ -230,6 +295,9 @@ export function appReducer(state, action) {
           ? { ...initialTarget, saveMod: savedHooks.saveMod, hasLeaderAttached: savedHooks.hasLeaderAttached, allocatePrecisionToLeader: savedHooks.allocatePrecisionToLeader }
           : { ...initialTarget },
         dice: { ...initialDice },
+        targetB: { ...initialTargetB },
+        diceB: { ...initialDiceB },
+        split: { ...initialSplit },
       };
     }
 
@@ -281,6 +349,25 @@ export function appReducer(state, action) {
 
     case "SET_EASTER_FIELD":
       return { ...state, easter: easterReducer(state.easter, action) };
+
+    case "SET_TARGET_B_FIELD":
+    case "CLEAR_TARGET_B":
+    case "LOAD_TARGET_B":
+      return { ...state, targetB: targetBReducer(state.targetB, action) };
+
+    case "SET_DICE_B_FIELD":
+    case "CLEAR_DICE_B":
+      return { ...state, diceB: diceBReducer(state.diceB, action) };
+
+    case "SET_SPLIT_FIELD":
+    case "TOGGLE_SPLIT":
+    case "CLEAR_SPLIT":
+      return { ...state, split: splitReducer(state.split, action) };
+
+    case "CLEAR_ALL": {
+      // Already handled above — re-check includes split+targetB
+      return state; // unreachable, handled in first CLEAR_ALL case
+    }
 
     default:
       return state;
