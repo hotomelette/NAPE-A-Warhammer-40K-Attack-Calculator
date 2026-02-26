@@ -5,11 +5,26 @@ import { parseDiceList, parseDiceSpec, clampModPlusMinusOne, rollDice } from "./
 import { appReducer, initialState } from "./appReducer.js";
 
 const APP_NAME = "NAPE – A Warhammer 40K Attack Calculator";
-const APP_VERSION = "5.17";
+const APP_VERSION = "5.18";
 
 /* =========================
    Helpers — see calculatorUtils.js
 ========================= */
+
+function DiceEntryTooltipContent({ theme }) {
+  const dark = theme === "dark";
+  return (
+    <div className={`text-xs space-y-1 ${dark ? "text-gray-200" : "text-gray-700"}`}>
+      <div className="font-bold mb-1">Dice entry sequence:</div>
+      <div>1. <strong>Attacks</strong> (if random) — enter expression, roll, enter results</div>
+      <div>2. <strong>Hit rolls</strong> — one die per attack (skip if Torrent)</div>
+      <div>3. <strong>Wound rolls</strong> — one die per hit</div>
+      <div>4. <strong>Save rolls</strong> — one die per savable wound</div>
+      <div>5. <strong>FNP rolls</strong> — one die per damage point (if FNP enabled)</div>
+      <div>6. <strong>Damage rolls</strong> — one die per failed save (if D is variable)</div>
+    </div>
+  );
+}
 
 function DiceEntryTooltip({ theme }) {
   const [show, setShow] = React.useState(false);
@@ -561,7 +576,7 @@ function AttackCalculator() {
 
   const {
     theme, simpleMode, showLog, showLimitations, showCheatSheet,
-    showDiceRef, showWizard, strictMode, preserveHooks,
+    showDiceRef, showTableUse, showWizard, strictMode, preserveHooks,
   } = ui;
 
   const {
@@ -639,6 +654,7 @@ function AttackCalculator() {
   const setShowLimitations = v => dispatch({ type: "SET_UI_FIELD", field: "showLimitations", value: v });
   const setShowCheatSheet  = v => dispatch({ type: "SET_UI_FIELD", field: "showCheatSheet",  value: v });
   const setShowDiceRef     = v => dispatch({ type: "SET_UI_FIELD", field: "showDiceRef",     value: v });
+  const setShowTableUse    = v => dispatch({ type: "SET_UI_FIELD", field: "showTableUse",    value: v });
   const setShowWizard      = v => dispatch({ type: "SET_UI_FIELD", field: "showWizard",      value: v });
   const setStrictMode      = v => dispatch({ type: "SET_UI_FIELD", field: "strictMode",      value: v });
   const setPreserveHooks   = v => dispatch({ type: "SET_UI_FIELD", field: "preserveHooks",   value: v });
@@ -1167,68 +1183,68 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
 
 
               <div className="max-w-screen-2xl mx-auto space-y-4 px-2 overflow-visible">
-          <div className={`rounded-2xl ${viz.headerBg} shadow p-4 border border-gray-700 text-gray-100`}>
-            <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-4 items-stretch">
-              <div className="min-w-0">
-                <div className="flex items-center gap-3 min-w-0 self-start">
-  <img
-    src="/favicon-256.png"
-    alt="NAPE"
-    className="h-16 w-16 md:h-20 md:w-20 rounded-xl border border-gray-700 bg-gray-900/40 p-1 shrink-0"
-  />
-  <div className="text-3xl md:text-4xl font-extrabold tracking-wide leading-tight">
-    {APP_NAME}
-  </div>
-</div>
-                <div className="text-2xl md:text-3xl font-extrabold tracking-wide leading-tight mt-0.5">
-                  10th Edition
-                </div>
-              <div className={`text-sm uppercase tracking-widest ${viz.accentText} mt-1`}>Manual dice, rules-accurate sequencing</div>
-                            <div className="mt-2">
-                <div className="text-sm text-gray-200 font-semibold">Table use</div>
-                <ul className="mt-1 text-xs text-gray-200 list-disc pl-5 space-y-1">
-                  <li>Enter Weapon stats → Target stats → then dice (dice entry is last).</li>
-                  <li>If Attacks is random (e.g. D6, 2D6, D6+1), enter the expression in the Attacks field. Roll your attack dice and enter the rolled values in “Attack rolls” — any +N modifier is added automatically.</li>
-                  <li>Then roll Hit dice, then Wound dice, then Save dice, then FNP dice (if applicable).</li>
-                  <li>Wound-roll pool auto-adjusts for Lethal Hits and Sustained Hits.</li>
-                </ul>
-              </div>
-            </div>
-
-              {/* Status (centered between title and controls) */}
-              <div className="flex flex-col justify-center">
-                <div className={`w-full inline-flex items-center justify-center gap-3 rounded-2xl border px-6 py-4 text-xl ${statusClass}`}>
-                <span className="text-3xl leading-none">{statusEmoji}</span>
-                <span className="font-extrabold tracking-wide">{status}</span>
+        {/* ── Slim sticky header ── */}
+        <div className={`sticky top-0 z-40 ${viz.headerBg} border-b border-gray-700/80 shadow-lg`}>
+          <div className="max-w-screen-2xl mx-auto px-3 py-2 flex items-center justify-between gap-3">
+            <span className="text-xs font-extrabold tracking-widest px-2 py-0.5 rounded border border-gray-600 text-gray-300 bg-gray-900/60 shrink-0">NAPE</span>
+            <div className="flex items-center gap-3 flex-1 justify-center flex-wrap min-w-0">
+              <div className={`inline-flex items-center gap-2 rounded-xl border px-3 py-1 text-sm font-bold ${statusClass}`}>
+                <span className="text-lg leading-none">{statusEmoji}</span>
+                <span>{status}</span>
               </div>
               {!statsReady ? (
-                <div className="mt-2 text-sm text-gray-200">
-                  <span className="opacity-90">Missing:</span> {[...missingWeapon, ...missingTarget].join(", ")}
-                </div>
+                <span className="text-xs text-gray-400 truncate max-w-[220px]">Missing: {[...missingWeapon, ...missingTarget].join(", ")}</span>
               ) : status === "Waiting for dice" ? (
-                <div className="mt-2 text-sm text-gray-200">
-                  <span className="opacity-90">Finish dice:</span> Hit {hitRemaining}, Wound {woundRemaining}, Save {saveRemaining}
-                  {fnpNeeded > 0 ? `, FNP ${fnpRemaining}` : ""}
+                <span className="text-xs text-gray-400">Hit {hitRemaining} · Wound {woundRemaining} · Save {saveRemaining}{fnpNeeded > 0 ? ` · FNP ${fnpRemaining}` : ""}</span>
+              ) : diceReady ? (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xl leading-none">{viz.emoji}</span>
+                  <span className={`text-2xl font-extrabold tabular-nums ${viz.totalNumber}`}>{dmgStr}</span>
+                  <span className="text-xs text-gray-400">dmg</span>
                 </div>
               ) : null}
             </div>
-
-            </div>
-
-            {/* Header action buttons */}
-            <div className="flex flex-wrap gap-2 mt-3">
-
-              <button
-                type="button"
-                className="rounded-lg bg-gray-900 text-gray-100 px-4 py-2 text-sm font-semibold border border-gray-700 hover:bg-gray-800 transition"
-                onClick={() => setShowDiceRef(true)}
-                title="Opens the dice sequencing reference."
-              >
-                🎲 Dice reference
+            <div className="flex items-center gap-2 shrink-0">
+              <button type="button"
+                className={`rounded px-2 py-1 text-xs font-bold border transition ${simpleMode ? "bg-emerald-600/80 text-white border-emerald-500/40" : "bg-gray-900/80 text-gray-300 border-gray-700 hover:bg-gray-800"}`}
+                onClick={toggleSimpleMode} title="Toggle Simple/Complex mode">
+                {simpleMode ? "Simple" : "Complex"}
+              </button>
+              <button type="button"
+                className="rounded px-2 py-1 text-xs font-bold border bg-gray-900/80 text-gray-300 border-gray-700 hover:bg-gray-800 transition"
+                onClick={toggleTheme}>
+                {theme === "dark" ? "🌙" : "☀️"}
               </button>
             </div>
-
+          </div>
         </div>
+
+                {/* ── Mini results strip (shows live damage when stats ready) ── */}
+        {statsReady && (
+          <div className={`rounded-xl border px-4 py-2 flex items-center gap-4 flex-wrap ${viz.totalPanel}`}>
+            <div className="flex items-center gap-2">
+              <span className="text-2xl leading-none">{viz.emoji}</span>
+              <span className={`text-4xl font-extrabold tabular-nums leading-none ${viz.totalNumber}`}>{dmgStr}</span>
+              <div className="flex flex-col ml-1">
+                <span className={`text-xs uppercase tracking-widest ${viz.totalLabel}`}>{totalLabelText}</span>
+                <span className={`text-xs ${viz.totalMeta}`}>{diceReady ? "final · post-mitigation" : "preview"}</span>
+              </div>
+            </div>
+            {splitEnabled && activeSplitResults.length > 1 && (
+              <div className="flex items-center gap-3 flex-wrap ml-2">
+                {activeSplitResults.map((r, i) => r && (
+                  <div key={i} className="flex items-center gap-1 text-sm">
+                    <span className="text-xs text-gray-400">T{i + 1}:</span>
+                    <span className="font-extrabold tabular-nums text-amber-300">{allowDamageTotals ? r.totalPostFnp : "–"}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {activeComputed.errors.length > 0 && (
+              <div className="text-xs text-red-400 ml-auto">{activeComputed.errors.length} issue{activeComputed.errors.length > 1 ? "s" : ""} ⚠</div>
+            )}
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 overflow-visible">
           {/* LEFT: Inputs */}
@@ -1546,24 +1562,24 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <StatLabel label="T" full="Toughness" example="e.g. 4" required={!t.toughness} theme={theme} />
-                          <input type="text" inputMode="numeric" value={t.toughness} onChange={e => setSplitTargetField(i, "toughness", e.target.value)}
+                          <input type="text" inputMode="numeric" inputMode="numeric" value={t.toughness} onChange={e => setSplitTargetField(i, "toughness", e.target.value)}
                             placeholder="T e.g. 4" className={`w-full rounded border p-2 font-bold ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300"} ${!t.toughness ? "border-red-500/60" : ""}`} />
                         </div>
                         <div>
                           <StatLabel label="Sv+" full="Armour Save" example="e.g. 3 (means 3+)" required={!t.armorSave} theme={theme} />
-                          <input type="text" inputMode="numeric" value={t.armorSave} onChange={e => setSplitTargetField(i, "armorSave", e.target.value)}
+                          <input type="text" inputMode="numeric" inputMode="numeric" value={t.armorSave} onChange={e => setSplitTargetField(i, "armorSave", e.target.value)}
                             placeholder="Sv+ e.g. 3" className={`w-full rounded border p-2 font-bold ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300"} ${!t.armorSave ? "border-red-500/60" : ""}`} />
                         </div>
                         <div>
                           <StatLabel label="Inv+" full="Invuln Save" example="e.g. 5 (means 5+)" theme={theme} />
-                          <input type="text" inputMode="numeric" value={t.invulnSave} onChange={e => setSplitTargetField(i, "invulnSave", e.target.value)}
+                          <input type="text" inputMode="numeric" inputMode="numeric" value={t.invulnSave} onChange={e => setSplitTargetField(i, "invulnSave", e.target.value)}
                             placeholder="Inv+ e.g. 5" className={`w-full rounded border p-2 font-bold ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300"}`} />
                         </div>
                         <div>
                           <StatLabel label="FNP+" full="Feel No Pain" example="e.g. 5 (means 5+)" theme={theme} />
                           <div className="flex items-center gap-2">
                             <input type="checkbox" checked={t.fnpEnabled} onChange={e => setSplitTargetField(i, "fnpEnabled", e.target.checked)} className="h-4 w-4 accent-amber-400" />
-                            <input type="text" inputMode="numeric" value={t.fnp} onChange={e => setSplitTargetField(i, "fnp", e.target.value)}
+                            <input type="text" inputMode="numeric" inputMode="numeric" value={t.fnp} onChange={e => setSplitTargetField(i, "fnp", e.target.value)}
                               disabled={!t.fnpEnabled} placeholder="FNP+ e.g. 5"
                               className={`flex-1 rounded border p-2 font-bold disabled:opacity-40 ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300"}`} />
                           </div>
@@ -2094,67 +2110,24 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                   Deterministic Combat Patrol-first rules interpretation. Rough accuracy: ~96–98% Combat Patrol, ~85–95% full 40k (varies by edge cases).
                 </div>
               </div>
-              <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
-              <button
-                type="button"
-                className={`rounded-lg px-3 py-2 text-sm font-extrabold border w-full md:w-auto ${
-                  simpleMode
-                    ? "bg-gradient-to-r from-emerald-600/80 to-teal-600/80 text-white border-emerald-400/30 hover:from-emerald-500/90 hover:to-teal-500/90"
-                    : "bg-gray-900 text-gray-100 border-gray-700 hover:bg-gray-800"
-                }`}
-                onClick={toggleSimpleMode}
-                title="Simple mode hides keywords, crit thresholds, and split volley for quick table use."
-              >
-                {simpleMode ? "⚔️ Simple mode" : "⚔️ Simple mode"}
-              </button>
-              <button
-                type="button"
-                  className="rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font-semibold border border-gray-700 hover:bg-gray-800 w-full md:w-auto"
-                onClick={toggleTheme}
-                title="Toggle light/dark theme"
-              >
-                Theme: {theme === "dark" ? "Dark" : "Light"}
-              </button>
-              <button
-                type="button"
-                className={`rounded-lg px-3 py-2 text-sm font-extrabold border w-full md:w-auto ${
-                  preserveHooks
-                    ? "bg-gradient-to-r from-sky-500/80 to-indigo-500/80 text-white border-sky-200/30 hover:from-sky-400/90 hover:to-indigo-400/90"
-                    : "bg-gray-900 text-gray-100 border-gray-700 hover:bg-gray-800"
-                }`}
-                onClick={() => setPreserveHooks(!preserveHooks)}
-                title="When enabled, Clear actions keep persistent toggle/option hooks."
-              >
-                Preserve hooks: {preserveHooks ? "ON" : "OFF"}
-              </button>
-              <button
-                type="button"
-                className={`rounded-lg px-3 py-2 text-sm font-extrabold border w-full md:w-auto ${
-                  strictMode
-                    ? "bg-gradient-to-r from-red-500/80 to-rose-500/80 text-white border-red-200/30 hover:from-red-400/90 hover:to-rose-400/90"
-                    : "bg-gray-900 text-gray-100 border-gray-700 hover:bg-gray-800"
-                }`}
-                onClick={() => setStrictMode(!strictMode)}
-                title="When enabled, totals are locked until stats + dice are complete (no soft totals)."
-              >
-                Strict mode: {strictMode ? "ON" : "OFF"}
-              </button>
-
-              <button
-                type="button"
-                  className="rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font-semibold border border-gray-700 hover:bg-gray-800 w-full md:w-auto"
-                onClick={() => setShowLimitations(!showLimitations)}
-              >
-                {showLimitations ? "Hide limitations" : "Show limitations"}
-              </button>
-
-              <button
-                type="button"
-                  className="rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font-semibold border border-gray-700 hover:bg-gray-800 w-full md:w-auto"
-                onClick={() => setShowCheatSheet(!showCheatSheet)}
-              >
-                {showCheatSheet ? "Hide cheat sheet" : "Show cheat sheet"}
-              </button>
+              <div className="flex flex-wrap gap-2 w-full md:w-auto">
+                {[
+                  { label: simpleMode ? "⚔️ Simple" : "⚔️ Complex", on: simpleMode, action: toggleSimpleMode, title: "Toggle Simple/Complex mode" },
+                  { label: theme === "dark" ? "🌙 Dark" : "☀️ Light", on: false, action: toggleTheme, title: "Toggle theme" },
+                  { label: `Preserve hooks: ${preserveHooks ? "ON" : "OFF"}`, on: preserveHooks, action: () => setPreserveHooks(!preserveHooks), title: "Keep toggle states on Clear" },
+                  { label: `Strict: ${strictMode ? "ON" : "OFF"}`, on: strictMode, action: () => setStrictMode(!strictMode), title: "Lock totals until dice complete" },
+                  { label: showTableUse ? "Hide table guide" : "📋 Table guide", on: showTableUse, action: () => setShowTableUse(!showTableUse), title: "Show/hide table use guide" },
+                  { label: showDiceRef ? "Hide dice ref" : "🎲 Dice ref", on: showDiceRef, action: () => setShowDiceRef(!showDiceRef), title: "Dice sequencing reference" },
+                  { label: showLimitations ? "Hide limitations" : "Limitations", on: showLimitations, action: () => setShowLimitations(!showLimitations) },
+                  { label: showCheatSheet ? "Hide cheat sheet" : "Cheat sheet", on: showCheatSheet, action: () => setShowCheatSheet(!showCheatSheet) },
+                  { label: showLog ? "Hide log" : "Show log", on: showLog, action: () => setShowLog(!showLog) },
+                ].map(({ label, on, action, title }) => (
+                  <button key={label} type="button"
+                    className={`rounded px-2 py-1 text-xs font-semibold border transition ${on ? "bg-amber-600/70 text-white border-amber-500/40" : "bg-gray-900 text-gray-300 border-gray-700 hover:bg-gray-800"}`}
+                    onClick={action} title={title}>
+                    {label}
+                  </button>
+                ))}
             </div>
           </div>
 
@@ -2175,6 +2148,29 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
           </div>
 
 
+
+          {showTableUse && (
+            <div className={`rounded-2xl border p-4 ${theme === "dark" ? "bg-slate-900 border-gray-700 text-gray-100" : "bg-white border-gray-200 text-gray-900"}`}>
+              <div className="text-sm font-extrabold mb-2">📋 Table Use Guide</div>
+              <ul className="text-xs space-y-1.5 list-disc pl-5 text-gray-300">
+                <li>Enter <strong>Weapon</strong> stats first (A, BS/WS, S, AP, D), then <strong>Target</strong> stats (T, Sv+).</li>
+                <li>If Attacks is random (D6, 2D6, D6+1) enter the expression, roll your attack dice, enter the rolled values in <em>Attack rolls</em>. The +N modifier is added automatically.</li>
+                <li>Roll and enter dice in sequence: Hit → Wound → Save → FNP (if enabled).</li>
+                <li>Wound-roll pool auto-adjusts for Lethal Hits and Sustained Hits.</li>
+                <li>Split Volley: enable after wound rolls to divide wounds across multiple targets, each with their own stats and save dice.</li>
+                <li>Use <strong>Roll all</strong> to auto-fill all dice at once for quick previews.</li>
+              </ul>
+            </div>
+          )}
+
+          {showDiceRef && (
+            <div className={`rounded-2xl border p-4 ${theme === "dark" ? "bg-slate-900 border-gray-700 text-gray-100" : "bg-white border-gray-200 text-gray-900"}`}>
+              <div className="text-sm font-extrabold mb-2">🎲 Dice Reference</div>
+              <div className={`rounded-xl border p-3 text-xs ${theme === "dark" ? "bg-gray-900 border-gray-700" : "bg-gray-50 border-gray-200"}`}>
+                <DiceEntryTooltipContent theme={theme} />
+              </div>
+            </div>
+          )}
 
           {showLimitations && (
             <div className="mt-4 rounded-xl border border-gray-700 bg-gray-950/30 p-3">

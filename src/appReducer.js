@@ -75,6 +75,7 @@ export const initialUI = {
     try { return localStorage.getItem("nape-simple-mode") === "true"; } catch { return false; }
   })(),
   showLog: true,
+  showTableUse: false,
   showLimitations: false,
   showCheatSheet: false,
   showDiceRef: false,
