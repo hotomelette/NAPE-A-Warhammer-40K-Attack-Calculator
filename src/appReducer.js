@@ -364,11 +364,6 @@ export function appReducer(state, action) {
     case "CLEAR_SPLIT":
       return { ...state, split: splitReducer(state.split, action) };
 
-    case "CLEAR_ALL": {
-      // Already handled above — re-check includes split+targetB
-      return state; // unreachable, handled in first CLEAR_ALL case
-    }
-
     default:
       return state;
   }
