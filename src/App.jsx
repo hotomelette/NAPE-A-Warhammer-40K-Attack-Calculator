@@ -615,6 +615,25 @@ export default function AttackCalculator() {
   const setClearAllTapCount = v => dispatch({ type: "SET_EASTER_FIELD", field: "clearAllTapCount", value: v });
   const setLastClearAllTapMs= v => dispatch({ type: "SET_EASTER_FIELD", field: "lastClearAllTapMs",value: v });
 
+  // ── Easter egg helpers ──
+  const triggerEmperorToast = () => {
+    setEmperorToast(true);
+    window.setTimeout(() => setEmperorToast(false), 5000);
+  };
+
+  const handleClearAllEaster = () => {
+    const now = Date.now();
+    const within = now - lastClearAllTapMs <= 1200;
+    const next = within ? clearAllTapCount + 1 : 1;
+    setLastClearAllTapMs(now);
+    setClearAllTapCount(next);
+    if (next >= 5) {
+      setClearAllTapCount(0);
+      setLastClearAllTapMs(0);
+      triggerEmperorToast();
+    }
+  };
+
   // ── Compound actions ──
   const clearDice   = () => dispatch({ type: "CLEAR_DICE" });
   const clearWeapon = () => dispatch({ type: "CLEAR_WEAPON" });
