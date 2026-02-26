@@ -1740,73 +1740,72 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
 
                           </Section>
 
-                          {splitEnabled && (
-                            <Section theme={theme} title="🎯 Target B — Dice">
-                              <div className={`text-xs mb-2 ${theme === "dark" ? "text-amber-400" : "text-amber-600"}`}>
-                                {woundsToBNum} wounds allocated → Target B saves
-                              </div>
-
-                              <Field
-                                label={<CounterLabel prefix="Save rolls (B)" need={woundsToBNum} entered={parseDiceList(saveRollsTextB).length} remaining={woundsToBNum - parseDiceList(saveRollsTextB).length} theme={theme} />}
-                                hint={splitB ? `Save target: ${splitB.saveTarget}+` : "Enter Target B stats first."}
-                                theme={theme}
-                              >
-                                <div className="flex gap-2">
-                                  <input
-                                    className={`flex-1 rounded border p-2 text-lg font-semibold ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100 placeholder:text-gray-500" : "bg-white border-gray-300 text-gray-900"} ${parseDiceList(saveRollsTextB).length !== woundsToBNum && woundsToBNum > 0 ? "border-red-500 ring-2 ring-red-200" : ""}`}
-                                    value={saveRollsTextB}
-                                    onChange={e => setSaveRollsTextB(e.target.value)}
-                                    placeholder="e.g. 5 2 6 ..."
-                                  />
-                                  <button type="button" title="Roll for me" disabled={woundsToBNum === 0}
-                                    onClick={() => setSaveRollsTextB(rollDice(woundsToBNum, 6))}
-                                    className="rounded-lg bg-amber-500 hover:bg-amber-400 disabled:opacity-30 text-gray-950 px-3 font-bold text-lg transition">🎲</button>
+                          {splitEnabled && extraTargets.map((t, i) => {
+                            const sr = splitResults[i + 1];
+                            const woundsN = Math.max(0, parseInt(t.wounds) || 0);
+                            return (
+                              <Section key={i} theme={theme} title={`🎯 Target ${i + 2} — Dice`}>
+                                <div className={`text-xs mb-2 ${theme === "dark" ? "text-amber-400" : "text-amber-600"}`}>
+                                  {woundsN} wounds allocated → Target {i + 2} saves
                                 </div>
-                              </Field>
-
-                              {!damageFixed && (
                                 <Field
-                                  label={<CounterLabel prefix="Damage rolls (B)" need={splitB ? splitB.failedSavesEffective : 0} entered={parseDiceList(damageRollsB).length} remaining={(splitB ? splitB.failedSavesEffective : 0) - parseDiceList(damageRollsB).length} theme={theme} />}
-                                  hint="One die per failed save. Modifier auto-added."
+                                  label={<CounterLabel prefix={`Save rolls (T${i + 2})`} need={woundsN} entered={parseDiceList(t.saveRollsText).length} remaining={woundsN - parseDiceList(t.saveRollsText).length} theme={theme} />}
+                                  hint={sr ? `Save target: ${sr.saveTarget}+` : "Enter Target stats first."}
                                   theme={theme}
                                 >
                                   <div className="flex gap-2">
                                     <input
-                                      className={`flex-1 rounded border p-2 text-lg font-semibold ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100 placeholder:text-gray-500" : "bg-white border-gray-300 text-gray-900"}`}
-                                      value={damageRollsB}
-                                      onChange={e => setDamageRollsB(e.target.value)}
-                                      placeholder="e.g. 3 5 2 ..."
+                                      className={`flex-1 rounded border p-2 text-lg font-semibold ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100 placeholder:text-gray-500" : "bg-white border-gray-300 text-gray-900"} ${parseDiceList(t.saveRollsText).length !== woundsN && woundsN > 0 ? "border-red-500 ring-2 ring-red-200" : ""}`}
+                                      value={t.saveRollsText}
+                                      onChange={e => setSplitTargetField(i, "saveRollsText", e.target.value)}
+                                      placeholder="e.g. 5 2 6 ..."
                                     />
-                                    <button type="button" title="Roll for me"
-                                      disabled={!splitB || splitB.failedSavesEffective === 0}
-                                      onClick={() => { const sp = parseDiceSpec(damageValue); setDamageRollsB(rollDice(splitB.failedSavesEffective, sp.sides)); }}
+                                    <button type="button" title="Roll for me" disabled={woundsN === 0}
+                                      onClick={() => setSplitTargetField(i, "saveRollsText", rollDice(woundsN, 6))}
                                       className="rounded-lg bg-amber-500 hover:bg-amber-400 disabled:opacity-30 text-gray-950 px-3 font-bold text-lg transition">🎲</button>
                                   </div>
                                 </Field>
-                              )}
-
-                              {(fnpEnabledB && fnpB !== "") && (
-                                <Field
-                                  label={<CounterLabel prefix="FNP rolls (B)" need={splitB ? splitB.fnpNeeded : 0} entered={parseDiceList(fnpRollsTextB).length} remaining={(splitB ? splitB.fnpNeeded : 0) - parseDiceList(fnpRollsTextB).length} theme={theme} />}
-                                  hint="One die per point of damage on Target B."
-                                  theme={theme}
-                                >
-                                  <div className="flex gap-2">
-                                    <input
-                                      className={`flex-1 rounded border p-2 text-lg font-semibold ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100 placeholder:text-gray-500" : "bg-white border-gray-300 text-gray-900"}`}
-                                      value={fnpRollsTextB}
-                                      onChange={e => setFnpRollsTextB(e.target.value)}
-                                      placeholder="e.g. 1 5 6 ..."
-                                    />
-                                    <button type="button" title="Roll for me"
-                                      disabled={!splitB || splitB.fnpNeeded === 0}
-                                      onClick={() => setFnpRollsTextB(rollDice(splitB.fnpNeeded, 6))}
-                                      className="rounded-lg bg-amber-500 hover:bg-amber-400 disabled:opacity-30 text-gray-950 px-3 font-bold text-lg transition">🎲</button>
-                                  </div>
-                                </Field>
-                              )}
-                            </Section>
-                          )}
+                                {!damageFixed && (
+                                  <Field
+                                    label={<CounterLabel prefix={`Damage rolls (T${i + 2})`} need={sr ? sr.failedSavesEffective : 0} entered={parseDiceList(t.damageRolls).length} remaining={(sr ? sr.failedSavesEffective : 0) - parseDiceList(t.damageRolls).length} theme={theme} />}
+                                    hint="One die per failed save." theme={theme}
+                                  >
+                                    <div className="flex gap-2">
+                                      <input
+                                        className={`flex-1 rounded border p-2 text-lg font-semibold ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100 placeholder:text-gray-500" : "bg-white border-gray-300 text-gray-900"}`}
+                                        value={t.damageRolls}
+                                        onChange={e => setSplitTargetField(i, "damageRolls", e.target.value)}
+                                        placeholder="e.g. 3 5 2 ..."
+                                      />
+                                      <button type="button" title="Roll for me"
+                                        disabled={!sr || sr.failedSavesEffective === 0}
+                                        onClick={() => { const sp = parseDiceSpec(damageValue); setSplitTargetField(i, "damageRolls", rollDice(sr.failedSavesEffective, sp.sides)); }}
+                                        className="rounded-lg bg-amber-500 hover:bg-amber-400 disabled:opacity-30 text-gray-950 px-3 font-bold text-lg transition">🎲</button>
+                                    </div>
+                                  </Field>
+                                )}
+                                {(t.fnpEnabled && t.fnp !== "") && (
+                                  <Field
+                                    label={<CounterLabel prefix={`FNP rolls (T${i + 2})`} need={sr ? sr.fnpNeeded : 0} entered={parseDiceList(t.fnpRollsText).length} remaining={(sr ? sr.fnpNeeded : 0) - parseDiceList(t.fnpRollsText).length} theme={theme} />}
+                                    hint="One die per point of damage." theme={theme}
+                                  >
+                                    <div className="flex gap-2">
+                                      <input
+                                        className={`flex-1 rounded border p-2 text-lg font-semibold ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100 placeholder:text-gray-500" : "bg-white border-gray-300 text-gray-900"}`}
+                                        value={t.fnpRollsText}
+                                        onChange={e => setSplitTargetField(i, "fnpRollsText", e.target.value)}
+                                        placeholder="e.g. 1 5 6 ..."
+                                      />
+                                      <button type="button" title="Roll for me"
+                                        disabled={!sr || sr.fnpNeeded === 0}
+                                        onClick={() => setSplitTargetField(i, "fnpRollsText", rollDice(sr.fnpNeeded, 6))}
+                                        className="rounded-lg bg-amber-500 hover:bg-amber-400 disabled:opacity-30 text-gray-950 px-3 font-bold text-lg transition">🎲</button>
+                                    </div>
+                                  </Field>
+                                )}
+                              </Section>
+                            );
+                          })}
 
 <Section theme={theme} title="Results">
 
