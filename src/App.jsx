@@ -5,7 +5,7 @@ import { parseDiceList, parseDiceSpec, clampModPlusMinusOne, rollDice } from "./
 import { appReducer, initialState } from "./appReducer.js";
 
 const APP_NAME = "NAPE – A Warhammer 40K Attack Calculator";
-const APP_VERSION = "5.16";
+const APP_VERSION = "5.17";
 
 /* =========================
    Helpers — see calculatorUtils.js
@@ -57,6 +57,15 @@ function StatLabel({ label, full, example, required, theme }) {
   );
 }
 
+function InlineStatField({ label, children }) {
+  return (
+    <div className="flex items-center gap-3">
+      <div className="w-20 shrink-0 text-base font-extrabold">{label}</div>
+      <div className="flex-1 min-w-0">{children}</div>
+    </div>
+  );
+}
+
 function RollAllButton({ onClick, disabled, isRolling, isReady }) {
   const cls = isRolling
     ? "flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-extrabold border transition bg-amber-600 border-amber-400 text-gray-950 animate-pulse cursor-wait"
@@ -92,22 +101,33 @@ function Section({ title, theme, children, action }) {
   );
 }
 
-function Field({ label, hint, children, theme }) {
-  const hintClass =
-    theme === "dark" ? "text-xs text-gray-300" : "text-xs text-gray-600";
+function FieldHint({ hint, theme }) {
+  const [show, setShow] = React.useState(false);
+  if (!hint) return null;
+  return (
+    <span className="relative inline-flex" style={{ overflow: "visible" }}>
+      <span
+        onMouseEnter={() => setShow(true)}
+        onMouseLeave={() => setShow(false)}
+        className={`cursor-help rounded border px-1 py-0.5 select-none ${theme === "dark" ? "border-gray-600 text-gray-400 hover:text-gray-200" : "border-gray-300 text-gray-500 hover:text-gray-700"}`}
+        style={{ fontSize: "10px", lineHeight: 1 }}
+      >?</span>
+      {show && (
+        <span
+          className={`absolute right-0 top-6 z-[9999] w-64 rounded-lg border p-2 text-xs font-normal shadow-2xl ${theme === "dark" ? "bg-gray-900 border-gray-600 text-gray-200" : "bg-white border-gray-300 text-gray-700"}`}
+          style={{ position: "absolute", pointerEvents: "none", whiteSpace: "normal" }}
+        >{hint}</span>
+      )}
+    </span>
+  );
+}
 
+function Field({ label, hint, children, theme }) {
   return (
     <div className="space-y-1">
-      <div className="flex items-baseline justify-between gap-3">
+      <div className="flex items-center justify-between gap-2">
         <div className="text-sm font-semibold tracking-wide">{label}</div>
-        {hint ? (
-          <div
-            title={hint}
-            className={`${hintClass} leading-tight text-right max-w-[70%] truncate whitespace-nowrap`}
-          >
-            {hint}
-          </div>
-        ) : null}
+        <FieldHint hint={hint} theme={theme} />
       </div>
       {children}
     </div>
@@ -554,7 +574,7 @@ function AttackCalculator() {
 
   // Split dispatch helpers
   const toggleSplit         = () => dispatch({ type: "TOGGLE_SPLIT" });
-  const addSplitTarget      = () => dispatch({ type: "ADD_SPLIT_TARGET" });
+  const addSplitTarget = () => dispatch({ type: "ADD_SPLIT_TARGET", totalWounds: totalSavableWounds });
   const removeSplitTarget   = (i) => dispatch({ type: "REMOVE_SPLIT_TARGET", index: i });
   const setSplitTargetField = (i, field, value) => dispatch({ type: "SET_SPLIT_TARGET_FIELD", index: i, field, value });
 
@@ -702,12 +722,21 @@ function AttackCalculator() {
   // Shared weapon props passed to every split target
   const sharedWeaponProps = { ap, damageFixed, damageValue, devastatingWounds };
 
+  // Auto-sync wound distribution when total changes or targets added
+  const prevTotalRef = React.useRef(totalSavableWounds);
+  React.useEffect(() => {
+    if (splitEnabled && extraTargets.length > 0 && totalSavableWounds !== prevTotalRef.current) {
+      prevTotalRef.current = totalSavableWounds;
+      dispatch({ type: "SYNC_SPLIT_WOUNDS", total: totalSavableWounds });
+    }
+  }, [splitEnabled, totalSavableWounds, extraTargets.length]);
+
   // Build blank disabled params (used when slot has no target)
   const disabledSlot = { woundsAllocated: 0, mortalWoundsAllocated: 0, armorSave: "", invulnSave: "", inCover: false, ignoreAp: false, saveMod: 0, ignoreFirstFailedSave: false, minusOneDamage: false, halfDamage: false, fnp: "", fnpEnabled: false, saveRollsText: "", damageRolls: "", fnpRollsText: "", ...sharedWeaponProps, enabled: false };
 
   // Always call 4 hooks (rules of hooks — must be unconditional)
   const splitResults = [
-    useCalculatorSplit({ woundsAllocated: splitEnabled ? target1Wounds : totalSavableWounds, mortalWoundsAllocated: totalMortalWounds, armorSave, invulnSave, inCover, ignoreAp, saveMod, ignoreFirstFailedSave, minusOneDamage, halfDamage, fnp, fnpEnabled, saveRollsText, damageRolls, fnpRollsText, ...sharedWeaponProps, label: "1", enabled: true }),
+    useCalculatorSplit({ woundsAllocated: splitEnabled ? target1Wounds : totalSavableWounds, mortalWoundsAllocated: totalMortalWounds, armorSave, invulnSave, inCover, ignoreAp, saveMod, ignoreFirstFailedSave, minusOneDamage, halfDamage, fnp, fnpEnabled, saveRollsText: splitEnabled ? parseDiceList(saveRollsText).slice(0, target1Wounds).join(" ") : saveRollsText, damageRolls, fnpRollsText, ...sharedWeaponProps, label: "1", enabled: true }),
     useCalculatorSplit(extraTargets[0] ? { woundsAllocated: Math.max(0, parseInt(extraTargets[0].wounds) || 0), mortalWoundsAllocated: 0, armorSave: extraTargets[0].armorSave, invulnSave: extraTargets[0].invulnSave, inCover: extraTargets[0].inCover, ignoreAp: extraTargets[0].ignoreAp, saveMod: extraTargets[0].saveMod || 0, ignoreFirstFailedSave: extraTargets[0].ignoreFirstFailedSave, minusOneDamage: extraTargets[0].minusOneDamage, halfDamage: extraTargets[0].halfDamage, fnp: extraTargets[0].fnp, fnpEnabled: extraTargets[0].fnpEnabled, saveRollsText: extraTargets[0].saveRollsText, damageRolls: extraTargets[0].damageRolls, fnpRollsText: extraTargets[0].fnpRollsText, ...sharedWeaponProps, label: "2", enabled: splitEnabled } : { ...disabledSlot, label: "2" }),
     useCalculatorSplit(extraTargets[1] ? { woundsAllocated: Math.max(0, parseInt(extraTargets[1].wounds) || 0), mortalWoundsAllocated: 0, armorSave: extraTargets[1].armorSave, invulnSave: extraTargets[1].invulnSave, inCover: extraTargets[1].inCover, ignoreAp: extraTargets[1].ignoreAp, saveMod: extraTargets[1].saveMod || 0, ignoreFirstFailedSave: extraTargets[1].ignoreFirstFailedSave, minusOneDamage: extraTargets[1].minusOneDamage, halfDamage: extraTargets[1].halfDamage, fnp: extraTargets[1].fnp, fnpEnabled: extraTargets[1].fnpEnabled, saveRollsText: extraTargets[1].saveRollsText, damageRolls: extraTargets[1].damageRolls, fnpRollsText: extraTargets[1].fnpRollsText, ...sharedWeaponProps, label: "3", enabled: splitEnabled } : { ...disabledSlot, label: "3" }),
     useCalculatorSplit(extraTargets[2] ? { woundsAllocated: Math.max(0, parseInt(extraTargets[2].wounds) || 0), mortalWoundsAllocated: 0, armorSave: extraTargets[2].armorSave, invulnSave: extraTargets[2].invulnSave, inCover: extraTargets[2].inCover, ignoreAp: extraTargets[2].ignoreAp, saveMod: extraTargets[2].saveMod || 0, ignoreFirstFailedSave: extraTargets[2].ignoreFirstFailedSave, minusOneDamage: extraTargets[2].minusOneDamage, halfDamage: extraTargets[2].halfDamage, fnp: extraTargets[2].fnp, fnpEnabled: extraTargets[2].fnpEnabled, saveRollsText: extraTargets[2].saveRollsText, damageRolls: extraTargets[2].damageRolls, fnpRollsText: extraTargets[2].fnpRollsText, ...sharedWeaponProps, label: "4", enabled: splitEnabled } : { ...disabledSlot, label: "4" }),
@@ -783,7 +812,7 @@ function AttackCalculator() {
 
   const hasHitCountError = !torrent && hitEntered !== hitNeeded;
   const hasWoundCountError = woundEntered !== woundNeeded;
-  const hasSaveCountError = saveEntered !== saveNeeded;
+  const hasSaveCountError = saveNeeded > 0 && saveEntered !== saveNeeded;
   const hasFnpCountError = fnpNeeded > 0 && fnpEntered !== fnpNeeded;
 
   const isNum = (v) => v !== "" && Number.isFinite(Number(v));
@@ -938,11 +967,7 @@ function AttackCalculator() {
       how: "Enable in the Rerolls panel: reroll 1s or reroll all fails for hits and wounds. Twin-linked locks reroll failed wounds ON. The tool determines eligible dice from initial rolls and prompts for the exact reroll count.",
       notes: "Reroll dice are entered separately in Manual dice entry after the initial rolls.",
     },
-    {
-      name: "Precision",
-      what: "Allows attacks to be allocated to a Leader when attached to a unit.",
-      how: "This tool provides an advisory hook only. It does not fully allocate damage to models.",
-    },
+
     {
       name: "Ignore first failed save",
       what: "Negates one failed save.",
@@ -1211,7 +1236,8 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
             <Section theme={theme} title="Weapon">
               <Field
                 label={<StatLabel label="A" full="Attacks" example="e.g. 6 (fixed) or D6+1 (random)" theme={theme} />}
-                hint="Fixed: enter A. Random: uncheck Fixed, enter a dice expression (e.g. D6+1, 2D6, D3+2), then enter the rolled dice in Manual dice entry → Attack rolls. The +N modifier is added automatically."
+                hint="Fixed: enter a number. Random: uncheck Fixed, enter a dice expression (D6+1, 2D6, D3+2). The +N modifier is auto-added to the dice result. Enter rolled attack dice in the Dice entry section."
+                theme={theme}
               >
                 <div className="flex flex-col md:flex-row md:items-center gap-2">
                   <label className="inline-flex items-center gap-2 text-sm text-gray-200 md:min-w-[160px]">
@@ -1250,16 +1276,16 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                 </div>
               </Field>
 
-              <div className="grid grid-cols-2 gap-3">
-                <Field label={<StatLabel label="BS / WS" full="Ballistic / Weapon Skill" example="e.g. 4 = roll 4+ to hit" required={!isNum(toHit)} theme={theme} />} hint="">
-                  <input className={`w-full rounded border p-2 text-lg font-semibold ${!isNum(toHit) ? "border-red-500 ring-2 ring-red-200" : ""}`} type="number" value={toHit} onChange={(e) => setToHit(e.target.value)} placeholder="e.g. 4" />
-                </Field>
-                <Field label={<StatLabel label="S" full="Strength" example="e.g. 5 — compared to target T" required={!isNum(strength)} theme={theme} />} hint="">
-                  <input className={`w-full rounded border p-2 text-lg font-semibold ${!isNum(strength) ? "border-red-500 ring-2 ring-red-200" : ""}`} type="number" value={strength} onChange={(e) => setStrength(e.target.value)} placeholder="e.g. 5" />
-                </Field>
-                <Field label={<StatLabel label="AP" full="Armour Penetration" example="e.g. -1 or -2 (auto-negated)" theme={theme} />} hint="">
+              <div className="space-y-2">
+                <InlineStatField label={<StatLabel label="BS/WS" full="Ballistic / Weapon Skill" example="e.g. 4 = roll 4+ to hit" required={!isNum(toHit)} theme={theme} />}>
+                  <input className={`w-full rounded border p-2 text-xl font-bold ${!isNum(toHit) ? "border-red-500 ring-2 ring-red-200" : ""} ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300 text-gray-900"}`} type="number" value={toHit} onChange={(e) => setToHit(e.target.value)} placeholder="e.g. 4" />
+                </InlineStatField>
+                <InlineStatField label={<StatLabel label="S" full="Strength" example="e.g. 5 — compared to target T" required={!isNum(strength)} theme={theme} />}>
+                  <input className={`w-full rounded border p-2 text-xl font-bold ${!isNum(strength) ? "border-red-500 ring-2 ring-red-200" : ""} ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300 text-gray-900"}`} type="number" value={strength} onChange={(e) => setStrength(e.target.value)} placeholder="e.g. 5" />
+                </InlineStatField>
+                <InlineStatField label={<StatLabel label="AP" full="Armour Penetration" example="e.g. -1 or -2 (auto-negated)" theme={theme} />}>
                   <input
-                    className={`w-full rounded border p-2 text-lg font-semibold ${!isNum(ap) ? "border-red-500 ring-2 ring-red-200" : ""}`}
+                    className={`w-full rounded border p-2 text-xl font-bold ${!isNum(ap) ? "border-red-500 ring-2 ring-red-200" : ""} ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300 text-gray-900"}`}
                     type="number"
                     value={ap}
                     onChange={(e) => {
@@ -1268,19 +1294,19 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                       const n = parseFloat(raw);
                       if (!isNaN(n)) setAp(String(Math.min(0, -Math.abs(n))));
                     }}
-                    placeholder="AP e.g. -1"
+                    placeholder="e.g. -1"
                   />
-                </Field>
+                </InlineStatField>
 
-                <Field label={<StatLabel label="D" full="Damage" example="e.g. 2 (fixed) or D3, D6 (variable)" theme={theme} />} hint="">
-                  <div className="flex flex-col gap-2">
+                <InlineStatField label={<StatLabel label="D" full="Damage" example="e.g. 2 (fixed) or D3, D6 (variable)" theme={theme} />}>
+                  <div className="flex flex-col gap-2 flex-1">
                     <div className="flex items-center gap-2">
-                      <label className="flex items-center gap-2 text-sm">
+                      <label className="flex items-center gap-2 text-sm whitespace-nowrap">
                         <input type="checkbox" checked={damageFixed} onChange={(e) => setDamageFixed(e.target.checked)} />
                         Fixed
                       </label>
                       {damageFixed ? (
-                        <input className={`flex-1 rounded border p-2 text-lg font-semibold ${damageFixed && !isNum(damageValue) ? "border-red-500 ring-2 ring-red-200" : ""}`} type="number" value={damageValue} onChange={(e) => setDamageValue(e.target.value)} placeholder="D e.g. 2" />
+                        <input className={`flex-1 rounded border p-2 text-xl font-bold ${damageFixed && !isNum(damageValue) ? "border-red-500 ring-2 ring-red-200" : ""} ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300 text-gray-900"}`} type="number" value={damageValue} onChange={(e) => setDamageValue(e.target.value)} placeholder="e.g. 2" />
                       ) : (
                         <input
                           className={`flex-1 rounded border p-2 text-lg font-semibold`}
@@ -1311,22 +1337,22 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                       </div>
                     )}
                   </div>
-                </Field>
+                </InlineStatField>
               </div>
 
               {!simpleMode && (
-              <div className="grid grid-cols-2 gap-3 mt-2">
-                <Field label="Critical Hit threshold" hint="Default 6. If crit hits 5+, set 5.">
-                  <input className="w-full rounded border p-2 text-lg font-semibold" type="number" value={critHitThreshold} onChange={(e) => setCritHitThreshold(e.target.value)} />
-                </Field>
-                <Field label="Critical Wound threshold" hint="Default 6. Anti-X may make 5+ or 4+.">
-                  <input className="w-full rounded border p-2 text-lg font-semibold" type="number" value={critWoundThreshold} onChange={(e) => setCritWoundThreshold(e.target.value)} />
-                </Field>
+              <div className="space-y-2 mt-2">
+                <InlineStatField label={<span className="flex items-center gap-1">Crit Hit <FieldHint hint="Default 6. If the weapon crits on 5+, set 5. Affects Lethal Hits and Sustained Hits triggers." theme={theme} /></span>}>
+                  <input className={`w-full rounded border p-2 text-xl font-bold ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300 text-gray-900"}`} type="number" value={critHitThreshold} onChange={(e) => setCritHitThreshold(e.target.value)} />
+                </InlineStatField>
+                <InlineStatField label={<span className="flex items-center gap-1">Crit Wound <FieldHint hint="Default 6. Anti-X rules (e.g. Anti-Infantry 4+) may lower this. Affects Devastating Wounds trigger." theme={theme} /></span>}>
+                  <input className={`w-full rounded border p-2 text-xl font-bold ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300 text-gray-900"}`} type="number" value={critWoundThreshold} onChange={(e) => setCritWoundThreshold(e.target.value)} />
+                </InlineStatField>
               </div>
               )}
 
               {!simpleMode && (
-              <Field label="Keywords / Effects" hint="Enable only what is active for the current weapon/turn.">
+              <Field label="Keywords / Effects" hint="Enable only keywords that apply to this weapon and this firing sequence." theme={theme}>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-2 gap-y-2 text-sm items-start">
 
                   <div className="flex flex-wrap items-center gap-2 self-start min-h-[40px]">
@@ -1414,11 +1440,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                     <span className="text-xs text-gray-300">(reroll failed wounds)</span>
                   </label>
 
-                  <label className="flex items-center gap-2 min-h-[40px]">
-                    <input type="checkbox" checked={precision} onChange={(e) => setPrecision(e.target.checked)} />
-                    <span className="font-semibold">Precision</span>
-                    <span className="text-xs text-gray-300">(leader allocation hook)</span>
-                  </label>
+
                 </div>
               </Field>
               )}
@@ -1426,35 +1448,31 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
             </Section>
 
             <Section theme={theme} title="Target 1">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <StatLabel label="T" full="Toughness" example="e.g. 4" required={!isNum(toughness)} theme={theme} />
+              <div className="space-y-2">
+                <InlineStatField label={<StatLabel label="T" full="Toughness" example="e.g. 4" required={!isNum(toughness)} theme={theme} />}>
                   <input type="text" inputMode="numeric" value={toughness} onChange={e => setToughness(e.target.value)}
-                    placeholder="T e.g. 4"
-                    className={`w-full rounded border p-2 font-bold text-lg ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300 text-gray-900"} ${!isNum(toughness) ? "border-red-500 ring-2 ring-red-200" : ""}`} />
-                </div>
-                <div>
-                  <StatLabel label="Sv+" full="Armour Save" example="e.g. 3 (means 3+)" required={!isNum(armorSave)} theme={theme} />
+                    placeholder="e.g. 4"
+                    className={`w-full rounded border p-2 font-bold text-xl ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300 text-gray-900"} ${!isNum(toughness) ? "border-red-500 ring-2 ring-red-200" : ""}`} />
+                </InlineStatField>
+                <InlineStatField label={<StatLabel label="Sv+" full="Armour Save" example="e.g. 3 (means 3+)" required={!isNum(armorSave)} theme={theme} />}>
                   <input type="text" inputMode="numeric" value={armorSave} onChange={e => setArmorSave(e.target.value)}
-                    placeholder="Sv+ e.g. 3"
-                    className={`w-full rounded border p-2 font-bold text-lg ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300 text-gray-900"} ${!isNum(armorSave) ? "border-red-500 ring-2 ring-red-200" : ""}`} />
-                </div>
-                <div>
-                  <StatLabel label="Inv+" full="Invuln Save" example="e.g. 5 (means 5+)" theme={theme} />
+                    placeholder="e.g. 3"
+                    className={`w-full rounded border p-2 font-bold text-xl ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300 text-gray-900"} ${!isNum(armorSave) ? "border-red-500 ring-2 ring-red-200" : ""}`} />
+                </InlineStatField>
+                <InlineStatField label={<StatLabel label="Inv+" full="Invuln Save" example="e.g. 5 (means 5+)" theme={theme} />}>
                   <input type="text" inputMode="numeric" value={invulnSave} onChange={e => setInvulnSave(e.target.value)}
-                    placeholder="Inv+ e.g. 5"
-                    className={`w-full rounded border p-2 font-bold text-lg ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300 text-gray-900"}`} />
-                </div>
-                <div>
-                  <StatLabel label="FNP+" full="Feel No Pain" example="e.g. 5 (means 5+)" theme={theme} />
-                  <div className="flex items-center gap-2">
-                    <input type="checkbox" checked={fnpEnabled} className="h-4 w-4 accent-amber-400"
+                    placeholder="e.g. 5"
+                    className={`w-full rounded border p-2 font-bold text-xl ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300 text-gray-900"}`} />
+                </InlineStatField>
+                <InlineStatField label={<StatLabel label="FNP+" full="Feel No Pain" example="e.g. 5 (means 5+)" theme={theme} />}>
+                  <div className="flex items-center gap-2 flex-1">
+                    <input type="checkbox" checked={fnpEnabled} className="h-4 w-4 accent-amber-400 shrink-0"
                       onChange={e => { const on = e.target.checked; setFnpEnabled(on); if (!on) { setFnp(""); setFnpRollsText(""); } }} />
                     <input type="text" inputMode="numeric" value={fnp} onChange={e => setFnp(e.target.value)}
-                      disabled={!fnpEnabled} placeholder="FNP+ e.g. 5"
-                      className={`flex-1 rounded border p-2 font-bold text-lg disabled:opacity-40 ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300 text-gray-900"}`} />
+                      disabled={!fnpEnabled} placeholder="e.g. 5"
+                      className={`flex-1 rounded border p-2 font-bold text-xl disabled:opacity-40 ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300 text-gray-900"}`} />
                   </div>
-                </div>
+                </InlineStatField>
               </div>
               <div className="mt-3 flex flex-wrap gap-3 text-sm">
                 <label className="flex items-center gap-2"><input type="checkbox" checked={inCover} onChange={e => setInCover(e.target.checked)} className="accent-amber-400" /> Cover (+1 Sv)</label>
@@ -1512,9 +1530,9 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                         <button type="button" onClick={() => removeSplitTarget(i)} className="ml-auto text-xs text-red-400 hover:text-red-300 px-2 py-1 rounded border border-red-800/40 hover:bg-red-900/20">✕ Remove</button>
                       </div>
                     ))}
-                    {/* Add target button — max 4 total, only if wounds available */}
-                    {extraTargets.length < 3 && totalSavableWounds > 0 && (
-                      <button type="button" onClick={addSplitTarget}
+                    {/* Add target button — max 4 total; require wound rolls for 2+ splits */}
+                    {extraTargets.length < 3 && totalSavableWounds > 0 && (extraTargets.length === 0 || parseDiceList(woundRollsText).length > 0) && (
+                      <button type="button" onClick={() => dispatch({ type: "ADD_SPLIT_TARGET", totalWounds: totalSavableWounds })}
                         className={`mt-1 text-xs px-3 py-1.5 rounded border font-semibold transition ${theme === "dark" ? "border-amber-700/60 text-amber-300 hover:bg-amber-900/20" : "border-amber-400 text-amber-700 hover:bg-amber-50"}`}>
                         + Add Target {extraTargets.length + 2}
                       </button>
@@ -1583,6 +1601,9 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                               />
                             }>
 
+                            {/* ── ⚔️ Weapon — Dice sub-header ── */}
+                            <div className={`text-sm font-extrabold tracking-wide mt-1 mb-0 uppercase letter-spacing-wide ${theme === "dark" ? "text-amber-300/80" : "text-amber-700/80"}`}>⚔️ Weapon — Dice</div>
+
                             {/* ── Rerolls (collapsed by default) ── */}
                             <div className={`rounded-xl border p-3 ${theme === "dark" ? "border-gray-700/60 bg-slate-950/20" : "border-gray-200 bg-gray-50"}`}>
                               <div className="flex items-center justify-between">
@@ -1641,8 +1662,8 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                             ) : null}
 
               <Field
-                              label={<CounterLabel prefix="Hit rolls" need={hitNeeded} entered={hitEntered} remaining={hitNeeded - hitEntered} />}
-                              hint="Enter exactly A hit dice unless TORRENT."
+                              label={<CounterLabel prefix="Hit rolls" need={hitNeeded} entered={hitEntered} remaining={hitNeeded - hitEntered} theme={theme} />}
+                              hint="One die per attack. Skip if Torrent (auto-hits). Crits trigger Lethal Hits / Sustained Hits. Count must match A exactly."
                             >
                               <div className="flex gap-2">
                                 <input
@@ -1659,7 +1680,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
 
                             {(rerollHitOnes || rerollHitFails) ? (
                               <Field
-                                label={<CounterLabel prefix="Hit reroll dice" need={hitRerollNeeded} entered={hitRerollEntered} remaining={hitRerollNeeded - hitRerollEntered} />}
+                                label={<CounterLabel prefix="Hit reroll dice" need={hitRerollNeeded} entered={hitRerollEntered} remaining={hitRerollNeeded - hitRerollEntered} theme={theme} />}
                                 hint="Enter rerolled hit dice in order for each eligible reroll. Eligibility is determined from the initial hit rolls."
                               >
                                 <input
@@ -1672,8 +1693,8 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                             ) : null}
 
                             <Field
-                              label={<CounterLabel prefix="Wound rolls" need={woundNeeded} entered={woundEntered} remaining={woundNeeded - woundEntered} />}
-                              hint={`Pool already accounts for Lethal and Sustained. Lethal auto-wounds this volley: ${activeComputed.autoWoundsFromLethal}.`}
+                              label={<CounterLabel prefix="Wound rolls" need={woundNeeded} entered={woundEntered} remaining={woundNeeded - woundEntered} theme={theme} />}
+                              hint={`One die per hit (incl. Sustained bonus hits). Lethal Hits skip directly to saves — auto-wounds this volley: ${activeComputed.autoWoundsFromLethal}. Count must match the wound roll pool.`}
                             >
                               <div className="flex gap-2">
                                 <input
@@ -1690,7 +1711,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
 
                             {(rerollWoundOnes || rerollWoundFails || twinLinked) ? (
                               <Field
-                                label={<CounterLabel prefix="Wound reroll dice" need={woundRerollNeeded} entered={woundRerollEntered} remaining={woundRerollNeeded - woundRerollEntered} />}
+                                label={<CounterLabel prefix="Wound reroll dice" need={woundRerollNeeded} entered={woundRerollEntered} remaining={woundRerollNeeded - woundRerollEntered} theme={theme} />}
                                 hint="Enter rerolled wound dice in order for each eligible reroll. Eligibility is determined from the initial wound rolls."
                               >
                                 <input
@@ -1702,9 +1723,10 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                               </Field>
                             ) : null}
 
+                            <div className={`text-sm font-extrabold tracking-wide mt-2 mb-0 uppercase ${theme === "dark" ? "text-amber-300/80" : "text-amber-700/80"}`}>🎯 Target 1 — Dice</div>
                             <Field
-                              label={<CounterLabel prefix={splitEnabled ? "Save rolls (A)" : "Save rolls"} need={saveNeeded} entered={saveEntered} remaining={saveNeeded - saveEntered} />}
-                              hint="Roll saves only for savable wounds. Mortal wounds skip saves."
+                              label={<CounterLabel prefix={splitEnabled ? "Save rolls (T1)" : "Save rolls"} need={saveNeeded} entered={saveEntered} remaining={saveNeeded - saveEntered} />}
+                              hint="One die per savable wound. Mortal wounds (Devastating) bypass saves and go straight to damage. Count must equal wounds allocated to this target."
                             >
                               <div className="flex gap-2">
                                 <input
@@ -2166,7 +2188,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                   <ul className="mt-2 list-disc pl-5 text-gray-200 space-y-1">
                     <li>Manual dice entry with step-by-step log</li>
                     <li>Hit, wound, save, FNP sequencing</li>
-                    <li>Crit thresholds, Sustained Hits, Lethal Hits, Devastating Wounds, Precision hook</li>
+                    <li>Crit thresholds, Sustained Hits, Lethal Hits, Devastating Wounds</li>
                     <li>Rerolls: reroll 1s and reroll fails for both hit and wound rolls; Twin-linked</li>
                     <li>Rapid Fire X (half-range bonus attacks)</li>
                     <li>Variable attacks: fixed integer or dice expression (e.g. D6+1, 2D6, D3+2)</li>

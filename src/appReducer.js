@@ -247,7 +247,30 @@ function splitReducer(state, action) {
     case "ADD_SPLIT_TARGET": {
       // Max 3 extra targets (so Target 1 + up to 3 extras = 4 total)
       if (state.extraTargets.length >= 3) return state;
-      return { ...state, extraTargets: [...state.extraTargets, { ...initialSplitTarget }] };
+      // Auto-distribute wounds evenly across all targets including new one
+      const newCount = state.extraTargets.length + 2; // +1 for T1, +1 for new
+      const total = action.totalWounds || 0;
+      const base = total > 0 ? Math.floor(total / newCount) : 0;
+      const rem  = total > 0 ? total % newCount : 0;
+      // T1 gets remainder automatically (it's always totalWounds - sum(extras))
+      // Distribute evenly among all extras
+      const newExtras = [...state.extraTargets, { ...initialSplitTarget }].map((t, i) => ({
+        ...t,
+        wounds: String(base + (i < rem ? 1 : 0)),
+      }));
+      return { ...state, extraTargets: newExtras };
+    }
+    case "SYNC_SPLIT_WOUNDS": {
+      // Rebalance all extra target wounds given a new total
+      const total = action.total || 0;
+      const count = state.extraTargets.length + 1; // +1 for T1
+      const base = count > 1 ? Math.floor(total / count) : 0;
+      const rem  = count > 1 ? total % count : 0;
+      const newExtras = state.extraTargets.map((t, i) => ({
+        ...t,
+        wounds: String(base + (i < rem ? 1 : 0)),
+      }));
+      return { ...state, extraTargets: newExtras };
     }
     case "REMOVE_SPLIT_TARGET": {
       const next = state.extraTargets.filter((_, i) => i !== action.index);
@@ -353,6 +376,7 @@ export function appReducer(state, action) {
     case "REMOVE_SPLIT_TARGET":
     case "SET_SPLIT_TARGET_FIELD":
     case "SET_TARGET1_WOUNDS":
+    case "SYNC_SPLIT_WOUNDS":
       return { ...state, split: splitReducer(state.split, action) };
 
     default:
