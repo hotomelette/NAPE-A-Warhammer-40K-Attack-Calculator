@@ -42,6 +42,14 @@ describe("mapToWeaponFields", () => {
     expect(result.attacksFixed).toBe(false);
     expect(result.attacksValue).toBe("D6");
   });
+
+  it("returns empty strings for absent numeric fields", () => {
+    const raw = { attacks: 2, damage: 1 };
+    const result = mapToWeaponFields(raw);
+    expect(result.toHit).toBe("");
+    expect(result.strength).toBe("");
+    expect(result.ap).toBe("");
+  });
 });
 
 describe("mapToTargetFields", () => {

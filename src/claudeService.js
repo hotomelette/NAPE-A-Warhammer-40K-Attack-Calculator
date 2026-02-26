@@ -65,6 +65,7 @@ export function mapToTargetFields(raw) {
 }
 
 export async function fetchAttackerStats(description, apiKey) {
+  // Browser-direct by design; see docs/plans/2026-02-26-unit-lookup-design.md
   const client = new Anthropic({ apiKey, dangerouslyAllowBrowser: true });
   const message = await client.messages.create({
     model: "claude-haiku-4-5-20251001",
@@ -78,6 +79,7 @@ export async function fetchAttackerStats(description, apiKey) {
 }
 
 export async function fetchDefenderStats(description, apiKey) {
+  // Browser-direct by design; see docs/plans/2026-02-26-unit-lookup-design.md
   const client = new Anthropic({ apiKey, dangerouslyAllowBrowser: true });
   const message = await client.messages.create({
     model: "claude-haiku-4-5-20251001",
