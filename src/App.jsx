@@ -3,6 +3,8 @@ import { useCalculator } from "./useCalculator.js";
 import { useCalculatorSplit } from "./useCalculatorSplit.js";
 import { parseDiceList, parseDiceSpec, clampModPlusMinusOne, rollDice } from "./calculatorUtils.js";
 import { appReducer, initialState } from "./appReducer.js";
+import { SettingsPanel, getApiKey } from "./SettingsPanel.jsx";
+import { useUnitLookup } from "./useUnitLookup.js";
 
 const APP_NAME = "NAPE – A Warhammer 40K Attack Calculator";
 const APP_VERSION = "5.19";
@@ -540,6 +542,7 @@ function AttackCalculator() {
   // State — consolidated via useReducer
   // ─────────────────────────────────────────
   const [state, dispatch] = useReducer(appReducer, initialState);
+  const unitLookup = useUnitLookup(getApiKey);
   const { weapon, target, dice, rerolls, ui, easter } = state;
 
   // ── Destructure slices for direct use ──
@@ -1261,8 +1264,32 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
               onClick={toggleTheme}>
               {theme === "dark" ? "🌙" : "☀️"}
             </button>
+            <SettingsPanel theme={theme} />
           </div>
         </div>
+
+                {/* ── Unit Lookup Bar ── */}
+                <div className="max-w-screen-2xl mx-auto px-2 pb-1">
+                  <div className={`flex gap-2 items-start rounded-lg border px-3 py-2 ${theme === "dark" ? "bg-gray-900/60 border-gray-700" : "bg-white/80 border-gray-300"}`}>
+                    <input
+                      type="text"
+                      value={unitLookup.text}
+                      onChange={e => unitLookup.setText(e.target.value)}
+                      onKeyDown={e => e.key === "Enter" && !unitLookup.loading && unitLookup.text.trim() && getApiKey() && unitLookup.fillAttacker(dispatch)}
+                      placeholder="Unit name — e.g. 'crisis commander plasma rifle' or 'doomstalker'"
+                      className={`flex-1 rounded border px-2 py-1 text-sm ${theme === "dark" ? "bg-gray-800 border-gray-600 text-gray-100 placeholder-gray-500" : "bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-400"}`}
+                    />
+                    {unitLookup.error && (
+                      <span className="text-xs text-red-400 self-center shrink-0">{unitLookup.error}</span>
+                    )}
+                  </div>
+                  {unitLookup.lastFilled && (
+                    <p className="text-xs text-gray-500 mt-1 px-1">
+                      Stats from Claude's training data — verify against your datasheet or{" "}
+                      <a href="https://wahapedia.ru" target="_blank" rel="noopener noreferrer" className="underline hover:text-gray-300">Wahapedia</a>.
+                    </p>
+                  )}
+                </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 overflow-visible">
           {/* LEFT: Inputs */}
