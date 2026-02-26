@@ -745,7 +745,7 @@ export default function AttackCalculator() {
 
   const hitNeeded = torrent ? 0 : activeComputed.A;
   const woundNeeded = activeComputed.woundRollPool;
-  const saveNeeded = activeComputed.savableWounds;
+  const saveNeeded = splitEnabled ? woundsToANum : (activeComputed.savableWounds || 0);
   const fnpNeeded = fnpEnabled && fnp !== "" ? activeComputed.totalPreFnp : 0;
 
   const hitRemaining = Math.max(0, hitNeeded - hitEntered);
@@ -1461,94 +1461,42 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
 
             <Section theme={theme} title="Target">
               <div className="grid grid-cols-2 gap-3">
-                <Field label="Toughness" hint="Target toughness characteristic.">
-                  <input className={`w-full rounded border p-2 text-lg font-semibold ${!isNum(toughness) ? "border-red-500 ring-2 ring-red-200" : ""}`} type="number" value={toughness} onChange={(e) => setToughness(e.target.value)} placeholder="required" />
-                </Field>
-                <Field label="Armor Save" hint="3 means 3+.">
-                  <input className={`w-full rounded border p-2 text-lg font-semibold ${!isNum(armorSave) ? "border-red-500 ring-2 ring-red-200" : ""}`} type="number" value={armorSave} onChange={(e) => setArmorSave(e.target.value)} placeholder="required" />
-                </Field>
-                <Field label="Invulnerable Save" hint="Optional. Leave blank if none.">
-                  <input className="w-full rounded border p-2 text-lg font-semibold" value={invulnSave} onChange={(e) => setInvulnSave(e.target.value)} placeholder="e.g. 4" />
-                </Field>
-                <Field label="Feel No Pain" hint="Toggle on if the target has FNP. Enter the FNP target number (e.g., 5 means 5+).">
-                  <div className="flex items-center gap-3 flex-nowrap">
-                    <label className="inline-flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={fnpEnabled}
-                        onChange={(e) => {
-                          const on = e.target.checked;
-                          setFnpEnabled(on);
-                          if (!on) {
-                            setFnp("");
-                            setFnpRollsText("");
-                          }
-                        }}
-                      />
-                      <span className="font-semibold">Use FNP</span>
-                    </label>
-                    <input
-                      className="w-32 rounded border p-2 text-lg font-semibold"
-                      value={fnp}
-                      onChange={(e) => setFnp(e.target.value)}
-                      placeholder="e.g. 5"
-                      disabled={!fnpEnabled}
-                      title="Feel No Pain X+: each point of damage is ignored on a roll of X+."
-                    />
+                <div>
+                  <div className={`text-xs font-semibold mb-1 ${!isNum(toughness) ? "text-red-400" : ""}`}>Toughness *</div>
+                  <input type="text" inputMode="numeric" value={toughness} onChange={e => setToughness(e.target.value)}
+                    placeholder="required"
+                    className={`w-full rounded border p-2 font-bold text-lg ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300 text-gray-900"} ${!isNum(toughness) ? "border-red-500 ring-2 ring-red-200" : ""}`} />
+                </div>
+                <div>
+                  <div className={`text-xs font-semibold mb-1 ${!isNum(armorSave) ? "text-red-400" : ""}`}>Armour Save *</div>
+                  <input type="text" inputMode="numeric" value={armorSave} onChange={e => setArmorSave(e.target.value)}
+                    placeholder="required"
+                    className={`w-full rounded border p-2 font-bold text-lg ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300 text-gray-900"} ${!isNum(armorSave) ? "border-red-500 ring-2 ring-red-200" : ""}`} />
+                </div>
+                <div>
+                  <div className="text-xs font-semibold mb-1">Invuln Save</div>
+                  <input type="text" inputMode="numeric" value={invulnSave} onChange={e => setInvulnSave(e.target.value)}
+                    placeholder="e.g. 4"
+                    className={`w-full rounded border p-2 font-bold text-lg ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300 text-gray-900"}`} />
+                </div>
+                <div>
+                  <div className="text-xs font-semibold mb-1">FNP</div>
+                  <div className="flex items-center gap-2">
+                    <input type="checkbox" checked={fnpEnabled} className="h-4 w-4 accent-amber-400"
+                      onChange={e => { const on = e.target.checked; setFnpEnabled(on); if (!on) { setFnp(""); setFnpRollsText(""); } }} />
+                    <input type="text" inputMode="numeric" value={fnp} onChange={e => setFnp(e.target.value)}
+                      disabled={!fnpEnabled} placeholder="e.g. 5"
+                      className={`flex-1 rounded border p-2 font-bold text-lg disabled:opacity-40 ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300 text-gray-900"}`} />
                   </div>
-                </Field>
+                </div>
               </div>
-
-              <Field label="Defensive modifiers (saves)" hint="Common Combat Patrol modifiers.">
-                <div className="flex flex-wrap gap-4 text-sm">
-                  <label className="inline-flex items-center gap-2">
-                    <input type="checkbox" checked={inCover} onChange={(e) => setInCover(e.target.checked)} />
-                    Cover (+1 save)
-                  </label>
-                  <label className="inline-flex items-center gap-2">
-                    <input type="checkbox" checked={ignoreAp} onChange={(e) => setIgnoreAp(e.target.checked)} />
-                    Ignore AP (treat AP as 0)
-                  </label>
-                </div>
-              </Field>
-
-              <Field
-                label="Damage mitigation"
-                hint="Applied per failed save instance. Ordering used: half (round up), then -1 (min 1)."
-              >
-                <div className="flex flex-wrap gap-4 text-sm">
-                  <label className="inline-flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={ignoreFirstFailedSave}
-                      onChange={(e) => setIgnoreFirstFailedSave(e.target.checked)}
-                    />
-                    Ignore first failed save
-                  </label>
-                  <label className="inline-flex items-center gap-2">
-                    <input type="checkbox" checked={minusOneDamage} onChange={(e) => setMinusOneDamage(e.target.checked)} />
-                    -1 Damage (min 1)
-                  </label>
-                  <label className="inline-flex items-center gap-2">
-                    <input type="checkbox" checked={halfDamage} onChange={(e) => setHalfDamage(e.target.checked)} />
-                    Half damage (round up)
-                  </label>
-                </div>
-              </Field>
-
-              <Field label="Leader attached? (advisory only — does not change math)" hint="Helps remind real-table Precision allocation. This calculator does not simulate wound allocation across models.">
-                <div className="flex items-center gap-3 text-sm">
-                  <label className="flex items-center gap-2">
-                    <input type="checkbox" checked={hasLeaderAttached} onChange={(e) => setHasLeaderAttached(e.target.checked)} />
-                    Target has Leader attached
-                  </label>
-                  <label className={`flex items-center gap-2 ${!hasLeaderAttached ? "opacity-50" : ""}`}>
-                    <input type="checkbox" checked={allocatePrecisionToLeader} onChange={(e) => setAllocatePrecisionToLeader(e.target.checked)} disabled={!hasLeaderAttached} />
-                    Allocate Precision-eligible attacks to leader
-                  </label>
-                </div>
-                {activeComputed.precisionNote ? <div className="text-xs text-gray-700 mt-1">{activeComputed.precisionNote}</div> : null}
-              </Field>
+              <div className="mt-3 flex flex-wrap gap-3 text-sm">
+                <label className="flex items-center gap-2"><input type="checkbox" checked={inCover} onChange={e => setInCover(e.target.checked)} className="accent-amber-400" /> Cover (+1 sv)</label>
+                <label className="flex items-center gap-2"><input type="checkbox" checked={ignoreAp} onChange={e => setIgnoreAp(e.target.checked)} className="accent-amber-400" /> Ignore AP</label>
+                <label className="flex items-center gap-2"><input type="checkbox" checked={ignoreFirstFailedSave} onChange={e => setIgnoreFirstFailedSave(e.target.checked)} className="accent-amber-400" /> Ignore 1st failed save</label>
+                <label className="flex items-center gap-2"><input type="checkbox" checked={minusOneDamage} onChange={e => setMinusOneDamage(e.target.checked)} className="accent-amber-400" /> -1 Damage</label>
+                <label className="flex items-center gap-2"><input type="checkbox" checked={halfDamage} onChange={e => setHalfDamage(e.target.checked)} className="accent-amber-400" /> Half Damage</label>
+              </div>
             </Section>
 
             {/* ── Split Volley Toggle ── */}
@@ -1748,7 +1696,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                             ) : null}
 
                             <Field
-                              label={<CounterLabel prefix="Save rolls" need={saveNeeded} entered={saveEntered} remaining={saveNeeded - saveEntered} />}
+                              label={<CounterLabel prefix={splitEnabled ? "Save rolls (A)" : "Save rolls"} need={saveNeeded} entered={saveEntered} remaining={saveNeeded - saveEntered} />}
                               hint="Roll saves only for savable wounds. Mortal wounds skip saves."
                             >
                               <div className="flex gap-2">
