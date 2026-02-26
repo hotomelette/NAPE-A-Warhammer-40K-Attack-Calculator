@@ -5,7 +5,7 @@ import { parseDiceList, parseDiceSpec, clampModPlusMinusOne, rollDice } from "./
 import { appReducer, initialState } from "./appReducer.js";
 
 const APP_NAME = "NAPE – A Warhammer 40K Attack Calculator";
-const APP_VERSION = "5.18";
+const APP_VERSION = "5.19";
 
 /* =========================
    Helpers — see calculatorUtils.js
@@ -1170,6 +1170,18 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
         ) : null}
       </div>
       <div className="relative z-10">
+        {/* Full-page emoji backdrop — faint, follows viz state */}
+        {statsReady && (
+          <div className="fixed inset-0 pointer-events-none overflow-hidden" style={{ opacity: diceReady ? 0.04 : 0.02, zIndex: 0 }}>
+            {Array.from({ length: 6 }).map((_, row) => (
+              <div key={row} className={row % 2 ? "nape-marquee-row nape-marquee-reverse" : "nape-marquee-row"}
+                style={{ animationDuration: `${50 + row * 12}s`, fontSize: "2.5rem", lineHeight: 2.5 }}>
+                {Array.from({ length: 30 }).map((_, i) => <span key={i} className="mr-4">{viz.emoji}</span>)}
+                {Array.from({ length: 30 }).map((_, i) => <span key={`d${i}`} className="mr-4">{viz.emoji}</span>)}
+              </div>
+            ))}
+          </div>
+        )}
 
       {emperorToast ? (
         <div className="fixed inset-0 z-50 flex items-start justify-center p-6 pointer-events-none">
@@ -1183,70 +1195,76 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
 
 
               <div className="max-w-screen-2xl mx-auto space-y-4 px-2 overflow-visible">
-        {/* ── Slim sticky header ── */}
-        <div className={`sticky top-0 z-40 ${viz.headerBg} border-b border-gray-700/80 shadow-lg`}>
-          <div className="max-w-screen-2xl mx-auto px-3 py-2 flex items-center justify-between gap-3">
-            <span className="text-xs font-extrabold tracking-widest px-2 py-0.5 rounded border border-gray-600 text-gray-300 bg-gray-900/60 shrink-0">NAPE</span>
-            <div className="flex items-center gap-3 flex-1 justify-center flex-wrap min-w-0">
-              <div className={`inline-flex items-center gap-2 rounded-xl border px-3 py-1 text-sm font-bold ${statusClass}`}>
-                <span className="text-lg leading-none">{statusEmoji}</span>
-                <span>{status}</span>
+        {/* ── Sticky combined header + live results ── */}
+        <div className={`sticky top-0 z-40 border-b border-gray-700/80 shadow-lg overflow-hidden ${viz.headerBg}`}>
+
+          {/* Emoji marquee background — mirrors the results panel animation */}
+          {statsReady && (
+            <div className="absolute inset-0 pointer-events-none overflow-hidden" style={{ opacity: diceReady ? 0.12 : 0.06 }}>
+              <div className="nape-marquee-row" style={{ animationDuration: "30s", fontSize: "1.5rem", lineHeight: 2 }}>
+                {Array.from({ length: 40 }).map((_, i) => <span key={i} className="mr-3">{viz.emoji}</span>)}
+                {Array.from({ length: 40 }).map((_, i) => <span key={`d${i}`} className="mr-3">{viz.emoji}</span>)}
               </div>
-              {!statsReady ? (
-                <span className="text-xs text-gray-400 truncate max-w-[220px]">Missing: {[...missingWeapon, ...missingTarget].join(", ")}</span>
-              ) : status === "Waiting for dice" ? (
-                <span className="text-xs text-gray-400">Hit {hitRemaining} · Wound {woundRemaining} · Save {saveRemaining}{fnpNeeded > 0 ? ` · FNP ${fnpRemaining}` : ""}</span>
-              ) : diceReady ? (
-                <div className="flex items-center gap-1.5">
-                  <span className="text-xl leading-none">{viz.emoji}</span>
-                  <span className={`text-2xl font-extrabold tabular-nums ${viz.totalNumber}`}>{dmgStr}</span>
-                  <span className="text-xs text-gray-400">dmg</span>
+              <div className="nape-marquee-row nape-marquee-reverse" style={{ animationDuration: "36s", fontSize: "1.5rem", lineHeight: 2 }}>
+                {Array.from({ length: 40 }).map((_, i) => <span key={i} className="mr-3">{viz.emoji}</span>)}
+                {Array.from({ length: 40 }).map((_, i) => <span key={`d${i}`} className="mr-3">{viz.emoji}</span>)}
+              </div>
+            </div>
+          )}
+
+          {/* Header content row */}
+          <div className="relative z-10 max-w-screen-2xl mx-auto px-3 py-2 flex items-center gap-3 flex-wrap">
+
+            {/* NAPE chip */}
+            <span className="text-xs font-extrabold tracking-widest px-2 py-0.5 rounded border border-gray-600 text-gray-300 bg-gray-900/60 shrink-0">NAPE</span>
+
+            {/* Status pill */}
+            <div className={`inline-flex items-center gap-2 rounded-xl border px-3 py-1 text-sm font-bold shrink-0 ${statusClass}`}>
+              <span className="text-lg leading-none">{statusEmoji}</span>
+              <span>{status}</span>
+            </div>
+
+            {/* Status detail OR live damage — same row */}
+            {!statsReady ? (
+              <span className="text-xs text-gray-400 truncate max-w-[200px]">Missing: {[...missingWeapon, ...missingTarget].join(", ")}</span>
+            ) : status === "Waiting for dice" ? (
+              <span className="text-xs text-gray-400 shrink-0">Hit {hitRemaining} · Wound {woundRemaining} · Save {saveRemaining}{fnpNeeded > 0 ? ` · FNP ${fnpRemaining}` : ""}</span>
+            ) : (
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="text-2xl leading-none">{viz.emoji}</span>
+                <span className={`text-3xl font-extrabold tabular-nums leading-none ${viz.totalNumber}`}>{dmgStr}</span>
+                <div className="flex flex-col leading-tight">
+                  <span className={`text-xs uppercase tracking-widest ${viz.totalLabel}`}>{totalLabelText}</span>
+                  <span className={`text-xs ${viz.totalMeta}`}>{diceReady ? "final" : "preview"}</span>
                 </div>
-              ) : null}
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <button type="button"
-                className={`rounded px-2 py-1 text-xs font-bold border transition ${simpleMode ? "bg-emerald-600/80 text-white border-emerald-500/40" : "bg-gray-900/80 text-gray-300 border-gray-700 hover:bg-gray-800"}`}
-                onClick={toggleSimpleMode} title="Toggle Simple/Complex mode">
-                {simpleMode ? "Simple" : "Complex"}
-              </button>
-              <button type="button"
-                className="rounded px-2 py-1 text-xs font-bold border bg-gray-900/80 text-gray-300 border-gray-700 hover:bg-gray-800 transition"
-                onClick={toggleTheme}>
-                {theme === "dark" ? "🌙" : "☀️"}
-              </button>
-            </div>
+                {splitEnabled && activeSplitResults.length > 1 && (
+                  <div className="flex items-center gap-2 ml-2">
+                    {activeSplitResults.map((r, i) => r && (
+                      <span key={i} className="text-xs font-bold text-amber-300">T{i+1}: {allowDamageTotals ? r.totalPostFnp : "–"}</span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Spacer */}
+            <div className="flex-1" />
+
+            {/* Mode toggles */}
+            <button type="button"
+              className={`rounded px-2 py-1 text-xs font-bold border transition shrink-0 ${simpleMode ? "bg-emerald-600/80 text-white border-emerald-500/40" : "bg-gray-900/80 text-gray-300 border-gray-700 hover:bg-gray-800"}`}
+              onClick={toggleSimpleMode} title="Toggle Simple/Complex mode">
+              {simpleMode ? "Simple" : "Complex"}
+            </button>
+            <button type="button"
+              className="rounded px-2 py-1 text-xs font-bold border bg-gray-900/80 text-gray-300 border-gray-700 hover:bg-gray-800 transition shrink-0"
+              onClick={toggleTheme}>
+              {theme === "dark" ? "🌙" : "☀️"}
+            </button>
           </div>
         </div>
 
-                {/* ── Mini results strip (shows live damage when stats ready) ── */}
-        {statsReady && (
-          <div className={`rounded-xl border px-4 py-2 flex items-center gap-4 flex-wrap ${viz.totalPanel}`}>
-            <div className="flex items-center gap-2">
-              <span className="text-2xl leading-none">{viz.emoji}</span>
-              <span className={`text-4xl font-extrabold tabular-nums leading-none ${viz.totalNumber}`}>{dmgStr}</span>
-              <div className="flex flex-col ml-1">
-                <span className={`text-xs uppercase tracking-widest ${viz.totalLabel}`}>{totalLabelText}</span>
-                <span className={`text-xs ${viz.totalMeta}`}>{diceReady ? "final · post-mitigation" : "preview"}</span>
-              </div>
-            </div>
-            {splitEnabled && activeSplitResults.length > 1 && (
-              <div className="flex items-center gap-3 flex-wrap ml-2">
-                {activeSplitResults.map((r, i) => r && (
-                  <div key={i} className="flex items-center gap-1 text-sm">
-                    <span className="text-xs text-gray-400">T{i + 1}:</span>
-                    <span className="font-extrabold tabular-nums text-amber-300">{allowDamageTotals ? r.totalPostFnp : "–"}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-            {activeComputed.errors.length > 0 && (
-              <div className="text-xs text-red-400 ml-auto">{activeComputed.errors.length} issue{activeComputed.errors.length > 1 ? "s" : ""} ⚠</div>
-            )}
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 overflow-visible">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 overflow-visible">
           {/* LEFT: Inputs */}
           <div className="lg:col-span-6 space-y-4">
             <Section theme={theme} title="Weapon">
