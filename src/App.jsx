@@ -1541,7 +1541,16 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
 
             </Section>
 
-            <Section theme={theme} title="Target 1">
+            <Section theme={theme} title="Target 1" action={
+  <FillButton
+    label="Fill Defender"
+    loading={unitLookup.loading}
+    disabled={!unitLookup.text.trim()}
+    hasKey={!!getApiKey()}
+    onClick={() => unitLookup.fillDefender(dispatch)}
+    theme={theme}
+  />
+}>
               <div className="space-y-2">
                 <InlineStatField label={<StatLabel label="T" full="Toughness" example="e.g. 4" required={!isNum(toughness)} theme={theme} />}>
                   <input type="text" inputMode="numeric" value={toughness} onChange={e => setToughness(e.target.value)}
