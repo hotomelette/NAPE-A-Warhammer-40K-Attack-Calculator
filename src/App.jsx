@@ -151,6 +151,30 @@ function Field({ label, hint, children, theme }) {
   );
 }
 
+function FillButton({ label, loading, disabled, hasKey, onClick, theme }) {
+  const dark = theme === "dark";
+  const noKey = !hasKey;
+  const title = noKey ? "Add your Claude API key in ⚙ settings" : disabled ? "Type a unit name above first" : label;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={loading || disabled || noKey}
+      title={title}
+      className={`rounded px-2 py-0.5 text-xs font-bold border transition shrink-0 ${
+        loading
+          ? "opacity-50 cursor-wait border-blue-500/40 text-blue-300 bg-blue-900/30"
+          : noKey || disabled
+          ? "opacity-40 cursor-not-allowed border-gray-600 text-gray-500 bg-transparent"
+          : dark
+          ? "border-blue-500/60 text-blue-300 bg-blue-900/40 hover:bg-blue-800/60"
+          : "border-blue-400 text-blue-700 bg-blue-50 hover:bg-blue-100"
+      }`}
+    >
+      {loading ? "…" : label}
+    </button>
+  );
+}
 
 function CounterLabel({ prefix, need, entered, remaining, theme }) {
   const state = remaining === 0 ? "ok" : remaining > 0 ? "low" : "high";
@@ -1294,7 +1318,16 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 overflow-visible">
           {/* LEFT: Inputs */}
           <div className="lg:col-span-6 space-y-4">
-            <Section theme={theme} title="Weapon">
+            <Section theme={theme} title="Weapon" action={
+  <FillButton
+    label="Fill Attacker"
+    loading={unitLookup.loading}
+    disabled={!unitLookup.text.trim()}
+    hasKey={!!getApiKey()}
+    onClick={() => unitLookup.fillAttacker(dispatch)}
+    theme={theme}
+  />
+}>
               <Field
                 label={<StatLabel label="A" full="Attacks" example="e.g. 6 (fixed) or D6+1 (random)" theme={theme} />}
                 hint="Fixed: enter a number. Random: uncheck Fixed, enter a dice expression (D6+1, 2D6, D3+2). The +N modifier is auto-added to the dice result. Enter rolled attack dice in the Dice entry section."
