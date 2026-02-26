@@ -1419,7 +1419,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                   <button
                     type="button"
                     className={mainToggleBtnClass}
-                    onClick={() => setShowRerolls((v) => !v)}
+                    onClick={() => setShowRerolls(!showRerolls)}
                   >
                     {showRerolls ? "Hide" : "Show"}
                   </button>
@@ -2093,7 +2093,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                   <button
                     type="button"
                     className={mainToggleBtnClass}
-                    onClick={() => setShowLog((v) => !v)}
+                    onClick={() => setShowLog(!showLog)}
                   >
                     {showLog ? "Hide log" : "Show log"}
                   </button>
@@ -2135,7 +2135,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                     ? "bg-gradient-to-r from-sky-500/80 to-indigo-500/80 text-white border-sky-200/30 hover:from-sky-400/90 hover:to-indigo-400/90"
                     : "bg-gray-900 text-gray-100 border-gray-700 hover:bg-gray-800"
                 }`}
-                onClick={() => setPreserveHooks((v) => !v)}
+                onClick={() => setPreserveHooks(!preserveHooks)}
                 title="When enabled, Clear actions keep persistent toggle/option hooks."
               >
                 Preserve hooks: {preserveHooks ? "ON" : "OFF"}
@@ -2147,7 +2147,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                     ? "bg-gradient-to-r from-red-500/80 to-rose-500/80 text-white border-red-200/30 hover:from-red-400/90 hover:to-rose-400/90"
                     : "bg-gray-900 text-gray-100 border-gray-700 hover:bg-gray-800"
                 }`}
-                onClick={() => setStrictMode((v) => !v)}
+                onClick={() => setStrictMode(!strictMode)}
                 title="When enabled, totals are locked until stats + dice are complete (no soft totals)."
               >
                 Strict mode: {strictMode ? "ON" : "OFF"}
@@ -2156,7 +2156,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
               <button
                 type="button"
                   className="rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font-semibold border border-gray-700 hover:bg-gray-800 w-full md:w-auto"
-                onClick={() => setShowLimitations((v) => !v)}
+                onClick={() => setShowLimitations(!showLimitations)}
               >
                 {showLimitations ? "Hide limitations" : "Show limitations"}
               </button>
@@ -2164,7 +2164,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
               <button
                 type="button"
                   className="rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font-semibold border border-gray-700 hover:bg-gray-800 w-full md:w-auto"
-                onClick={() => setShowCheatSheet((v) => !v)}
+                onClick={() => setShowCheatSheet(!showCheatSheet)}
               >
                 {showCheatSheet ? "Hide cheat sheet" : "Show cheat sheet"}
               </button>
