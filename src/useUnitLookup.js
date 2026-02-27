@@ -28,6 +28,8 @@ export function useUnitLookup(getApiKey) {
   const fillAttacker = useCallback(async (dispatch) => {
     setAttackerLoading(true);
     setAttackerError(null);
+    setAttackerOptions(null);
+    setAttackerPageCache(null);
     try {
       const apiKey = getApiKey();
       const result = await fetchAttackerStats(attackerText, apiKey);
@@ -72,6 +74,8 @@ export function useUnitLookup(getApiKey) {
   const fillDefender = useCallback(async (dispatch) => {
     setDefenderLoading(true);
     setDefenderError(null);
+    setDefenderOptions(null);
+    setDefenderPageCache(null);
     try {
       const apiKey = getApiKey();
       const result = await fetchDefenderStats(defenderText, apiKey);

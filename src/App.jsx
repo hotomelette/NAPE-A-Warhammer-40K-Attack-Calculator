@@ -215,11 +215,10 @@ function LookupSourceBadge({ meta, theme }) {
     <p className={`text-xs ${dark ? "text-yellow-400" : "text-yellow-600"}`}>
       {meta.resolvedName ? (
         <>
-          ⚠ {meta.resolvedName} ·{" "}
+          ⚠ {meta.resolvedName} · training data — verify on{" "}
           <a href={meta.wahapediaUrl || "https://wahapedia.ru"} target="_blank" rel="noopener noreferrer" className={linkClass}>
             Wahapedia
           </a>
-          {" "}— verify on Wahapedia
         </>
       ) : (
         <>
@@ -234,7 +233,7 @@ function LookupSourceBadge({ meta, theme }) {
 }
 
 function DisambiguationChips({ options, loading, onChoose, theme, label }) {
-  if (!options) return null;
+  if (!options || options.length === 0) return null;
   const dark = theme === "dark";
   const displayLabel = label || "Multiple weapons found — pick one:";
   return (
