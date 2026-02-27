@@ -38,9 +38,9 @@ export function useUnitLookup(getApiKey) {
         const { fields, meta } = result;
         dispatch({ type: "LOAD_WEAPON", weapon: fields });
         setAttackerMeta(meta);
-        setLastFilled("attacker");
         setAttackerOptions(null);
         setAttackerPageCache(null);
+        setLastFilled("attacker");
       }
     } catch (err) {
       console.error("[UnitLookup] fillAttacker failed:", err);
@@ -82,9 +82,9 @@ export function useUnitLookup(getApiKey) {
         const { fields, meta } = result;
         dispatch({ type: "LOAD_TARGET", target: fields });
         setDefenderMeta(meta);
-        setLastFilled("defender");
         setDefenderOptions(null);
         setDefenderPageCache(null);
+        setLastFilled("defender");
       }
     } catch (err) {
       console.error("[UnitLookup] fillDefender failed:", err);
