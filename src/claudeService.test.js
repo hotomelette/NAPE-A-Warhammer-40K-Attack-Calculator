@@ -105,3 +105,15 @@ describe("fetchWahapediaPage", () => {
     expect(result).toBeNull();
   });
 });
+
+describe("fromPage helper exports", () => {
+  it("fetchAttackerStatsFromPage is exported", async () => {
+    const mod = await import("./claudeService.js");
+    expect(typeof mod.fetchAttackerStatsFromPage).toBe("function");
+  });
+
+  it("fetchDefenderStatsFromPage is exported", async () => {
+    const mod = await import("./claudeService.js");
+    expect(typeof mod.fetchDefenderStatsFromPage).toBe("function");
+  });
+});
