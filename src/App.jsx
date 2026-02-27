@@ -190,22 +190,76 @@ function LookupSourceBadge({ meta, theme }) {
     }) : "";
     return (
       <p className={`text-xs ${dark ? "text-green-400" : "text-green-600"}`}>
-        ✓ Pulled from{" "}
-        <a href={meta.wahapediaUrl} target="_blank" rel="noopener noreferrer" className={linkClass}>
-          Wahapedia
-        </a>
-        {time && <>{" "}· {time}</>}
+        {meta.resolvedName ? (
+          <>
+            ✓ {meta.resolvedName} ·{" "}
+            <a href={meta.wahapediaUrl} target="_blank" rel="noopener noreferrer" className={linkClass}>
+              Wahapedia
+            </a>
+            {time && <>{" "}· {time}</>}
+          </>
+        ) : (
+          <>
+            ✓ Pulled from{" "}
+            <a href={meta.wahapediaUrl} target="_blank" rel="noopener noreferrer" className={linkClass}>
+              Wahapedia
+            </a>
+            {time && <>{" "}· {time}</>}
+          </>
+        )}
       </p>
     );
   }
 
   return (
     <p className={`text-xs ${dark ? "text-yellow-400" : "text-yellow-600"}`}>
-      ⚠ Training data — verify on{" "}
-      <a href={meta.wahapediaUrl || "https://wahapedia.ru"} target="_blank" rel="noopener noreferrer" className={linkClass}>
-        Wahapedia
-      </a>
+      {meta.resolvedName ? (
+        <>
+          ⚠ {meta.resolvedName} ·{" "}
+          <a href={meta.wahapediaUrl || "https://wahapedia.ru"} target="_blank" rel="noopener noreferrer" className={linkClass}>
+            Wahapedia
+          </a>
+          {" "}— verify on Wahapedia
+        </>
+      ) : (
+        <>
+          ⚠ Training data — verify on{" "}
+          <a href={meta.wahapediaUrl || "https://wahapedia.ru"} target="_blank" rel="noopener noreferrer" className={linkClass}>
+            Wahapedia
+          </a>
+        </>
+      )}
     </p>
+  );
+}
+
+function DisambiguationChips({ options, loading, onChoose, theme, label }) {
+  if (!options) return null;
+  const dark = theme === "dark";
+  const displayLabel = label || "Multiple weapons found — pick one:";
+  return (
+    <div className="space-y-1">
+      <p className={`text-xs ${dark ? "text-gray-400" : "text-gray-500"}`}>
+        {displayLabel}
+      </p>
+      <div className="flex flex-wrap gap-1.5">
+        {options.map((opt) => (
+          <button
+            key={opt}
+            type="button"
+            disabled={loading}
+            onClick={() => onChoose(opt)}
+            className={`rounded-full px-2.5 py-0.5 text-xs font-medium border transition
+              ${loading ? "opacity-50 cursor-wait" : "cursor-pointer"}
+              ${dark
+                ? "border-blue-500 text-blue-300 hover:bg-blue-900/40"
+                : "border-blue-400 text-blue-700 hover:bg-blue-50"}`}
+          >
+            {opt}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -1355,7 +1409,15 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                     <FillButton label="Fill" loading={unitLookup.attackerLoading} disabled={!unitLookup.attackerText.trim()} hasKey={hasApiKey} onClick={() => unitLookup.fillAttacker(dispatch)} theme={theme} />
                   </div>
                   {unitLookup.attackerError && <span className="text-xs text-red-400">{unitLookup.attackerError}</span>}
-                  <LookupSourceBadge meta={unitLookup.attackerMeta} theme={theme} />
+                  {unitLookup.attackerOptions
+                    ? <DisambiguationChips
+                        options={unitLookup.attackerOptions}
+                        loading={unitLookup.attackerLoading}
+                        onChoose={(choice) => unitLookup.resolveAttacker(dispatch, choice)}
+                        theme={theme}
+                      />
+                    : <LookupSourceBadge meta={unitLookup.attackerMeta} theme={theme} />
+                  }
                 </div>
               )}
               <Field
@@ -1586,7 +1648,16 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                     <FillButton label="Fill" loading={unitLookup.defenderLoading} disabled={!unitLookup.defenderText.trim()} hasKey={hasApiKey} onClick={() => unitLookup.fillDefender(dispatch)} theme={theme} />
                   </div>
                   {unitLookup.defenderError && <span className="text-xs text-red-400">{unitLookup.defenderError}</span>}
-                  <LookupSourceBadge meta={unitLookup.defenderMeta} theme={theme} />
+                  {unitLookup.defenderOptions
+                    ? <DisambiguationChips
+                        options={unitLookup.defenderOptions}
+                        loading={unitLookup.defenderLoading}
+                        onChoose={(choice) => unitLookup.resolveDefender(dispatch, choice)}
+                        theme={theme}
+                        label="Multiple units found — pick one:"
+                      />
+                    : <LookupSourceBadge meta={unitLookup.defenderMeta} theme={theme} />
+                  }
                 </div>
               )}
               <div className="space-y-2">
