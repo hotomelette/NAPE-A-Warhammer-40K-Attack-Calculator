@@ -169,7 +169,9 @@ export async function fetchAttackerStats(description, apiKey) {
     messages: [{ role: "user", content: userContent }],
   });
   const raw = parseJson(msg.content[0].text);
-  return { fields: mapToWeaponFields(raw), meta: { source, wahapediaUrl, fetchedAt } };
+  const meta = { source, wahapediaUrl };
+  if (source === "live") meta.fetchedAt = fetchedAt;
+  return { fields: mapToWeaponFields(raw), meta };
 }
 
 export async function fetchDefenderStats(description, apiKey) {
@@ -207,5 +209,7 @@ export async function fetchDefenderStats(description, apiKey) {
     messages: [{ role: "user", content: userContent }],
   });
   const raw = parseJson(msg.content[0].text);
-  return { fields: mapToTargetFields(raw), meta: { source, wahapediaUrl, fetchedAt } };
+  const meta = { source, wahapediaUrl };
+  if (source === "live") meta.fetchedAt = fetchedAt;
+  return { fields: mapToTargetFields(raw), meta };
 }
