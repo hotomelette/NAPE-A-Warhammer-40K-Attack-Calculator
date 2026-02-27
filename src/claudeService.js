@@ -78,6 +78,7 @@ export async function fetchAttackerStats(description, apiKey) {
   const message = await client.messages.create({
     model: "claude-sonnet-4-6",
     max_tokens: 256,
+    temperature: 0,
     system: ATTACKER_SYSTEM_PROMPT,
     messages: [{ role: "user", content: description }],
   });
@@ -92,6 +93,7 @@ export async function fetchDefenderStats(description, apiKey) {
   const message = await client.messages.create({
     model: "claude-sonnet-4-6",
     max_tokens: 128,
+    temperature: 0,
     system: DEFENDER_SYSTEM_PROMPT,
     messages: [{ role: "user", content: description }],
   });
