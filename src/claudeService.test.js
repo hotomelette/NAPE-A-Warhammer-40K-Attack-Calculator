@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { mapToWeaponFields, mapToTargetFields } from "./claudeService.js";
 
 describe("mapToWeaponFields", () => {
@@ -72,5 +72,36 @@ describe("mapToTargetFields", () => {
     const raw = { toughness: 4, save: 4 };
     const result = mapToTargetFields(raw);
     expect(result.invulnSave).toBe("");
+  });
+});
+
+describe("fetchWahapediaPage", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("returns text and url on success", async () => {
+    const { fetchWahapediaPage } = await import("./claudeService.js");
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ text: "datasheet content", url: "https://wahapedia.ru/wh40k10ed/factions/necrons/Canoptek-Doomstalker" }),
+    }));
+    const result = await fetchWahapediaPage("necrons/Canoptek-Doomstalker", "https://worker.example.com");
+    expect(result).toEqual({ text: "datasheet content", url: "https://wahapedia.ru/wh40k10ed/factions/necrons/Canoptek-Doomstalker" });
+  });
+
+  it("returns null when worker reports not_found", async () => {
+    const { fetchWahapediaPage } = await import("./claudeService.js");
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ error: "not_found" }),
+    }));
+    const result = await fetchWahapediaPage("bad/Path", "https://worker.example.com");
+    expect(result).toBeNull();
+  });
+
+  it("returns null on network error", async () => {
+    const { fetchWahapediaPage } = await import("./claudeService.js");
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("Network error")));
+    const result = await fetchWahapediaPage("any/Path", "https://worker.example.com");
+    expect(result).toBeNull();
   });
 });
