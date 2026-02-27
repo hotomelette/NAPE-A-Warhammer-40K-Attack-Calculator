@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 
 const WORKER_URL = import.meta.env.VITE_WAHAPEDIA_WORKER_URL || null;
+const CLAUDE_MODEL = "claude-sonnet-4-6";
 
 // ─── System prompts ──────────────────────────────────────────────────────────
 
@@ -100,20 +101,25 @@ export function mapToTargetFields(raw) {
 
 function parseJson(text) {
   const cleaned = text.trim().replace(/^```[a-z]*\n?/i, "").replace(/```$/, "").trim();
-  return JSON.parse(cleaned);
+  try {
+    return JSON.parse(cleaned);
+  } catch {
+    throw new Error(`Claude returned non-JSON response: ${cleaned.slice(0, 120)}`);
+  }
 }
 
 async function resolveWahapediaPath(description, client) {
   try {
     const msg = await client.messages.create({
-      model: "claude-sonnet-4-6",
+      model: CLAUDE_MODEL,
       max_tokens: 64,
       temperature: 0,
       system: URL_RESOLUTION_PROMPT,
       messages: [{ role: "user", content: description }],
     });
     const path = msg.content[0].text.trim();
-    if (!path || path === "unknown" || path.includes(" ")) return null;
+    const pathPattern = /^[a-z0-9-]+\/[A-Za-z0-9-]+$/;
+    if (!path || path === "unknown" || !pathPattern.test(path)) return null;
     return path;
   } catch {
     return null;
@@ -127,24 +133,17 @@ export async function fetchWahapediaPage(path, workerUrl) {
     const data = await res.json();
     if (data.error) return null;
     return data;
-  } catch {
+  } catch (err) {
+    console.warn("[fetchWahapediaPage] failed for path", path, err);
     return null;
   }
 }
 
-// ─── Public API ───────────────────────────────────────────────────────────────
-
-export async function fetchAttackerStats(description, apiKey) {
-  // Browser-direct by design; see docs/plans/2026-02-26-unit-lookup-design.md
-  const client = new Anthropic({ apiKey, dangerouslyAllowBrowser: true });
-
-  // Phase 1: resolve Wahapedia path (always — gives a specific link even on training fallback)
+async function resolveAndFetch(description, client) {
   const path = await resolveWahapediaPath(description, client);
   const wahapediaUrl = path
     ? `https://wahapedia.ru/wh40k10ed/factions/${path}`
     : "https://wahapedia.ru";
-
-  // Phase 2: fetch live page if worker is configured
   let pageContent = null;
   let source = "training";
   let fetchedAt;
@@ -156,13 +155,21 @@ export async function fetchAttackerStats(description, apiKey) {
       fetchedAt = new Date().toISOString();
     }
   }
+  return { pageContent, source, wahapediaUrl, fetchedAt };
+}
 
-  // Phase 3: extract stats (with or without live page)
+// ─── Public API ───────────────────────────────────────────────────────────────
+
+export async function fetchAttackerStats(description, apiKey) {
+  // Browser-direct by design; see docs/plans/2026-02-26-unit-lookup-design.md
+  const client = new Anthropic({ apiKey, dangerouslyAllowBrowser: true });
+  const { pageContent, source, wahapediaUrl, fetchedAt } = await resolveAndFetch(description, client);
+
   const userContent = pageContent
     ? `Unit/weapon: ${description}\n\nWahapedia datasheet:\n${pageContent}`
     : description;
   const msg = await client.messages.create({
-    model: "claude-sonnet-4-6",
+    model: CLAUDE_MODEL,
     max_tokens: 256,
     temperature: 0,
     system: ATTACKER_SYSTEM_PROMPT,
@@ -177,32 +184,13 @@ export async function fetchAttackerStats(description, apiKey) {
 export async function fetchDefenderStats(description, apiKey) {
   // Browser-direct by design; see docs/plans/2026-02-26-unit-lookup-design.md
   const client = new Anthropic({ apiKey, dangerouslyAllowBrowser: true });
+  const { pageContent, source, wahapediaUrl, fetchedAt } = await resolveAndFetch(description, client);
 
-  // Phase 1: resolve Wahapedia path
-  const path = await resolveWahapediaPath(description, client);
-  const wahapediaUrl = path
-    ? `https://wahapedia.ru/wh40k10ed/factions/${path}`
-    : "https://wahapedia.ru";
-
-  // Phase 2: fetch live page if worker is configured
-  let pageContent = null;
-  let source = "training";
-  let fetchedAt;
-  if (WORKER_URL && path) {
-    const page = await fetchWahapediaPage(path, WORKER_URL);
-    if (page) {
-      pageContent = page.text;
-      source = "live";
-      fetchedAt = new Date().toISOString();
-    }
-  }
-
-  // Phase 3: extract stats
   const userContent = pageContent
     ? `Unit: ${description}\n\nWahapedia datasheet:\n${pageContent}`
     : description;
   const msg = await client.messages.create({
-    model: "claude-sonnet-4-6",
+    model: CLAUDE_MODEL,
     max_tokens: 128,
     temperature: 0,
     system: DEFENDER_SYSTEM_PROMPT,
