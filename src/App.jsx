@@ -572,9 +572,11 @@ function AttackCalculator() {
     const sync = () => setHasApiKey(!!getApiKey());
     window.addEventListener("storage", sync);
     window.addEventListener("focus", sync);
+    window.addEventListener("nape-api-key-changed", sync);
     return () => {
       window.removeEventListener("storage", sync);
       window.removeEventListener("focus", sync);
+      window.removeEventListener("nape-api-key-changed", sync);
     };
   }, []);
   const { weapon, target, dice, rerolls, ui, easter } = state;

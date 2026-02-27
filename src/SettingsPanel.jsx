@@ -14,12 +14,14 @@ export function SettingsPanel({ theme }) {
 
   const save = () => {
     try { localStorage.setItem(STORAGE_KEY, key.trim()); } catch {}
+    window.dispatchEvent(new Event("nape-api-key-changed"));
     setSaved(true);
     setTimeout(() => setSaved(false), 1500);
   };
 
   const clear = () => {
     try { localStorage.removeItem(STORAGE_KEY); } catch {}
+    window.dispatchEvent(new Event("nape-api-key-changed"));
     setKey("");
   };
 
