@@ -176,6 +176,38 @@ function FillButton({ label, loading, disabled, hasKey, onClick, theme }) {
   );
 }
 
+function LookupSourceBadge({ meta, theme }) {
+  if (!meta) return null;
+  const dark = theme === "dark";
+  const linkClass = `underline ${dark ? "hover:text-gray-200" : "hover:text-gray-700"}`;
+
+  if (meta.source === "live") {
+    const time = new Date(meta.fetchedAt).toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZoneName: "short",
+    });
+    return (
+      <p className={`text-xs ${dark ? "text-green-400" : "text-green-600"}`}>
+        ✓ Pulled from{" "}
+        <a href={meta.wahapediaUrl} target="_blank" rel="noopener noreferrer" className={linkClass}>
+          Wahapedia
+        </a>
+        {" "}· {time}
+      </p>
+    );
+  }
+
+  return (
+    <p className={`text-xs ${dark ? "text-yellow-400" : "text-yellow-600"}`}>
+      ⚠ Training data — verify on{" "}
+      <a href={meta.wahapediaUrl || "https://wahapedia.ru"} target="_blank" rel="noopener noreferrer" className={linkClass}>
+        Wahapedia
+      </a>
+    </p>
+  );
+}
+
 function CounterLabel({ prefix, need, entered, remaining, theme }) {
   const state = remaining === 0 ? "ok" : remaining > 0 ? "low" : "high";
   const color =
@@ -1322,7 +1354,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                     <FillButton label="Fill" loading={unitLookup.attackerLoading} disabled={!unitLookup.attackerText.trim()} hasKey={hasApiKey} onClick={() => unitLookup.fillAttacker(dispatch)} theme={theme} />
                   </div>
                   {unitLookup.attackerError && <span className="text-xs text-red-400">{unitLookup.attackerError}</span>}
-                  {unitLookup.lastFilled === "attacker" && <p className="text-xs text-gray-500">Stats from Claude's training data — verify against your datasheet or <a href="https://wahapedia.ru" target="_blank" rel="noopener noreferrer" className="underline hover:text-gray-300">Wahapedia</a>.</p>}
+                  <LookupSourceBadge meta={unitLookup.attackerMeta} theme={theme} />
                 </div>
               )}
               <Field
@@ -1553,7 +1585,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                     <FillButton label="Fill" loading={unitLookup.defenderLoading} disabled={!unitLookup.defenderText.trim()} hasKey={hasApiKey} onClick={() => unitLookup.fillDefender(dispatch)} theme={theme} />
                   </div>
                   {unitLookup.defenderError && <span className="text-xs text-red-400">{unitLookup.defenderError}</span>}
-                  {unitLookup.lastFilled === "defender" && <p className="text-xs text-gray-500">Stats from Claude's training data — verify against your datasheet or <a href="https://wahapedia.ru" target="_blank" rel="noopener noreferrer" className="underline hover:text-gray-300">Wahapedia</a>.</p>}
+                  <LookupSourceBadge meta={unitLookup.defenderMeta} theme={theme} />
                 </div>
               )}
               <div className="space-y-2">
