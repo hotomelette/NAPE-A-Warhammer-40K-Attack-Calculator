@@ -18,14 +18,17 @@ export function useUnitLookup(getApiKey) {
   const [attackerError, setAttackerError] = useState(null);
   const [defenderError, setDefenderError] = useState(null);
   const [lastFilled, setLastFilled] = useState(null);
+  const [attackerMeta, setAttackerMeta] = useState(null);
+  const [defenderMeta, setDefenderMeta] = useState(null);
 
   const fillAttacker = useCallback(async (dispatch) => {
     setAttackerLoading(true);
     setAttackerError(null);
     try {
       const apiKey = getApiKey();
-      const fields = await fetchAttackerStats(attackerText, apiKey);
+      const { fields, meta } = await fetchAttackerStats(attackerText, apiKey);
       dispatch({ type: "LOAD_WEAPON", weapon: fields });
+      setAttackerMeta(meta);
       setLastFilled("attacker");
     } catch (err) {
       console.error("[UnitLookup] fillAttacker failed:", err);
@@ -40,8 +43,9 @@ export function useUnitLookup(getApiKey) {
     setDefenderError(null);
     try {
       const apiKey = getApiKey();
-      const fields = await fetchDefenderStats(defenderText, apiKey);
+      const { fields, meta } = await fetchDefenderStats(defenderText, apiKey);
       dispatch({ type: "LOAD_TARGET", target: fields });
+      setDefenderMeta(meta);
       setLastFilled("defender");
     } catch (err) {
       console.error("[UnitLookup] fillDefender failed:", err);
@@ -57,5 +61,6 @@ export function useUnitLookup(getApiKey) {
     attackerLoading, defenderLoading,
     attackerError, defenderError,
     lastFilled, fillAttacker, fillDefender,
+    attackerMeta, defenderMeta,
   };
 }

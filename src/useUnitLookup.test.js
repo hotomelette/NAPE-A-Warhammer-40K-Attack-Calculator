@@ -38,7 +38,7 @@ describe("useUnitLookup", () => {
 
   it("dispatches LOAD_WEAPON on fillAttacker success", async () => {
     const weaponFields = { attacksFixed: true, attacksValue: "1", toHit: "3", strength: "8", ap: "-3", damageFixed: true, damageValue: "3", torrent: false, lethalHits: false, sustainedHits: false, sustainedHitsN: 1, devastatingWounds: false, twinLinked: false };
-    fetchAttackerStats.mockResolvedValueOnce(weaponFields);
+    fetchAttackerStats.mockResolvedValueOnce({ fields: weaponFields, meta: { source: "training", wahapediaUrl: "https://wahapedia.ru" } });
     const dispatch = vi.fn();
     const { result } = renderHook(() => useUnitLookup(getApiKey));
     act(() => result.current.setAttackerText("crisis commander plasma rifle"));
@@ -60,7 +60,7 @@ describe("useUnitLookup", () => {
 
   it("dispatches LOAD_TARGET on fillDefender success", async () => {
     const targetFields = { toughness: "8", armorSave: "3", invulnSave: "4", fnpEnabled: false, fnp: "" };
-    fetchDefenderStats.mockResolvedValueOnce(targetFields);
+    fetchDefenderStats.mockResolvedValueOnce({ fields: targetFields, meta: { source: "training", wahapediaUrl: "https://wahapedia.ru" } });
     const dispatch = vi.fn();
     const { result } = renderHook(() => useUnitLookup(getApiKey));
     act(() => result.current.setDefenderText("canoptek doomstalker"));
@@ -68,5 +68,35 @@ describe("useUnitLookup", () => {
     expect(dispatch).toHaveBeenCalledWith({ type: "LOAD_TARGET", target: targetFields });
     expect(result.current.lastFilled).toBe("defender");
     expect(result.current.defenderError).toBe(null);
+  });
+
+  it("starts with null attackerMeta and defenderMeta", () => {
+    const { result } = renderHook(() => useUnitLookup(getApiKey));
+    expect(result.current.attackerMeta).toBeNull();
+    expect(result.current.defenderMeta).toBeNull();
+  });
+
+  it("stores attackerMeta on fillAttacker success", async () => {
+    const weaponFields = { attacksFixed: true, attacksValue: "4", toHit: "3", strength: "7", ap: "-1", damageFixed: true, damageValue: "1", torrent: false, lethalHits: false, sustainedHits: false, sustainedHitsN: 1, devastatingWounds: false, twinLinked: false };
+    const meta = { source: "live", wahapediaUrl: "https://wahapedia.ru/wh40k10ed/factions/tau-empire/Crisis-Battlesuits", fetchedAt: "2026-02-26T21:00:00Z" };
+    fetchAttackerStats.mockResolvedValueOnce({ fields: weaponFields, meta });
+    const dispatch = vi.fn();
+    const { result } = renderHook(() => useUnitLookup(getApiKey));
+    act(() => result.current.setAttackerText("crisis battlesuits plasma"));
+    await act(() => result.current.fillAttacker(dispatch));
+    expect(result.current.attackerMeta).toEqual(meta);
+    expect(dispatch).toHaveBeenCalledWith({ type: "LOAD_WEAPON", weapon: weaponFields });
+  });
+
+  it("stores defenderMeta on fillDefender success", async () => {
+    const targetFields = { toughness: "8", armorSave: "3", invulnSave: "4", fnpEnabled: false, fnp: "" };
+    const meta = { source: "training", wahapediaUrl: "https://wahapedia.ru/wh40k10ed/factions/necrons/Canoptek-Doomstalker" };
+    fetchDefenderStats.mockResolvedValueOnce({ fields: targetFields, meta });
+    const dispatch = vi.fn();
+    const { result } = renderHook(() => useUnitLookup(getApiKey));
+    act(() => result.current.setDefenderText("canoptek doomstalker"));
+    await act(() => result.current.fillDefender(dispatch));
+    expect(result.current.defenderMeta).toEqual(meta);
+    expect(dispatch).toHaveBeenCalledWith({ type: "LOAD_TARGET", target: targetFields });
   });
 });
