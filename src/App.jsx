@@ -1235,7 +1235,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
 
               <div className="max-w-screen-2xl mx-auto space-y-4 px-2 overflow-visible">
         {/* ── Sticky combined header + live results ── */}
-        <div className={`sticky top-0 z-40 border-b border-gray-700/80 shadow-lg overflow-hidden ${viz.headerBg}`}>
+        <div className={`sticky top-0 z-40 border-b border-gray-700/80 shadow-lg ${viz.headerBg}`}>
 
           {/* Emoji marquee background — mirrors the results panel animation */}
           {statsReady && (
