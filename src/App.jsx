@@ -567,6 +567,16 @@ function AttackCalculator() {
   // ─────────────────────────────────────────
   const [state, dispatch] = useReducer(appReducer, initialState);
   const unitLookup = useUnitLookup(getApiKey);
+  const [hasApiKey, setHasApiKey] = useState(() => !!getApiKey());
+  useEffect(() => {
+    const sync = () => setHasApiKey(!!getApiKey());
+    window.addEventListener("storage", sync);
+    window.addEventListener("focus", sync);
+    return () => {
+      window.removeEventListener("storage", sync);
+      window.removeEventListener("focus", sync);
+    };
+  }, []);
   const { weapon, target, dice, rerolls, ui, easter } = state;
 
   // ── Destructure slices for direct use ──
@@ -1299,7 +1309,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                       type="text"
                       value={unitLookup.text}
                       onChange={e => unitLookup.setText(e.target.value)}
-                      onKeyDown={e => e.key === "Enter" && !unitLookup.loading && unitLookup.text.trim() && getApiKey() && unitLookup.fillAttacker(dispatch)}
+                      onKeyDown={e => e.key === "Enter" && !unitLookup.attackerLoading && unitLookup.text.trim() && getApiKey() && unitLookup.fillAttacker(dispatch)}
                       placeholder="Unit name — e.g. 'crisis commander plasma rifle' or 'doomstalker'"
                       className={`flex-1 rounded border px-2 py-1 text-sm ${theme === "dark" ? "bg-gray-800 border-gray-600 text-gray-100 placeholder-gray-500" : "bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-400"}`}
                     />
@@ -1321,9 +1331,9 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
             <Section theme={theme} title="Weapon" action={
   <FillButton
     label="Fill Attacker"
-    loading={unitLookup.loading}
+    loading={unitLookup.attackerLoading}
     disabled={!unitLookup.text.trim()}
-    hasKey={!!getApiKey()}
+    hasKey={hasApiKey}
     onClick={() => unitLookup.fillAttacker(dispatch)}
     theme={theme}
   />
@@ -1544,9 +1554,9 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
             <Section theme={theme} title="Target 1" action={
   <FillButton
     label="Fill Defender"
-    loading={unitLookup.loading}
+    loading={unitLookup.defenderLoading}
     disabled={!unitLookup.text.trim()}
-    hasKey={!!getApiKey()}
+    hasKey={hasApiKey}
     onClick={() => unitLookup.fillDefender(dispatch)}
     theme={theme}
   />

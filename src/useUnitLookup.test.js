@@ -16,7 +16,8 @@ describe("useUnitLookup", () => {
   it("starts with empty text, not loading, no error", () => {
     const { result } = renderHook(() => useUnitLookup(getApiKey));
     expect(result.current.text).toBe("");
-    expect(result.current.loading).toBe(false);
+    expect(result.current.attackerLoading).toBe(false);
+    expect(result.current.defenderLoading).toBe(false);
     expect(result.current.error).toBe(null);
     expect(result.current.lastFilled).toBe(null);
   });

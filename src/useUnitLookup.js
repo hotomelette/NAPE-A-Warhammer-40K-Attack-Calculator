@@ -3,12 +3,13 @@ import { fetchAttackerStats, fetchDefenderStats } from "./claudeService.js";
 
 export function useUnitLookup(getApiKey) {
   const [text, setText] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [attackerLoading, setAttackerLoading] = useState(false);
+  const [defenderLoading, setDefenderLoading] = useState(false);
   const [error, setError] = useState(null);
   const [lastFilled, setLastFilled] = useState(null);
 
   const fillAttacker = useCallback(async (dispatch) => {
-    setLoading(true);
+    setAttackerLoading(true);
     setError(null);
     try {
       const apiKey = getApiKey();
@@ -18,12 +19,12 @@ export function useUnitLookup(getApiKey) {
     } catch {
       setError("Couldn't identify unit — try a different description");
     } finally {
-      setLoading(false);
+      setAttackerLoading(false);
     }
   }, [text, getApiKey]);
 
   const fillDefender = useCallback(async (dispatch) => {
-    setLoading(true);
+    setDefenderLoading(true);
     setError(null);
     try {
       const apiKey = getApiKey();
@@ -33,9 +34,9 @@ export function useUnitLookup(getApiKey) {
     } catch {
       setError("Couldn't identify unit — try a different description");
     } finally {
-      setLoading(false);
+      setDefenderLoading(false);
     }
   }, [text, getApiKey]);
 
-  return { text, setText, loading, error, lastFilled, fillAttacker, fillDefender };
+  return { text, setText, attackerLoading, defenderLoading, error, lastFilled, fillAttacker, fillDefender };
 }
