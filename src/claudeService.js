@@ -236,6 +236,9 @@ export async function fetchAttackerStatsFromPage(description, chosenWeapon, page
     messages: [{ role: "user", content: userContent }],
   });
   const raw = parseJson(msg.content[0].text);
+  if (raw.type === "options") {
+    throw new Error(`Unexpected disambiguation response for "${chosenWeapon}" — please try a more specific description`);
+  }
   return {
     type: "stats",
     fields: mapToWeaponFields(raw),
@@ -292,6 +295,9 @@ export async function fetchDefenderStatsFromPage(description, chosenUnit, pageCa
     messages: [{ role: "user", content: userContent }],
   });
   const raw = parseJson(msg.content[0].text);
+  if (raw.type === "options") {
+    throw new Error(`Unexpected disambiguation response for "${chosenUnit}" — please try a more specific description`);
+  }
   return {
     type: "stats",
     fields: mapToTargetFields(raw),
