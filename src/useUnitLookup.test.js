@@ -15,17 +15,25 @@ const getApiKey = () => mockApiKey;
 describe("useUnitLookup", () => {
   it("starts with empty text, not loading, no error", () => {
     const { result } = renderHook(() => useUnitLookup(getApiKey));
-    expect(result.current.text).toBe("");
+    expect(result.current.attackerText).toBe("");
+    expect(result.current.defenderText).toBe("");
     expect(result.current.attackerLoading).toBe(false);
     expect(result.current.defenderLoading).toBe(false);
-    expect(result.current.error).toBe(null);
+    expect(result.current.attackerError).toBe(null);
+    expect(result.current.defenderError).toBe(null);
     expect(result.current.lastFilled).toBe(null);
   });
 
-  it("updates text via setText", () => {
+  it("updates attackerText via setAttackerText", () => {
     const { result } = renderHook(() => useUnitLookup(getApiKey));
-    act(() => result.current.setText("crisis commander"));
-    expect(result.current.text).toBe("crisis commander");
+    act(() => result.current.setAttackerText("crisis commander"));
+    expect(result.current.attackerText).toBe("crisis commander");
+  });
+
+  it("updates defenderText via setDefenderText", () => {
+    const { result } = renderHook(() => useUnitLookup(getApiKey));
+    act(() => result.current.setDefenderText("doomstalker"));
+    expect(result.current.defenderText).toBe("doomstalker");
   });
 
   it("dispatches LOAD_WEAPON on fillAttacker success", async () => {
@@ -33,20 +41,20 @@ describe("useUnitLookup", () => {
     fetchAttackerStats.mockResolvedValueOnce(weaponFields);
     const dispatch = vi.fn();
     const { result } = renderHook(() => useUnitLookup(getApiKey));
-    act(() => result.current.setText("crisis commander plasma rifle"));
+    act(() => result.current.setAttackerText("crisis commander plasma rifle"));
     await act(() => result.current.fillAttacker(dispatch));
     expect(dispatch).toHaveBeenCalledWith({ type: "LOAD_WEAPON", weapon: weaponFields });
     expect(result.current.lastFilled).toBe("attacker");
-    expect(result.current.error).toBe(null);
+    expect(result.current.attackerError).toBe(null);
   });
 
-  it("sets error on fillAttacker failure", async () => {
+  it("sets attackerError on fillAttacker failure", async () => {
     fetchAttackerStats.mockRejectedValueOnce(new Error("API error"));
     const dispatch = vi.fn();
     const { result } = renderHook(() => useUnitLookup(getApiKey));
-    act(() => result.current.setText("???"));
+    act(() => result.current.setAttackerText("???"));
     await act(() => result.current.fillAttacker(dispatch));
-    expect(result.current.error).toBe("Couldn't identify unit — try a different description");
+    expect(result.current.attackerError).toBe("Couldn't identify unit — try a different description");
     expect(dispatch).not.toHaveBeenCalled();
   });
 
@@ -55,9 +63,10 @@ describe("useUnitLookup", () => {
     fetchDefenderStats.mockResolvedValueOnce(targetFields);
     const dispatch = vi.fn();
     const { result } = renderHook(() => useUnitLookup(getApiKey));
-    act(() => result.current.setText("canoptek doomstalker"));
+    act(() => result.current.setDefenderText("canoptek doomstalker"));
     await act(() => result.current.fillDefender(dispatch));
     expect(dispatch).toHaveBeenCalledWith({ type: "LOAD_TARGET", target: targetFields });
     expect(result.current.lastFilled).toBe("defender");
+    expect(result.current.defenderError).toBe(null);
   });
 });

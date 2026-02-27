@@ -1304,42 +1304,27 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
           </div>
         </div>
 
-                {/* ── Unit Lookup Bar ── */}
-                <div className="max-w-screen-2xl mx-auto px-2 pb-1">
-                  <div className={`flex gap-2 items-start rounded-lg border px-3 py-2 ${theme === "dark" ? "bg-gray-900/60 border-gray-700" : "bg-white/80 border-gray-300"}`}>
-                    <input
-                      type="text"
-                      value={unitLookup.text}
-                      onChange={e => unitLookup.setText(e.target.value)}
-                      onKeyDown={e => e.key === "Enter" && !unitLookup.attackerLoading && unitLookup.text.trim() && getApiKey() && unitLookup.fillAttacker(dispatch)}
-                      placeholder="Unit name — e.g. 'crisis commander plasma rifle' or 'doomstalker'"
-                      className={`flex-1 rounded border px-2 py-1 text-sm ${theme === "dark" ? "bg-gray-800 border-gray-600 text-gray-100 placeholder-gray-500" : "bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-400"}`}
-                    />
-                    {unitLookup.error && (
-                      <span className="text-xs text-red-400 self-center shrink-0">{unitLookup.error}</span>
-                    )}
-                  </div>
-                  {unitLookup.lastFilled && (
-                    <p className="text-xs text-gray-500 mt-1 px-1">
-                      Stats from Claude's training data — verify against your datasheet or{" "}
-                      <a href="https://wahapedia.ru" target="_blank" rel="noopener noreferrer" className="underline hover:text-gray-300">Wahapedia</a>.
-                    </p>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 overflow-visible">
+<div className="grid grid-cols-1 lg:grid-cols-12 gap-4 overflow-visible">
           {/* LEFT: Inputs */}
           <div className="lg:col-span-6 space-y-4">
-            <Section theme={theme} title="Weapon" action={
-  <FillButton
-    label="Fill Attacker"
-    loading={unitLookup.attackerLoading}
-    disabled={!unitLookup.text.trim()}
-    hasKey={hasApiKey}
-    onClick={() => unitLookup.fillAttacker(dispatch)}
-    theme={theme}
-  />
-}>
+            <Section theme={theme} title="Weapon">
+              {hasApiKey && (
+                <div className="flex flex-col gap-1 mb-2">
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={unitLookup.attackerText}
+                      onChange={e => unitLookup.setAttackerText(e.target.value)}
+                      onKeyDown={e => e.key === "Enter" && !unitLookup.attackerLoading && unitLookup.attackerText.trim() && unitLookup.fillAttacker(dispatch)}
+                      placeholder="e.g. intercessor bolt rifle, crisis suit plasma rifle"
+                      className={`flex-1 rounded border px-2 py-1 text-sm ${theme === "dark" ? "bg-gray-800 border-gray-600 text-gray-100 placeholder-gray-500" : "bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-400"}`}
+                    />
+                    <FillButton label="Fill" loading={unitLookup.attackerLoading} disabled={!unitLookup.attackerText.trim()} hasKey={hasApiKey} onClick={() => unitLookup.fillAttacker(dispatch)} theme={theme} />
+                  </div>
+                  {unitLookup.attackerError && <span className="text-xs text-red-400">{unitLookup.attackerError}</span>}
+                  {unitLookup.lastFilled === "attacker" && <p className="text-xs text-gray-500">Stats from Claude's training data — verify against your datasheet or <a href="https://wahapedia.ru" target="_blank" rel="noopener noreferrer" className="underline hover:text-gray-300">Wahapedia</a>.</p>}
+                </div>
+              )}
               <Field
                 label={<StatLabel label="A" full="Attacks" example="e.g. 6 (fixed) or D6+1 (random)" theme={theme} />}
                 hint="Fixed: enter a number. Random: uncheck Fixed, enter a dice expression (D6+1, 2D6, D3+2). The +N modifier is auto-added to the dice result. Enter rolled attack dice in the Dice entry section."
@@ -1553,16 +1538,24 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
 
             </Section>
 
-            <Section theme={theme} title="Target 1" action={
-  <FillButton
-    label="Fill Defender"
-    loading={unitLookup.defenderLoading}
-    disabled={!unitLookup.text.trim()}
-    hasKey={hasApiKey}
-    onClick={() => unitLookup.fillDefender(dispatch)}
-    theme={theme}
-  />
-}>
+            <Section theme={theme} title="Target 1">
+              {hasApiKey && (
+                <div className="flex flex-col gap-1 mb-2">
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={unitLookup.defenderText}
+                      onChange={e => unitLookup.setDefenderText(e.target.value)}
+                      onKeyDown={e => e.key === "Enter" && !unitLookup.defenderLoading && unitLookup.defenderText.trim() && unitLookup.fillDefender(dispatch)}
+                      placeholder="e.g. doomstalker, ork boy, space marine"
+                      className={`flex-1 rounded border px-2 py-1 text-sm ${theme === "dark" ? "bg-gray-800 border-gray-600 text-gray-100 placeholder-gray-500" : "bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-400"}`}
+                    />
+                    <FillButton label="Fill" loading={unitLookup.defenderLoading} disabled={!unitLookup.defenderText.trim()} hasKey={hasApiKey} onClick={() => unitLookup.fillDefender(dispatch)} theme={theme} />
+                  </div>
+                  {unitLookup.defenderError && <span className="text-xs text-red-400">{unitLookup.defenderError}</span>}
+                  {unitLookup.lastFilled === "defender" && <p className="text-xs text-gray-500">Stats from Claude's training data — verify against your datasheet or <a href="https://wahapedia.ru" target="_blank" rel="noopener noreferrer" className="underline hover:text-gray-300">Wahapedia</a>.</p>}
+                </div>
+              )}
               <div className="space-y-2">
                 <InlineStatField label={<StatLabel label="T" full="Toughness" example="e.g. 4" required={!isNum(toughness)} theme={theme} />}>
                   <input type="text" inputMode="numeric" value={toughness} onChange={e => setToughness(e.target.value)}
