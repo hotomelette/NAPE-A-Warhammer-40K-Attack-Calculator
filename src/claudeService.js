@@ -73,7 +73,7 @@ export async function fetchAttackerStats(description, apiKey) {
     system: ATTACKER_SYSTEM_PROMPT,
     messages: [{ role: "user", content: description }],
   });
-  const text = message.content[0].text.trim();
+  const text = message.content[0].text.trim().replace(/^```[a-z]*\n?/i, "").replace(/```$/, "").trim();
   const raw = JSON.parse(text);
   return mapToWeaponFields(raw);
 }
@@ -87,7 +87,7 @@ export async function fetchDefenderStats(description, apiKey) {
     system: DEFENDER_SYSTEM_PROMPT,
     messages: [{ role: "user", content: description }],
   });
-  const text = message.content[0].text.trim();
+  const text = message.content[0].text.trim().replace(/^```[a-z]*\n?/i, "").replace(/```$/, "").trim();
   const raw = JSON.parse(text);
   return mapToTargetFields(raw);
 }
