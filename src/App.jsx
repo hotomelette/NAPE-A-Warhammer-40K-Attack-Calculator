@@ -1824,7 +1824,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                                 <button
                                   type="button"
                                   className={`rounded px-2 py-1 text-xs font-semibold border transition ${theme === "dark" ? "bg-gray-800 border-gray-600 text-gray-300 hover:bg-gray-700" : "bg-gray-50 border-gray-300 text-gray-600 hover:bg-gray-100"}`}
-                                  onClick={() => clearDice()}
+                                  onClick={clearDice}
                                 >
                                   Clear dice
                                 </button>
@@ -2069,7 +2069,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
   <div className="flex gap-2">
     <button
       type="button"
-      className="rounded px-2 py-1.5 text-xs font-extrabold border transition bg-gradient-to-r from-yellow-400/80 to-amber-400/80 text-gray-950 border-yellow-200/40 hover:from-yellow-300/90 hover:to-amber-300/90"
+      className="rounded px-2 py-1 text-xs font-extrabold border transition bg-gradient-to-r from-yellow-400/80 to-amber-400/80 text-gray-950 border-yellow-200/40 hover:from-yellow-300/90 hover:to-amber-300/90"
       onClick={loadExample}
       title="Fill all fields with a known working example"
     >
@@ -2077,7 +2077,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
     </button>
     <button
       type="button"
-      className={`rounded px-2 py-1.5 text-xs font-semibold border transition ${theme === "dark" ? "bg-gray-900 text-gray-100 border-gray-700 hover:bg-gray-800" : "bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200"}`}
+      className={`rounded px-2 py-1 text-xs font-semibold border transition ${theme === "dark" ? "bg-gray-900 text-gray-100 border-gray-700 hover:bg-gray-800" : "bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200"}`}
       onClick={() => { handleClearAllEaster(); clearAll(); }}
     >
       Clear all
