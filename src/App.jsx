@@ -182,18 +182,19 @@ function LookupSourceBadge({ meta, theme }) {
   const linkClass = `underline ${dark ? "hover:text-gray-200" : "hover:text-gray-700"}`;
 
   if (meta.source === "live") {
-    const time = new Date(meta.fetchedAt).toLocaleTimeString([], {
+    const ts = meta.fetchedAt ? new Date(meta.fetchedAt) : null;
+    const time = ts && !isNaN(ts) ? ts.toLocaleTimeString([], {
       hour: "2-digit",
       minute: "2-digit",
       timeZoneName: "short",
-    });
+    }) : "";
     return (
       <p className={`text-xs ${dark ? "text-green-400" : "text-green-600"}`}>
         ✓ Pulled from{" "}
         <a href={meta.wahapediaUrl} target="_blank" rel="noopener noreferrer" className={linkClass}>
           Wahapedia
         </a>
-        {" "}· {time}
+        {time && <>{" "}· {time}</>}
       </p>
     );
   }
