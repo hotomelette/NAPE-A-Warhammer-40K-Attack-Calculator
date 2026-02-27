@@ -1393,7 +1393,15 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
 <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 overflow-visible">
           {/* LEFT: Inputs */}
           <div className="lg:col-span-6 space-y-4">
-            <Section theme={theme} title="Weapon">
+            <Section theme={theme} title="Weapon" action={
+  <button
+    type="button"
+    className={`rounded px-2 py-1 text-xs font-semibold border transition ${theme === "dark" ? "bg-gray-800 border-gray-600 text-gray-300 hover:bg-gray-700" : "bg-gray-50 border-gray-300 text-gray-600 hover:bg-gray-100"}`}
+    onClick={clearWeapon}
+  >
+    Clear weapon
+  </button>
+}>
               {hasApiKey && (
                 <div className="flex flex-col gap-1 mb-2">
                   <div className="flex gap-2">
@@ -1632,7 +1640,15 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
 
             </Section>
 
-            <Section theme={theme} title="Target 1">
+            <Section theme={theme} title="Target 1" action={
+  <button
+    type="button"
+    className={`rounded px-2 py-1 text-xs font-semibold border transition ${theme === "dark" ? "bg-gray-800 border-gray-600 text-gray-300 hover:bg-gray-700" : "bg-gray-50 border-gray-300 text-gray-600 hover:bg-gray-100"}`}
+    onClick={clearTarget}
+  >
+    Clear target
+  </button>
+}>
               {hasApiKey && (
                 <div className="flex flex-col gap-1 mb-2">
                   <div className="flex gap-2">
@@ -1804,12 +1820,21 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                                 <DiceEntryTooltip theme={theme} />
                               </span>
                             } action={
-                              <RollAllButton
-                                onClick={rollAll}
-                                disabled={!statsReady || isRollingAll}
-                                isRolling={isRollingAll}
-                                isReady={statsReady}
-                              />
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  className={`rounded px-2 py-1 text-xs font-semibold border transition ${theme === "dark" ? "bg-gray-800 border-gray-600 text-gray-300 hover:bg-gray-700" : "bg-gray-50 border-gray-300 text-gray-600 hover:bg-gray-100"}`}
+                                  onClick={() => clearDice()}
+                                >
+                                  Clear dice
+                                </button>
+                                <RollAllButton
+                                  onClick={rollAll}
+                                  disabled={!statsReady || isRollingAll}
+                                  isRolling={isRollingAll}
+                                  isReady={statsReady}
+                                />
+                              </div>
                             }>
 
                             {/* ── ⚔️ Weapon — Dice sub-header ── */}
@@ -2040,7 +2065,25 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                             );
                           })}
 
-<Section theme={theme} title="Results">
+<Section theme={theme} title="Results" action={
+  <div className="flex gap-2">
+    <button
+      type="button"
+      className="rounded px-2 py-1.5 text-xs font-extrabold border transition bg-gradient-to-r from-yellow-400/80 to-amber-400/80 text-gray-950 border-yellow-200/40 hover:from-yellow-300/90 hover:to-amber-300/90"
+      onClick={loadExample}
+      title="Fill all fields with a known working example"
+    >
+      Load example
+    </button>
+    <button
+      type="button"
+      className={`rounded px-2 py-1.5 text-xs font-semibold border transition ${theme === "dark" ? "bg-gray-900 text-gray-100 border-gray-700 hover:bg-gray-800" : "bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200"}`}
+      onClick={() => { handleClearAllEaster(); clearAll(); }}
+    >
+      Clear all
+    </button>
+  </div>
+}>
 
                 {!statsReady ? (
                   <div className={`mt-3 rounded-xl border p-4 text-base ${theme === "dark" ? "border-red-600 bg-red-900/30 text-red-200" : "border-red-300 bg-red-50 text-red-800"}`}>
@@ -2223,53 +2266,6 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                     )}
                   </div>
                 )}
-
-                <div className="mt-3">
-                  <div className="space-y-2">
-                    {/* Row 1: Load example + Clear all */}
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        className="rounded-lg bg-gradient-to-r from-yellow-400/80 to-amber-400/80 text-gray-950 px-3 py-2 text-sm font-extrabold border border-yellow-200/40 hover:from-yellow-300/90 hover:to-amber-300/90 w-full"
-                        onClick={loadExample}
-                        title="Fill all fields with a known working example"
-                      >
-                        Load example
-                      </button>
-                      <button
-                        type="button"
-                        className="rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font-semibold border border-gray-700 hover:bg-gray-800 w-full"
-                        onClick={() => { handleClearAllEaster(); clearAll(); }}
-                      >
-                        Clear all
-                      </button>
-                    </div>
-
-                    {/* Row 2: Clear weapon/target/dice */}
-                    <div className="grid grid-cols-3 gap-2">
-                      <button
-                        type="button"
-                        className="rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font-semibold border border-gray-700 hover:bg-gray-800 w-full"
-                        onClick={clearWeapon}
-                      >
-                        Clear weapon
-                      </button>
-                      <button
-                        type="button"
-                        className="rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font-semibold border border-gray-700 hover:bg-gray-800 w-full"
-                        onClick={clearTarget}
-                      >
-                        Clear target
-                      </button>
-                      <button type="button" className="rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font-semibold border border-gray-700 hover:bg-gray-800 w-full" onClick={() => clearDice()}>
-                        Clear dice
-                      </button>
-                    </div>
-
-
-
-                  </div>
-                </div>
 
                 </div>
               </Section>
