@@ -953,7 +953,9 @@ function AttackCalculator() {
 
   const hasHitCountError = !torrent && hitEntered !== hitNeeded;
   const hasWoundCountError = woundEntered !== woundNeeded;
-  const hasSaveCountError = saveNeeded > 0 && saveEntered !== saveNeeded;
+  const hasSaveCountError = splitEnabled
+    ? (saveNeeded > 0 && saveEntered < saveNeeded)
+    : (saveNeeded > 0 && saveEntered !== saveNeeded);
   const hasFnpCountError = fnpNeeded > 0 && fnpEntered !== fnpNeeded;
 
   const isNum = (v) => v !== "" && Number.isFinite(Number(v));
