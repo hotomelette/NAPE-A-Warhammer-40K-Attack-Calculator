@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 
 const WORKER_URL = import.meta.env.VITE_WAHAPEDIA_WORKER_URL || null;
-const CLAUDE_MODEL = "claude-sonnet-4-6";
+const CLAUDE_MODEL = "claude-haiku-4-5-20251001";
 
 // ─── System prompts ──────────────────────────────────────────────────────────
 
