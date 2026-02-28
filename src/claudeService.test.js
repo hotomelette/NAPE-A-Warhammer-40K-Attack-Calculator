@@ -106,6 +106,41 @@ describe("fetchWahapediaPage", () => {
   });
 });
 
+describe("fetchWahapediaSearch", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("returns text and confirmed url on success", async () => {
+    const { fetchWahapediaSearch } = await import("./claudeService.js");
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({
+        text: "live datasheet",
+        url: "https://wahapedia.ru/wh40k10ed/factions/t-au-empire/Broadside-Battlesuits",
+      }),
+    }));
+    const result = await fetchWahapediaSearch("Broadside-Battlesuits", "tau-empire", "https://worker.example.com");
+    expect(result.text).toBe("live datasheet");
+    expect(result.url).toContain("t-au-empire");
+  });
+
+  it("returns null when worker returns not_found", async () => {
+    const { fetchWahapediaSearch } = await import("./claudeService.js");
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ error: "not_found" }),
+    }));
+    const result = await fetchWahapediaSearch("Fake-Unit", "orks", "https://worker.example.com");
+    expect(result).toBeNull();
+  });
+
+  it("returns null on network error", async () => {
+    const { fetchWahapediaSearch } = await import("./claudeService.js");
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("Network error")));
+    const result = await fetchWahapediaSearch("Any-Unit", "necrons", "https://worker.example.com");
+    expect(result).toBeNull();
+  });
+});
+
 describe("fromPage helper exports", () => {
   it("fetchAttackerStatsFromPage is exported", async () => {
     const mod = await import("./claudeService.js");

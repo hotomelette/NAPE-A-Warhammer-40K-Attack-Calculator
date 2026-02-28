@@ -170,22 +170,49 @@ export async function fetchWahapediaPage(path, workerUrl) {
   }
 }
 
+export async function fetchWahapediaSearch(unitName, factionHint, workerUrl) {
+  try {
+    const url = `${workerUrl}/search?unit=${encodeURIComponent(unitName)}&faction=${encodeURIComponent(factionHint)}`;
+    const res = await fetch(url);
+    const data = await res.json();
+    if (data.error) return null;
+    return data; // { text, url }
+  } catch (err) {
+    console.warn("[fetchWahapediaSearch] failed", unitName, err);
+    return null;
+  }
+}
+
 async function resolveAndFetch(description, client) {
   const path = await resolveWahapediaPath(description, client);
-  const wahapediaUrl = path
+  let wahapediaUrl = path
     ? `https://wahapedia.ru/wh40k10ed/factions/${path}`
     : "https://wahapedia.ru";
   let pageContent = null;
   let source = "training";
   let fetchedAt;
+
   if (WORKER_URL && path) {
-    const page = await fetchWahapediaPage(path, WORKER_URL);
+    // Try the direct path first
+    let page = await fetchWahapediaPage(path, WORKER_URL);
+
+    // If direct path failed, search by unit name across all faction slugs
+    if (!page) {
+      const slashIdx = path.indexOf("/");
+      const factionHint = slashIdx !== -1 ? path.slice(0, slashIdx) : path;
+      const unitName = slashIdx !== -1 ? path.slice(slashIdx + 1) : path;
+      page = await fetchWahapediaSearch(unitName, factionHint, WORKER_URL);
+    }
+
     if (page) {
       pageContent = page.text;
       source = "live";
       fetchedAt = new Date().toISOString();
+      // Use the confirmed URL from whichever call succeeded
+      if (page.url) wahapediaUrl = page.url;
     }
   }
+
   return { pageContent, source, wahapediaUrl, fetchedAt };
 }
 
