@@ -984,9 +984,9 @@ function AttackCalculator() {
     statsReady &&
     activeComputed.errors.length === 0 &&
     !hasHitCountError &&
-    !hasWoundCountError &&
-    !hasSaveCountError &&
-    !hasFnpCountError;
+    (woundNeeded === 0 || !hasWoundCountError) &&
+    (saveNeeded === 0 || !hasSaveCountError) &&
+    (fnpNeeded === 0 || !hasFnpCountError);
   const status = !statsReady ? "Waiting for stats" : diceReady ? "Ready" : "Waiting for dice";
 
   const statusEmoji = status === "Ready" ? "✅⚔️" : status === "Waiting for dice" ? "⏳🎲" : "⛔🧩";
@@ -1929,24 +1929,26 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                               </Field>
                             ) : null}
 
-                            <Field
-                              label={<CounterLabel prefix="Wound rolls" need={woundNeeded} entered={woundEntered} remaining={woundNeeded - woundEntered} theme={theme} />}
-                              hint={`One die per hit (incl. Sustained bonus hits). Lethal Hits skip directly to saves — auto-wounds this volley: ${activeComputed.autoWoundsFromLethal}. Count must match the wound roll pool.`}
-                            >
-                              <div className="flex gap-2">
-                                <input
-                                  className={`flex-1 rounded border p-2 text-lg font-semibold ${hasWoundCountError ? "border-red-500 ring-2 ring-red-200" : ""}`}
-                                  value={woundRollsText}
-                                  onChange={(e) => setWoundRollsText(e.target.value)}
-                                  placeholder="e.g. 6 4 3 1 ..."
-                                />
-                                <button type="button" title="Roll for me" disabled={woundNeeded === 0}
-                                  onClick={() => setWoundRollsText(rollDice(woundNeeded, 6))}
-                                  className="rounded-lg bg-amber-500 hover:bg-amber-400 disabled:opacity-30 text-gray-950 px-3 font-bold text-lg transition">🎲</button>
-                              </div>
-                            </Field>
+                            {woundNeeded > 0 && (
+                              <Field
+                                label={<CounterLabel prefix="Wound rolls" need={woundNeeded} entered={woundEntered} remaining={woundNeeded - woundEntered} theme={theme} />}
+                                hint={`One die per hit (incl. Sustained bonus hits). Lethal Hits skip directly to saves — auto-wounds this volley: ${activeComputed.autoWoundsFromLethal}. Count must match the wound roll pool.`}
+                              >
+                                <div className="flex gap-2">
+                                  <input
+                                    className={`flex-1 rounded border p-2 text-lg font-semibold ${hasWoundCountError ? "border-red-500 ring-2 ring-red-200" : ""}`}
+                                    value={woundRollsText}
+                                    onChange={(e) => setWoundRollsText(e.target.value)}
+                                    placeholder="e.g. 6 4 3 1 ..."
+                                  />
+                                  <button type="button" title="Roll for me" disabled={woundNeeded === 0}
+                                    onClick={() => setWoundRollsText(rollDice(woundNeeded, 6))}
+                                    className="rounded-lg bg-amber-500 hover:bg-amber-400 disabled:opacity-30 text-gray-950 px-3 font-bold text-lg transition">🎲</button>
+                                </div>
+                              </Field>
+                            )}
 
-                            {(rerollWoundOnes || rerollWoundFails || twinLinked) ? (
+                            {(rerollWoundOnes || rerollWoundFails || twinLinked) && woundNeeded > 0 ? (
                               <Field
                                 label={<CounterLabel prefix="Wound reroll dice" need={woundRerollNeeded} entered={woundRerollEntered} remaining={woundRerollNeeded - woundRerollEntered} theme={theme} />}
                                 hint="Enter rerolled wound dice in order for each eligible reroll. Eligibility is determined from the initial wound rolls."
@@ -1960,25 +1962,29 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                               </Field>
                             ) : null}
 
-                            <div className={`text-sm font-extrabold tracking-wide mt-2 mb-0 uppercase ${theme === "dark" ? "text-amber-300/80" : "text-amber-700/80"}`}>🎯 Target 1 — Dice</div>
-                            <Field
-                              label={<CounterLabel prefix={splitEnabled ? "Save rolls (T1)" : "Save rolls"} need={saveNeeded} entered={saveEntered} remaining={saveNeeded - saveEntered} />}
-                              hint="One die per savable wound. Mortal wounds (Devastating) bypass saves and go straight to damage. Count must equal wounds allocated to this target."
-                            >
-                              <div className="flex gap-2">
-                                <input
-                                  className={`flex-1 rounded border p-2 text-lg font-semibold ${hasSaveCountError ? "border-red-500 ring-2 ring-red-200" : ""}`}
-                                  value={saveRollsText}
-                                  onChange={(e) => setSaveRollsText(e.target.value)}
-                                  placeholder="e.g. 5 2 6 ..."
-                                />
-                                <button type="button" title="Roll for me" disabled={saveNeeded === 0}
-                                  onClick={() => setSaveRollsText(rollDice(saveNeeded, 6))}
-                                  className="rounded-lg bg-amber-500 hover:bg-amber-400 disabled:opacity-30 text-gray-950 px-3 font-bold text-lg transition">🎲</button>
-                              </div>
-                            </Field>
+                            {saveNeeded > 0 && (
+                              <>
+                                <div className={`text-sm font-extrabold tracking-wide mt-2 mb-0 uppercase ${theme === "dark" ? "text-amber-300/80" : "text-amber-700/80"}`}>🎯 Target 1 — Dice</div>
+                                <Field
+                                  label={<CounterLabel prefix={splitEnabled ? "Save rolls (T1)" : "Save rolls"} need={saveNeeded} entered={saveEntered} remaining={saveNeeded - saveEntered} />}
+                                  hint="One die per savable wound. Mortal wounds (Devastating) bypass saves and go straight to damage. Count must equal wounds allocated to this target."
+                                >
+                                  <div className="flex gap-2">
+                                    <input
+                                      className={`flex-1 rounded border p-2 text-lg font-semibold ${hasSaveCountError ? "border-red-500 ring-2 ring-red-200" : ""}`}
+                                      value={saveRollsText}
+                                      onChange={(e) => setSaveRollsText(e.target.value)}
+                                      placeholder="e.g. 5 2 6 ..."
+                                    />
+                                    <button type="button" title="Roll for me" disabled={saveNeeded === 0}
+                                      onClick={() => setSaveRollsText(rollDice(saveNeeded, 6))}
+                                      className="rounded-lg bg-amber-500 hover:bg-amber-400 disabled:opacity-30 text-gray-950 px-3 font-bold text-lg transition">🎲</button>
+                                  </div>
+                                </Field>
+                              </>
+                            )}
 
-                            {(fnpEnabled && fnp !== "") ? (
+                            {fnpNeeded > 0 ? (
                             <Field
                                             label={<CounterLabel prefix="FNP rolls" need={fnpNeeded} entered={fnpEntered} remaining={fnpNeeded - fnpEntered} />}
                                             hint="Only if FNP is enabled. One die per point of damage."
