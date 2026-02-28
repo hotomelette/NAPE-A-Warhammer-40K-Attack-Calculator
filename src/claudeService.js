@@ -11,10 +11,19 @@ The path format is: {faction-slug}/{Unit-Name-With-Hyphens}
 
 Examples:
 - "space marine intercessor bolt rifle" → space-marines/Intercessor-Squad
-- "crisis battlesuits plasma" → tau-empire/Crisis-Battlesuits
+- "crisis battlesuits plasma" → t-au-empire/Crisis-Battlesuits
+- "broadside battlesuits" → t-au-empire/Broadside-Battlesuits
 - "forgefiend" → chaos-space-marines/Forgefiend
 - "canoptek doomstalker" → necrons/Canoptek-Doomstalker
 - "ork boy" → orks/Boyz
+- "noise marine" → emperor-s-children/Noise-Marines
+
+Faction slug reference — use these EXACT slugs:
+space-marines | grey-knights | adeptus-custodes | adepta-sororitas | adeptus-mechanicus
+astra-militarum | imperial-knights | imperial-agents | chaos-space-marines | death-guard
+thousand-sons | world-eaters | emperor-s-children | t-au-empire | aeldari | drukhari
+tyranids | necrons | orks | genestealer-cults | leagues-of-votann | chaos-knights
+dark-angels | blood-angels | space-wolves | black-templars | deathwatch
 
 Rules:
 - Return ONLY the path string. No URL prefix, no explanation, no markdown.
