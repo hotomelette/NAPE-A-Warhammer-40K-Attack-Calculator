@@ -1384,9 +1384,10 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
               {simpleMode ? "Simple" : "Complex"}
             </button>
             <button type="button"
-              className="rounded px-2 py-1 text-xs font-bold border bg-gray-900/80 text-gray-300 border-gray-700 hover:bg-gray-800 transition shrink-0"
-              onClick={toggleTheme}>
-              {theme === "dark" ? "🌙" : "☀️"}
+              className={`rounded px-2 py-1 text-xs font-bold border transition shrink-0 ${theme === "dark" ? "bg-slate-800 border-gray-600 text-gray-300 hover:bg-slate-700" : "bg-gray-100 border-gray-300 text-gray-700 hover:bg-gray-200"}`}
+              onClick={toggleTheme}
+              title="Toggle dark/light theme">
+              {theme === "dark" ? "🌙 Dark" : "☀️ Light"}
             </button>
             <SettingsPanel theme={theme} />
           </div>
@@ -2291,49 +2292,23 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
         </div>
 
           <div className="rounded-2xl bg-gray-900/40 border border-gray-700 text-gray-100 p-4">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-              <div className="text-center md:text-left">
-                <div className="text-sm font-semibold">Reference and accuracy</div>
-                <div className="text-xs text-gray-300">
-                  Deterministic Combat Patrol-first rules interpretation. Rough accuracy: ~96–98% Combat Patrol, ~85–95% full 40k (varies by edge cases).
-                </div>
-              </div>
-              <div className="flex flex-wrap gap-2 w-full md:w-auto">
-                {[
-                  { label: simpleMode ? "⚔️ Simple" : "⚔️ Complex", on: simpleMode, action: toggleSimpleMode, title: "Toggle Simple/Complex mode" },
-                  { label: theme === "dark" ? "🌙 Dark" : "☀️ Light", on: false, action: toggleTheme, title: "Toggle theme" },
-                  { label: `Preserve hooks: ${preserveHooks ? "ON" : "OFF"}`, on: preserveHooks, action: () => setPreserveHooks(!preserveHooks), title: "Keep toggle states on Clear" },
-                  { label: `Strict: ${strictMode ? "ON" : "OFF"}`, on: strictMode, action: () => setStrictMode(!strictMode), title: "Lock totals until dice complete" },
-                  { label: showTableUse ? "Hide table guide" : "📋 Table guide", on: showTableUse, action: () => setShowTableUse(!showTableUse), title: "Show/hide table use guide" },
-                  { label: showDiceRef ? "Hide dice ref" : "🎲 Dice ref", on: showDiceRef, action: () => setShowDiceRef(!showDiceRef), title: "Dice sequencing reference" },
-                  { label: showLimitations ? "Hide limitations" : "Limitations", on: showLimitations, action: () => setShowLimitations(!showLimitations) },
-                  { label: showCheatSheet ? "Hide cheat sheet" : "Cheat sheet", on: showCheatSheet, action: () => setShowCheatSheet(!showCheatSheet) },
-                  { label: showLog ? "Hide log" : "Show log", on: showLog, action: () => setShowLog(!showLog) },
-                ].map(({ label, on, action, title }) => (
-                  <button key={label} type="button"
-                    className={`rounded px-2 py-1 text-xs font-semibold border transition ${on ? "bg-amber-600/70 text-white border-amber-500/40" : "bg-gray-900 text-gray-300 border-gray-700 hover:bg-gray-800"}`}
-                    onClick={action} title={title}>
-                    {label}
-                  </button>
-                ))}
+            <div className="flex flex-wrap gap-2">
+              {[
+                { label: showTableUse ? "Hide table guide" : "📋 Table guide", on: showTableUse, action: () => setShowTableUse(!showTableUse), title: "Show/hide table use guide" },
+                { label: showDiceRef ? "Hide dice ref" : "🎲 Dice ref", on: showDiceRef, action: () => setShowDiceRef(!showDiceRef), title: "Dice sequencing reference" },
+                { label: showLimitations ? "Hide limitations" : "Limitations", on: showLimitations, action: () => setShowLimitations(!showLimitations) },
+                { label: showCheatSheet ? "Hide cheat sheet" : "Cheat sheet", on: showCheatSheet, action: () => setShowCheatSheet(!showCheatSheet) },
+                { label: `Preserve hooks: ${preserveHooks ? "ON" : "OFF"}`, on: preserveHooks, action: () => setPreserveHooks(!preserveHooks), title: "Keep toggle states on Clear" },
+                { label: `Strict: ${strictMode ? "ON" : "OFF"}`, on: strictMode, action: () => setStrictMode(!strictMode), title: "Lock totals until dice complete" },
+                { label: showLog ? "Hide log" : "Show log", on: showLog, action: () => setShowLog(!showLog) },
+              ].map(({ label, on, action, title }) => (
+                <button key={label} type="button"
+                  className={`rounded px-2 py-1 text-xs font-semibold border transition ${on ? "bg-amber-600/70 text-white border-amber-500/40" : "bg-gray-900 text-gray-300 border-gray-700 hover:bg-gray-800"}`}
+                  onClick={action} title={title}>
+                  {label}
+                </button>
+              ))}
             </div>
-          </div>
-
-            <div className="mt-3 flex flex-wrap items-center justify-center md:justify-start gap-2">
-              <Chip>~96–98% Combat Patrol</Chip>
-              <Chip>~85–95% full 40k</Chip>
-            <Chip>Manual rolls</Chip>
-            <Chip>Crit thresholds</Chip>
-            <Chip>Lethal Hits</Chip>
-            <Chip>Sustained Hits</Chip>
-            <Chip>Devastating Wounds</Chip>
-            
-            <Chip>Cover</Chip>
-            <Chip>Ignore AP</Chip>
-            <Chip>Ignore first failed save</Chip>
-            <Chip>-1 Damage</Chip>
-            <Chip>Half Damage</Chip>
-          </div>
 
 
 
@@ -2425,7 +2400,6 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
   <img src="/favicon-256.png" alt="NAPE" className="h-9 w-9 rounded-lg border border-gray-600 bg-gray-950/30 p-1" />
   <div className="font-semibold text-gray-300">{APP_NAME} · v{APP_VERSION}</div>
 </div>
-              <div>Deterministic Combat Patrol-first rules interpretation. Manual dice entry. Not official rules.</div>
               <div>© {new Date().getFullYear()} Kyle. Warhammer 40,000 is a trademark of Games Workshop. Unofficial fan-made tool.</div>
             </div>
 
