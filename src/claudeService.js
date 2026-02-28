@@ -29,6 +29,7 @@ Rules:
 - Return ONLY the path string. No URL prefix, no explanation, no markdown.
 - For weapons, return the unit page that contains that weapon.
 - Handle misspellings — match to the closest Wahapedia entry.
+- Apostrophes become hyphens in slugs: T'au → t-au-empire, Emperor's → emperor-s-children.
 - If truly unknown, return: unknown`;
 
 const ATTACKER_SYSTEM_PROMPT = `You are a Warhammer 40,000 10th edition rules expert.
