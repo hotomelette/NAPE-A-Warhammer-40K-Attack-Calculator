@@ -1733,7 +1733,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                   <div className={`rounded-xl p-3 border ${theme === "dark" ? "bg-gray-900/60 border-gray-700" : "bg-gray-50 border-gray-200"}`}>
                     <div className="flex items-center justify-between mb-2">
                       <div className="text-sm font-semibold">Wound allocation</div>
-                      <div className={`text-xs font-bold ${extraWoundsSum <= totalSavableWounds ? "text-green-400" : "text-red-400"}`}>
+                      <div className={`text-xs font-bold ${extraWoundsSum <= totalSavableWounds ? (theme === "dark" ? "text-green-400" : "text-green-700") : (theme === "dark" ? "text-red-400" : "text-red-600")}`}>
                         {Math.min(extraWoundsSum, totalSavableWounds) + target1Wounds}/{totalSavableWounds} allocated
                       </div>
                     </div>
@@ -1741,7 +1741,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                     <div className="flex items-center gap-2 mb-2">
                       <span className="text-sm w-20">🎯 Target 1:</span>
                       <span className={`w-14 rounded border p-1.5 text-center font-bold text-base ${theme === "dark" ? "bg-gray-900/20 border-gray-700 text-amber-400" : "bg-gray-50 border-gray-200 text-amber-600"}`}>{target1Wounds}</span>
-                      <span className="text-xs text-gray-400">wounds (remainder)</span>
+                      <span className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>wounds (remainder)</span>
                     </div>
                     {/* Extra targets — each editable */}
                     {extraTargets.map((t, i) => (
@@ -1753,7 +1753,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                           className={`w-14 rounded border p-1.5 text-center font-bold text-base ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300 text-gray-900"}`}
                           placeholder="0"
                         />
-                        <span className="text-xs text-gray-400">wounds</span>
+                        <span className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>wounds</span>
                         <button type="button" onClick={() => removeSplitTarget(i)} className="ml-auto text-xs text-red-400 hover:text-red-300 px-2 py-1 rounded border border-red-800/40 hover:bg-red-900/20">✕ Remove</button>
                       </div>
                     ))}
@@ -1769,7 +1769,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                   {/* Extra target stats panels */}
                   {extraTargets.map((t, i) => (
                     <div key={i} className={`rounded-xl p-3 border ${theme === "dark" ? "bg-gray-900/40 border-gray-700" : "bg-gray-50 border-gray-200"}`}>
-                      <div className="text-sm font-extrabold mb-3 text-amber-400">🎯 Target {i + 2} — Stats</div>
+                      <div className={`text-sm font-extrabold mb-3 ${theme === "dark" ? "text-amber-400" : "text-amber-700"}`}>🎯 Target {i + 2} — Stats</div>
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <StatLabel label="T" full="Toughness" example="e.g. 4" required={!t.toughness} theme={theme} />
@@ -2243,19 +2243,19 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                     </div>
                     <div className="grid grid-cols-3 gap-2 text-center">
                       <div className={`rounded-lg p-2 border ${theme === "dark" ? "bg-slate-900 border-gray-700" : "bg-white border-gray-200"}`}>
-                        <div className="text-xs uppercase tracking-widest text-gray-400 mb-1">🎯 Target A</div>
-                        <div className="text-2xl font-black text-amber-400">{allowDamageTotals ? (splitA ? splitA.totalPostFnp : 0) : "–"}</div>
-                        <div className="text-xs text-gray-400">dmg</div>
+                        <div className={`text-xs uppercase tracking-widest mb-1 ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>🎯 Target A</div>
+                        <div className={`text-2xl font-black ${theme === "dark" ? "text-amber-400" : "text-amber-700"}`}>{allowDamageTotals ? (splitA ? splitA.totalPostFnp : 0) : "–"}</div>
+                        <div className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>dmg</div>
                       </div>
                       <div className={`rounded-lg p-2 border ${theme === "dark" ? "bg-slate-900 border-gray-700" : "bg-white border-gray-200"}`}>
-                        <div className="text-xs uppercase tracking-widest text-gray-400 mb-1">🎯 Target B</div>
-                        <div className="text-2xl font-black text-orange-400">{allowDamageTotals ? splitB.totalPostFnp : "–"}</div>
-                        <div className="text-xs text-gray-400">dmg</div>
+                        <div className={`text-xs uppercase tracking-widest mb-1 ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>🎯 Target B</div>
+                        <div className={`text-2xl font-black ${theme === "dark" ? "text-orange-400" : "text-orange-700"}`}>{allowDamageTotals ? splitB.totalPostFnp : "–"}</div>
+                        <div className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>dmg</div>
                       </div>
                       <div className={`rounded-lg p-2 border ${theme === "dark" ? "bg-amber-900/40 border-amber-700/50" : "bg-amber-100 border-amber-300"}`}>
-                        <div className="text-xs uppercase tracking-widest text-amber-400 mb-1">Total</div>
-                        <div className="text-2xl font-black text-amber-300">{allowDamageTotals ? (splitA ? splitA.totalPostFnp : 0) + splitB.totalPostFnp : "–"}</div>
-                        <div className="text-xs text-gray-400">dmg</div>
+                        <div className={`text-xs uppercase tracking-widest mb-1 ${theme === "dark" ? "text-amber-400" : "text-amber-700"}`}>Total</div>
+                        <div className={`text-2xl font-black ${theme === "dark" ? "text-amber-300" : "text-amber-800"}`}>{allowDamageTotals ? (splitA ? splitA.totalPostFnp : 0) + splitB.totalPostFnp : "–"}</div>
+                        <div className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>dmg</div>
                       </div>
                     </div>
                     {splitB.errors.length > 0 && (
