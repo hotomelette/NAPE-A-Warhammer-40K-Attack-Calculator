@@ -32,13 +32,15 @@ function stripHtml(html) {
 }
 
 // Capitalize first letter of each hyphen-separated word, preserve rest of casing.
+// Apostrophes within a word become hyphens (matching Wahapedia URL convention).
 // "broadside-battlesuits" → "Broadside-Battlesuits"
 // "XV88-Broadside" → "XV88-Broadside" (already correct)
+// "Von Ryan's Leapers" → "Von-Ryan-s-Leapers"
 function normalizeUnitName(name) {
   return name
     .replace(/\s+/g, "-")
     .split("-")
-    .map((w) => (w ? w.charAt(0).toUpperCase() + w.slice(1) : w))
+    .map((w) => (w ? w.charAt(0).toUpperCase() + w.slice(1).replace(/'/g, "-") : w))
     .join("-");
 }
 

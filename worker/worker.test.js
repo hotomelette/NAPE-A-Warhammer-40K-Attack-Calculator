@@ -84,6 +84,22 @@ describe("worker /search endpoint", () => {
     expect(data.error).toBeUndefined();
   });
 
+  it("normalizes apostrophe in unit name to hyphen", async () => {
+    let fetchedUrl = null;
+    vi.stubGlobal("fetch", vi.fn().mockImplementation((url) => {
+      fetchedUrl = url;
+      if (url.includes("Von-Ryan-s-Leapers")) {
+        return Promise.resolve({ ok: true, text: () => Promise.resolve("<html>ok</html>") });
+      }
+      return Promise.resolve({ ok: false, status: 404 });
+    }));
+    const req = makeRequest("https://worker.example.com/search?unit=Von-Ryan's-Leapers&faction=tyranids");
+    const res = await worker.fetch(req);
+    const data = await res.json();
+    expect(fetchedUrl).toContain("Von-Ryan-s-Leapers");
+    expect(data.error).toBeUndefined();
+  });
+
   it("returns not_found when unit exists in no faction", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 404 }));
     const req = makeRequest("https://worker.example.com/search?unit=Totally-Fake-Unit&faction=orks");
