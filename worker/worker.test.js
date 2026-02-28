@@ -4,6 +4,14 @@ let worker;
 beforeEach(async () => {
   vi.resetModules();
   worker = (await import("./worker.js")).default;
+  // Default cache stub: always miss, put is a no-op.
+  // Individual tests override this as needed.
+  vi.stubGlobal("caches", {
+    default: {
+      match: vi.fn().mockResolvedValue(undefined),
+      put: vi.fn().mockResolvedValue(undefined),
+    },
+  });
 });
 afterEach(() => vi.unstubAllGlobals());
 
@@ -114,5 +122,63 @@ describe("worker /search endpoint", () => {
     expect(res.status).toBe(400);
     const data = await res.json();
     expect(data.error).toBe("missing_unit");
+  });
+});
+
+describe("worker caching", () => {
+  it("returns cached response without fetching Wahapedia on cache hit", async () => {
+    const cachedBody = JSON.stringify({ text: "cached content", url: "https://wahapedia.ru/wh40k10ed/factions/necrons/Canoptek-Doomstalker" });
+    const cachedResponse = new Response(cachedBody, { headers: { "Content-Type": "application/json" } });
+    vi.stubGlobal("caches", {
+      default: {
+        match: vi.fn().mockResolvedValue(cachedResponse),
+        put: vi.fn(),
+      },
+    });
+    vi.stubGlobal("fetch", vi.fn()); // must not be called
+
+    const req = makeRequest("https://worker.example.com/wahapedia?path=necrons/Canoptek-Doomstalker");
+    const res = await worker.fetch(req);
+    const data = await res.json();
+
+    expect(data.text).toBe("cached content");
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("stores successful response in cache with 24h Cache-Control header", async () => {
+    const mockPut = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal("caches", {
+      default: {
+        match: vi.fn().mockResolvedValue(undefined),
+        put: mockPut,
+      },
+    });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: true,
+      text: () => Promise.resolve("<html><body>unit content</body></html>"),
+    }));
+
+    const req = makeRequest("https://worker.example.com/wahapedia?path=necrons/Canoptek-Doomstalker");
+    await worker.fetch(req);
+
+    expect(mockPut).toHaveBeenCalledOnce();
+    const storedResponse = mockPut.mock.calls[0][1];
+    expect(storedResponse.headers.get("Cache-Control")).toBe("public, max-age=86400");
+  });
+
+  it("does not cache error responses", async () => {
+    const mockPut = vi.fn();
+    vi.stubGlobal("caches", {
+      default: {
+        match: vi.fn().mockResolvedValue(undefined),
+        put: mockPut,
+      },
+    });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 404 }));
+
+    const req = makeRequest("https://worker.example.com/wahapedia?path=bad/Path");
+    await worker.fetch(req);
+
+    expect(mockPut).not.toHaveBeenCalled();
   });
 });
