@@ -199,9 +199,13 @@ async function resolveAndFetch(description, client) {
     // If direct path failed, search by unit name across all faction slugs
     if (!page) {
       const slashIdx = path.indexOf("/");
-      const factionHint = slashIdx !== -1 ? path.slice(0, slashIdx) : path;
-      const unitName = slashIdx !== -1 ? path.slice(slashIdx + 1) : path;
-      page = await fetchWahapediaSearch(unitName, factionHint, WORKER_URL);
+      // Path without a slash is unreachable (resolveWahapediaPath enforces faction/Unit format)
+      // but guard explicitly to avoid passing the same string as both unit and faction.
+      if (slashIdx !== -1) {
+        const factionHint = path.slice(0, slashIdx);
+        const unitName = path.slice(slashIdx + 1);
+        page = await fetchWahapediaSearch(unitName, factionHint, WORKER_URL);
+      }
     }
 
     if (page) {

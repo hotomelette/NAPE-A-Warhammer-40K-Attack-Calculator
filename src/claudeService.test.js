@@ -111,16 +111,23 @@ describe("fetchWahapediaSearch", () => {
 
   it("returns text and confirmed url on success", async () => {
     const { fetchWahapediaSearch } = await import("./claudeService.js");
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({
-        text: "live datasheet",
-        url: "https://wahapedia.ru/wh40k10ed/factions/t-au-empire/Broadside-Battlesuits",
-      }),
+    let capturedUrl = null;
+    vi.stubGlobal("fetch", vi.fn().mockImplementation((url) => {
+      capturedUrl = url;
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({
+          text: "live datasheet",
+          url: "https://wahapedia.ru/wh40k10ed/factions/t-au-empire/Broadside-Battlesuits",
+        }),
+      });
     }));
-    const result = await fetchWahapediaSearch("Broadside-Battlesuits", "tau-empire", "https://worker.example.com");
+    const result = await fetchWahapediaSearch("Broadside-Battlesuits", "t-au-empire", "https://worker.example.com");
     expect(result.text).toBe("live datasheet");
     expect(result.url).toContain("t-au-empire");
+    // Verify the outgoing request encoded both params correctly
+    expect(capturedUrl).toContain("unit=Broadside-Battlesuits");
+    expect(capturedUrl).toContain("faction=t-au-empire");
   });
 
   it("returns null when worker returns not_found", async () => {
