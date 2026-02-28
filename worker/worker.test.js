@@ -143,6 +143,7 @@ describe("worker caching", () => {
 
     expect(data.text).toBe("cached content");
     expect(fetch).not.toHaveBeenCalled();
+    expect(caches.default.match).toHaveBeenCalledWith(req);
   });
 
   it("stores successful response in cache with 24h Cache-Control header", async () => {
@@ -162,6 +163,7 @@ describe("worker caching", () => {
     await worker.fetch(req);
 
     expect(mockPut).toHaveBeenCalledOnce();
+    expect(mockPut.mock.calls[0][0]).toBe(req);
     const storedResponse = mockPut.mock.calls[0][1];
     expect(storedResponse.headers.get("Cache-Control")).toBe("public, max-age=86400");
   });
