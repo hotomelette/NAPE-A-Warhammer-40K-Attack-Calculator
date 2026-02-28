@@ -1810,6 +1810,32 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
             </div>
             )}
 
+            {!simpleMode && (
+              <Section theme={theme} title="Rerolls">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="inline-flex items-center text-xs font-semibold text-amber-200 bg-amber-900/40 border border-amber-700/50 rounded-full px-2 py-0.5">EXPERIMENTAL</div>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <label className="flex items-center gap-2">
+                    <input type="checkbox" checked={rerollHitOnes} onChange={e => setRerollHitOnes(e.target.checked)} />
+                    Reroll hit 1s
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input type="checkbox" checked={rerollHitFails} onChange={e => setRerollHitFails(e.target.checked)} />
+                    Reroll failed hits
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input type="checkbox" checked={rerollWoundOnes} onChange={e => setRerollWoundOnes(e.target.checked)} />
+                    Reroll wound 1s
+                  </label>
+                  <label className={`flex items-center gap-2 ${twinLinked ? "opacity-75" : ""}`}>
+                    <input type="checkbox" checked={rerollWoundFails || twinLinked} disabled={twinLinked} onChange={e => setRerollWoundFails(e.target.checked)} />
+                    Reroll failed wounds {twinLinked ? <span className="text-xs text-gray-500">(Twin-linked)</span> : null}
+                  </label>
+                </div>
+              </Section>
+            )}
+
           </div>
 
           {/* RIGHT: Results */}
@@ -1836,33 +1862,6 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                                 />
                               </div>
                             }>
-
-                            {/* ── ⚔️ Weapon — Dice sub-header ── */}
-                            <div className={`text-sm font-extrabold tracking-wide mt-1 mb-0 uppercase letter-spacing-wide ${theme === "dark" ? "text-amber-300/80" : "text-amber-700/80"}`}>⚔️ Weapon — Dice</div>
-
-                            {/* ── Rerolls (collapsed by default) ── */}
-                            <div className={`rounded-xl border p-3 ${theme === "dark" ? "border-gray-700/60 bg-slate-950/20" : "border-gray-200 bg-gray-50"}`}>
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                  <div className="text-sm font-extrabold">Rerolls</div>
-                                  <div className="inline-flex items-center text-xs font-semibold text-amber-200 bg-amber-900/40 border border-amber-700/50 rounded-full px-2 py-0.5">EXPERIMENTAL</div>
-                                </div>
-                                <button type="button" className={mainToggleBtnClass} onClick={() => setShowRerolls(!showRerolls)}>
-                                  {showRerolls ? "Hide" : "Show"}
-                                </button>
-                              </div>
-                              {showRerolls && (
-                                <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
-                                  <label className="flex items-center gap-2"><input type="checkbox" checked={rerollHitOnes} onChange={e => setRerollHitOnes(e.target.checked)} /> Reroll hit 1s</label>
-                                  <label className="flex items-center gap-2"><input type="checkbox" checked={rerollHitFails} onChange={e => setRerollHitFails(e.target.checked)} /> Reroll failed hits</label>
-                                  <label className="flex items-center gap-2"><input type="checkbox" checked={rerollWoundOnes} onChange={e => setRerollWoundOnes(e.target.checked)} /> Reroll wound 1s</label>
-                                  <label className={`flex items-center gap-2 ${twinLinked ? "opacity-75" : ""}`}>
-                                    <input type="checkbox" checked={rerollWoundFails || twinLinked} disabled={twinLinked} onChange={e => setRerollWoundFails(e.target.checked)} />
-                                    Reroll failed wounds {twinLinked ? <span className="text-xs text-gray-500">(Twin-linked)</span> : null}
-                                  </label>
-                                </div>
-                              )}
-                            </div>
 
               {!attacksFixed ? (
                               <Field
