@@ -2269,25 +2269,15 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                 </div>
               </Section>
 
-              <Section theme={theme} title="Step-by-step log">
-                <div className="flex items-center justify-between mb-2">
-                  <div className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>Detailed resolution trace for this volley.</div>
-                  <button
-                    type="button"
-                    className={mainToggleBtnClass}
-                    onClick={() => setShowLog(!showLog)}
-                  >
-                    {showLog ? "Hide log" : "Show log"}
-                  </button>
-                </div>
-                {showLog && (
+              {showLog && (
+                <Section theme={theme} title="Step-by-step log">
                   <ol className={`text-sm leading-relaxed list-decimal pl-5 space-y-1 ${theme === "dark" ? "text-gray-100" : "text-gray-800"}`}>
                     {activeComputed.log.map((line, idx) => (
                       <li key={idx}>{line}</li>
                     ))}
                   </ol>
-                )}
-              </Section>
+                </Section>
+              )}
           </div>
 
         </div>
