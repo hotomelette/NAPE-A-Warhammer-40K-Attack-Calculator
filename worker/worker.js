@@ -52,7 +52,11 @@ async function scrapeWahapediaPage(faction, unitName) {
   return { text: stripHtml(html), url };
 }
 
-async function handleSearch(searchParams) {
+async function handleSearch(request, searchParams) {
+  const cache = caches.default;
+  const cached = await cache.match(request);
+  if (cached) return cached;
+
   const rawUnit = searchParams.get("unit");
   if (!rawUnit) return json({ error: "missing_unit" }, 400);
 
@@ -68,7 +72,12 @@ async function handleSearch(searchParams) {
   for (const faction of orderedFactions) {
     try {
       const result = await scrapeWahapediaPage(faction, unitName);
-      if (result) return json(result);
+      if (result) {
+        const response = json(result);
+        response.headers.set("Cache-Control", "public, max-age=86400");
+        await cache.put(request, response.clone());
+        return response;
+      }
     } catch {
       // network error on this faction — continue to next
     }
@@ -77,7 +86,11 @@ async function handleSearch(searchParams) {
   return json({ error: "not_found" }, 404);
 }
 
-async function handleWahapedia(searchParams) {
+async function handleWahapedia(request, searchParams) {
+  const cache = caches.default;
+  const cached = await cache.match(request);
+  if (cached) return cached;
+
   const path = searchParams.get("path");
   if (!path) return json({ error: "missing_path" }, 400);
 
@@ -89,7 +102,10 @@ async function handleWahapedia(searchParams) {
     if (!res.ok) return json({ error: "not_found", status: res.status }, 404);
 
     const html = await res.text();
-    return json({ text: stripHtml(html), url: wahapediaUrl });
+    const response = json({ text: stripHtml(html), url: wahapediaUrl });
+    response.headers.set("Cache-Control", "public, max-age=86400");
+    await cache.put(request, response.clone());
+    return response;
   } catch (e) {
     return json({ error: "fetch_failed", message: e.message }, 502);
   }
@@ -101,7 +117,7 @@ export default {
 
     const { pathname, searchParams } = new URL(request.url);
 
-    if (pathname === "/search") return handleSearch(searchParams);
-    return handleWahapedia(searchParams);
+    if (pathname === "/search") return handleSearch(request, searchParams);
+    return handleWahapedia(request, searchParams);
   },
 };
