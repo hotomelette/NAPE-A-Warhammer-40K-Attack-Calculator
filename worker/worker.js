@@ -21,6 +21,16 @@ function json(data, status = 200) {
   });
 }
 
+function stripHtml(html) {
+  return html
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<style[\s\S]*?<\/style>/gi, "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 8000);
+}
+
 // Capitalize first letter of each hyphen-separated word, preserve rest of casing.
 // "broadside-battlesuits" → "Broadside-Battlesuits"
 // "XV88-Broadside" → "XV88-Broadside" (already correct)
@@ -37,14 +47,7 @@ async function scrapeWahapediaPage(faction, unitName) {
   const res = await fetch(url, { headers: { "User-Agent": "NAPE-40K-Calculator/1.0" } });
   if (!res.ok) return null;
   const html = await res.text();
-  const text = html
-    .replace(/<script[\s\S]*?<\/script>/gi, "")
-    .replace(/<style[\s\S]*?<\/style>/gi, "")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, 8000);
-  return { text, url };
+  return { text: stripHtml(html), url };
 }
 
 async function handleSearch(searchParams) {
@@ -52,7 +55,8 @@ async function handleSearch(searchParams) {
   if (!rawUnit) return json({ error: "missing_unit" }, 400);
 
   const unitName = normalizeUnitName(rawUnit);
-  const factionHint = searchParams.get("faction") || null;
+  const rawFaction = searchParams.get("faction");
+  const factionHint = rawFaction && FACTION_SLUGS.includes(rawFaction) ? rawFaction : null;
 
   // Try faction hint first, then all remaining factions
   const orderedFactions = factionHint
@@ -83,15 +87,7 @@ async function handleWahapedia(searchParams) {
     if (!res.ok) return json({ error: "not_found", status: res.status }, 404);
 
     const html = await res.text();
-    const text = html
-      .replace(/<script[\s\S]*?<\/script>/gi, "")
-      .replace(/<style[\s\S]*?<\/style>/gi, "")
-      .replace(/<[^>]+>/g, " ")
-      .replace(/\s+/g, " ")
-      .trim()
-      .slice(0, 8000);
-
-    return json({ text, url: wahapediaUrl });
+    return json({ text: stripHtml(html), url: wahapediaUrl });
   } catch (e) {
     return json({ error: "fetch_failed", message: e.message }, 502);
   }

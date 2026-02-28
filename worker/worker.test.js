@@ -47,9 +47,10 @@ describe("worker /search endpoint", () => {
   });
 
   it("finds unit via fallback when faction hint 404s", async () => {
+    const calledUrls = [];
     vi.stubGlobal("fetch", vi.fn().mockImplementation((url) => {
-      if (url.includes("tau-empire")) return Promise.resolve({ ok: false, status: 404 });
-      if (url.includes("t-au-empire")) return Promise.resolve({
+      calledUrls.push(url);
+      if (url.includes("/t-au-empire/")) return Promise.resolve({
         ok: true,
         text: () => Promise.resolve("<html>Broadside</html>"),
       });
@@ -58,8 +59,13 @@ describe("worker /search endpoint", () => {
     const req = makeRequest("https://worker.example.com/search?unit=Broadside-Battlesuits&faction=tau-empire");
     const res = await worker.fetch(req);
     const data = await res.json();
+    // tau-empire (invalid hint, fails FACTION_SLUGS validation) → skipped, search starts from beginning of FACTION_SLUGS
     expect(data.url).toContain("t-au-empire");
     expect(data.error).toBeUndefined();
+    // First call must have been to space-marines (first in FACTION_SLUGS), not tau-empire
+    expect(calledUrls[0]).toContain("space-marines");
+    // t-au-empire must appear in the calls
+    expect(calledUrls.some(u => u.includes("t-au-empire"))).toBe(true);
   });
 
   it("normalizes lowercase unit name to PascalCase", async () => {
