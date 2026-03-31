@@ -1994,13 +1994,26 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                               </span>
                             } action={
                               <div className="flex items-center gap-2">
-                                <button
-                                  type="button"
-                                  className={`rounded px-2 py-1 text-xs font-semibold border transition ${theme === "dark" ? "bg-gray-800 border-gray-600 text-gray-300 hover:bg-gray-700" : "bg-gray-50 border-gray-300 text-gray-600 hover:bg-gray-100"}`}
-                                  onClick={clearDice}
-                                >
-                                  Clear dice
-                                </button>
+                                <RollButton
+                                  onClick={rollWeapon}
+                                  disabled={!statsReady || isRollingAll || isRollingWeapon || isRollingTarget}
+                                  isRolling={isRollingWeapon}
+                                  isReady={statsReady}
+                                  emoji="⚔️"
+                                  label="Roll weapon"
+                                  readyClass="bg-gradient-to-r from-red-700 to-rose-700 hover:from-red-600 hover:to-rose-600 border-red-500/40 text-white"
+                                  rollingClass="bg-red-700 border-red-500 text-white"
+                                />
+                                <RollButton
+                                  onClick={rollTarget}
+                                  disabled={!((splitEnabled ? target1Wounds : (activeComputed.savableWounds || 0)) > 0) || isRollingAll || isRollingWeapon || isRollingTarget}
+                                  isRolling={isRollingTarget}
+                                  isReady={(splitEnabled ? target1Wounds : (activeComputed.savableWounds || 0)) > 0}
+                                  emoji="🎯"
+                                  label="Roll target"
+                                  readyClass="bg-gradient-to-r from-teal-700 to-cyan-700 hover:from-teal-600 hover:to-cyan-600 border-teal-500/40 text-white"
+                                  rollingClass="bg-teal-700 border-teal-500 text-white"
+                                />
                                 <RollButton
                                   onClick={rollAll}
                                   disabled={!statsReady || isRollingAll || isRollingWeapon || isRollingTarget}
@@ -2011,6 +2024,13 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                                   readyClass="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 border-amber-400/40 text-gray-950"
                                   rollingClass="bg-amber-600 border-amber-400 text-gray-950"
                                 />
+                                <button
+                                  type="button"
+                                  className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-extrabold border transition ${theme === "dark" ? "bg-transparent border-gray-600 text-gray-400 hover:bg-gray-800 hover:text-gray-300" : "bg-transparent border-gray-300 text-gray-500 hover:bg-gray-100 hover:text-gray-700"}`}
+                                  onClick={clearDice}
+                                >
+                                  Clear dice
+                                </button>
                               </div>
                             }>
 
