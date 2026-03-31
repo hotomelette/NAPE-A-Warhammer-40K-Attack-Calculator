@@ -292,6 +292,11 @@ Study phases 1–3 to copy the animation pattern exactly.
       }
     }
 
+    // Clear stale target-side fields so the defender knows to roll their half
+    setSaveRollsText("");
+    setDamageRolls("");
+    setFnpRollsText("");
+
     setIsRollingWeapon(false);
   };
 ```
@@ -306,7 +311,7 @@ npm run build 2>&1 | tail -10
 
 ```bash
 git add src/App.jsx
-git commit -m "feat: add rollWeapon function (phases 1-3: attack dice, hits, wounds)"
+git commit -m "feat: add rollWeapon function (phases 1-3: attack dice, hits, wounds; clears target dice)"
 ```
 
 ---

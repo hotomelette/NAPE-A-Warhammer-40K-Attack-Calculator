@@ -51,9 +51,9 @@ Replace `RollAllButton` with a generic `RollButton` component accepting `emoji`,
 
 New state: `isRollingWeapon`, `isRollingTarget` (boolean useState). The `displayComputed` freeze (currently `isRollingAll ? computed : activeComputed`) extends to all three flags.
 
-### What Roll Weapon does NOT do
+### Clearing stale target dice
 
-Roll Weapon does not clear save/FNP fields. If the user re-rolls weapon dice, stale save/FNP entries remain — clicking Roll Target re-rolls them.
+After Roll Weapon completes Phase 3, it clears `saveRollsText`, `damageRolls`, and `fnpRollsText`. This signals to the defender that their half needs to be re-rolled (via Roll Target or individual 🎲 buttons). Leaving stale values would produce count-mismatch errors and ambiguous results.
 
 ## Files changed
 
