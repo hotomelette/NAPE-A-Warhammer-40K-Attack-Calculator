@@ -1277,10 +1277,19 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
       }
     } else {
       // ── Split path ──
-      // Read fresh extraTargets from ref — avoids stale closure after SYNC_SPLIT_WOUNDS
+      // Compute allocation directly from totalWounds using the same even-split formula
+      // as SYNC_SPLIT_WOUNDS. This avoids reading t.wounds from state, which is unreliable
+      // because SYNC_SPLIT_WOUNDS fires on every animation tick with random intermediates.
       const freshExtras = extraTargetsRef.current;
-      const extraWoundsAllocated = freshExtras.reduce((s, t) => s + Math.max(0, parseInt(t.wounds) || 0), 0);
-      const t1WoundsCount = Math.max(0, totalWounds - Math.min(extraWoundsAllocated, totalWounds));
+      const allCount = freshExtras.length + 1; // T1 + extras
+      const syncBase = allCount > 1 ? Math.floor(totalWounds / allCount) : 0;
+      const syncRem  = allCount > 1 ? totalWounds % allCount : 0;
+      const extraWoundsCount = freshExtras.map((_, i) => syncBase + (i < syncRem ? 1 : 0));
+      const t1WoundsCount = Math.max(0, totalWounds - extraWoundsCount.reduce((s, w) => s + w, 0));
+
+      // Push the correct allocation to state now so wound fields update before saves roll
+      dispatch({ type: "SYNC_SPLIT_WOUNDS", total: totalWounds });
+      await pause(80);
 
       // T1 saves
       let t1Failed = 0;
@@ -1297,7 +1306,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
       const extFailed = [];
       for (let i = 0; i < freshExtras.length; i++) {
         const t = freshExtras[i];
-        const wN = Math.max(0, parseInt(t.wounds) || 0);
+        const wN = extraWoundsCount[i];
         if (wN === 0) { extFailed.push(0); setSplitTargetField(i, "saveRollsText", ""); continue; }
         const tInv = t.invulnSave === "" ? null : Number(t.invulnSave);
         const tArmorBase = Number(t.armorSave) || 7;
