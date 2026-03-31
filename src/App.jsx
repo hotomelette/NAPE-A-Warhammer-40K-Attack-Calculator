@@ -711,7 +711,10 @@ function AttackCalculator() {
   const { enabled: splitEnabled, extraTargets = [] } = split;
 
   // Split dispatch helpers
-  const toggleSplit         = () => dispatch({ type: "TOGGLE_SPLIT" });
+  const toggleSplit = () => {
+    dispatch({ type: "TOGGLE_SPLIT" });
+    if (!splitEnabled) dispatch({ type: "ADD_SPLIT_TARGET", totalWounds: totalSavableWounds });
+  };
   const addSplitTarget = () => dispatch({ type: "ADD_SPLIT_TARGET", totalWounds: totalSavableWounds });
   const removeSplitTarget   = (i) => dispatch({ type: "REMOVE_SPLIT_TARGET", index: i });
   const setSplitTargetField = (i, field, value) => dispatch({ type: "SET_SPLIT_TARGET_FIELD", index: i, field, value });
@@ -871,6 +874,10 @@ function AttackCalculator() {
       dispatch({ type: "SYNC_SPLIT_WOUNDS", total: totalSavableWounds });
     }
   }, [splitEnabled, totalSavableWounds, extraTargets.length]);
+
+  // Always-fresh ref so async roll functions read current extraTargets after SYNC_SPLIT_WOUNDS
+  const extraTargetsRef = React.useRef(extraTargets);
+  React.useEffect(() => { extraTargetsRef.current = extraTargets; }, [extraTargets]);
 
   // Build blank disabled params (used when slot has no target)
   const disabledSlot = { woundsAllocated: 0, mortalWoundsAllocated: 0, armorSave: "", invulnSave: "", inCover: false, ignoreAp: false, saveMod: 0, ignoreFirstFailedSave: false, minusOneDamage: false, halfDamage: false, fnp: "", fnpEnabled: false, saveRollsText: "", damageRolls: "", fnpRollsText: "", ...sharedWeaponProps, enabled: false };
@@ -1270,7 +1277,9 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
       }
     } else {
       // ── Split path ──
-      const extraWoundsAllocated = extraTargets.reduce((s, t) => s + Math.max(0, parseInt(t.wounds) || 0), 0);
+      // Read fresh extraTargets from ref — avoids stale closure after SYNC_SPLIT_WOUNDS
+      const freshExtras = extraTargetsRef.current;
+      const extraWoundsAllocated = freshExtras.reduce((s, t) => s + Math.max(0, parseInt(t.wounds) || 0), 0);
       const t1WoundsCount = Math.max(0, totalWounds - Math.min(extraWoundsAllocated, totalWounds));
 
       // T1 saves
@@ -1286,8 +1295,8 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
 
       // Extra target saves
       const extFailed = [];
-      for (let i = 0; i < extraTargets.length; i++) {
-        const t = extraTargets[i];
+      for (let i = 0; i < freshExtras.length; i++) {
+        const t = freshExtras[i];
         const wN = Math.max(0, parseInt(t.wounds) || 0);
         if (wN === 0) { extFailed.push(0); setSplitTargetField(i, "saveRollsText", ""); continue; }
         const tInv = t.invulnSave === "" ? null : Number(t.invulnSave);
@@ -1323,8 +1332,8 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
       } else { setFnpRollsText(""); }
 
       // Extra target damage + FNP
-      for (let i = 0; i < extraTargets.length; i++) {
-        const t = extraTargets[i];
+      for (let i = 0; i < freshExtras.length; i++) {
+        const t = freshExtras[i];
         const failedEff = Math.max(0, (extFailed[i] || 0) - (t.ignoreFirstFailedSave ? 1 : 0));
         let tDmg = 0;
         if (!damageFixed && dmgSpec.hasDie && failedEff > 0) {
@@ -1437,14 +1446,18 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
 
   const rollTarget = async () => {
     if (isRollingAll || isRollingWeapon || isRollingTarget) return;
+    const freshExtras = extraTargetsRef.current;
+    const hasSplitExtra = splitEnabled && freshExtras.length > 0;
     const currentSaveNeeded = splitEnabled ? target1Wounds : (activeComputed.savableWounds || 0);
-    if (currentSaveNeeded <= 0) return;
+    const anyExtraWounds = hasSplitExtra && freshExtras.some(t => (parseInt(t.wounds) || 0) > 0);
+    if (currentSaveNeeded <= 0 && !anyExtraWounds) return;
     setIsRollingTarget(true);
 
     const armorSaveNum = Number(armorSave);
     const apNum = Number(ap) || 0;
     const saveTarget = Math.min(7, Math.max(2, ignoreAp ? armorSaveNum : armorSaveNum - apNum - (inCover ? 1 : 0)));
     const dmgSpec = parseDiceSpec(damageValue);
+    const mortalWoundAttacks = activeComputed.mortalWoundAttacks || 0;
 
     const { flushSync } = await import("react-dom");
     const animateField = (setter, finalRolls, sides) => new Promise(resolve => {
@@ -1459,33 +1472,75 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
     });
     const pause = (ms) => new Promise(r => setTimeout(r, ms));
 
-    // Phase 4: Saves
-    const saveRollsFinal = Array.from({ length: currentSaveNeeded }, () => Math.ceil(Math.random() * 6));
-    await animateField(setSaveRollsText, saveRollsFinal, 6);
-    const failedSaves = saveRollsFinal.filter(d => d < saveTarget).length;
-    const failedEffective = Math.max(0, failedSaves - (ignoreFirstFailedSave ? 1 : 0));
-    await pause(120);
+    // Phase 4: T1 Saves
+    let t1FailedEff = 0;
+    let t1Dmg = 0;
+    if (currentSaveNeeded > 0) {
+      const saveRollsFinal = Array.from({ length: currentSaveNeeded }, () => Math.ceil(Math.random() * 6));
+      await animateField(setSaveRollsText, saveRollsFinal, 6);
+      const failedSaves = saveRollsFinal.filter(d => d < saveTarget).length;
+      t1FailedEff = Math.max(0, failedSaves - (ignoreFirstFailedSave ? 1 : 0));
+      await pause(120);
 
-    // Phase 5: Variable damage
-    const mortalWoundAttacks = activeComputed.mortalWoundAttacks || 0;
-    let totalDmg = 0;
-    if (!damageFixed && dmgSpec.hasDie) {
-      const totalDmgDice = failedEffective + mortalWoundAttacks;
-      if (totalDmgDice > 0) {
-        const rolls = Array.from({ length: totalDmgDice }, () => Math.ceil(Math.random() * dmgSpec.sides));
-        await animateField(setDamageRolls, rolls, dmgSpec.sides);
-        totalDmg = rolls.reduce((s, d) => s + d + dmgSpec.mod, 0);
-        await pause(120);
+      // Phase 5: T1 Damage
+      if (!damageFixed && dmgSpec.hasDie) {
+        const totalDmgDice = t1FailedEff + mortalWoundAttacks;
+        if (totalDmgDice > 0) {
+          const rolls = Array.from({ length: totalDmgDice }, () => Math.ceil(Math.random() * dmgSpec.sides));
+          await animateField(setDamageRolls, rolls, dmgSpec.sides);
+          t1Dmg = rolls.reduce((s, d) => s + d + dmgSpec.mod, 0);
+          await pause(120);
+        }
+      } else if (damageFixed) {
+        t1Dmg = (t1FailedEff + mortalWoundAttacks) * (Number(damageValue) || 0);
       }
-    } else if (damageFixed) {
-      const d = Number(damageValue) || 0;
-      totalDmg = (failedEffective + mortalWoundAttacks) * d;
+
+      // Phase 6: T1 FNP
+      if (fnpEnabled && fnp !== "" && t1Dmg > 0) {
+        const fnpRolls = Array.from({ length: t1Dmg }, () => Math.ceil(Math.random() * 6));
+        await animateField(setFnpRollsText, fnpRolls, 6);
+      }
+      if (hasSplitExtra) await pause(80);
+    } else {
+      setSaveRollsText("");
     }
 
-    // Phase 6: FNP
-    if (fnpEnabled && fnp !== "" && totalDmg > 0) {
-      const fnpRolls = Array.from({ length: totalDmg }, () => Math.ceil(Math.random() * 6));
-      await animateField(setFnpRollsText, fnpRolls, 6);
+    // Extra targets (split mode)
+    if (hasSplitExtra) {
+      for (let i = 0; i < freshExtras.length; i++) {
+        const t = freshExtras[i];
+        const wN = Math.max(0, parseInt(t.wounds) || 0);
+        if (wN === 0) { setSplitTargetField(i, "saveRollsText", ""); continue; }
+        const tInv = t.invulnSave === "" ? null : Number(t.invulnSave);
+        const tArmorBase = Number(t.armorSave) || 7;
+        const tArmorMod = t.inCover ? clampMin2Plus(tArmorBase - 1) : tArmorBase;
+        const tSaveTarget = clampMin2Plus(chooseSaveTarget(tArmorMod, tInv, t.ignoreAp ? 0 : apNum));
+        const tSaves = Array.from({ length: wN }, () => Math.ceil(Math.random() * 6));
+        await animateField(v => setSplitTargetField(i, "saveRollsText", v), tSaves, 6);
+        const tFailed = tSaves.filter(d => d < tSaveTarget).length;
+        const tFailedEff = Math.max(0, tFailed - (t.ignoreFirstFailedSave ? 1 : 0));
+        await pause(80);
+
+        let tDmg = 0;
+        if (!damageFixed && dmgSpec.hasDie && tFailedEff > 0) {
+          const extDmgRolls = Array.from({ length: tFailedEff }, () => Math.ceil(Math.random() * dmgSpec.sides));
+          await animateField(v => setSplitTargetField(i, "damageRolls", v), extDmgRolls, dmgSpec.sides);
+          tDmg = extDmgRolls.reduce((s, d) => s + d + dmgSpec.mod, 0);
+          await pause(80);
+        } else if (damageFixed) {
+          tDmg = tFailedEff * (Number(damageValue) || 0);
+          setSplitTargetField(i, "damageRolls", "");
+        } else {
+          setSplitTargetField(i, "damageRolls", "");
+        }
+        if (t.fnpEnabled && t.fnp !== "" && tDmg > 0) {
+          const tFnpRolls = Array.from({ length: tDmg }, () => Math.ceil(Math.random() * 6));
+          await animateField(v => setSplitTargetField(i, "fnpRollsText", v), tFnpRolls, 6);
+          await pause(80);
+        } else {
+          setSplitTargetField(i, "fnpRollsText", "");
+        }
+      }
     }
 
     setIsRollingTarget(false);

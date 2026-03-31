@@ -49,7 +49,7 @@ export function useCalculatorSplit({
     const saveTarget = clampMin2Plus(chooseSaveTarget(armorWithCover, inv, apForCalc));
 
     const saveRolls = parseDiceList(saveRollsText);
-    if (savableWounds > 0 && saveRolls.length !== savableWounds) {
+    if (savableWounds > 0 && saveRolls.length > 0 && saveRolls.length !== savableWounds) {
       errors.push(`Target ${label}: Save rolls provided (${saveRolls.length}) must equal wounds allocated (${savableWounds}).`);
     }
 
@@ -85,7 +85,7 @@ export function useCalculatorSplit({
         ? mortalWoundAttacks + failedSavesEffective
         : failedSavesEffective;
 
-    if (!damageFixed && expectedVarDice > 0 && damageDice.length !== expectedVarDice) {
+    if (!damageFixed && expectedVarDice > 0 && damageDice.length > 0 && damageDice.length !== expectedVarDice) {
       errors.push(`Target ${label}: Damage rolls provided (${damageDice.length}) must equal ${expectedVarDice}.`);
     }
 
@@ -128,7 +128,7 @@ export function useCalculatorSplit({
     const fnpNeeded = fnpEnabled && fnp !== "" ? totalPreFnp : 0;
 
     if (fnpNeeded > 0) {
-      if (fnpRolls.length !== fnpNeeded) {
+      if (fnpRolls.length > 0 && fnpRolls.length !== fnpNeeded) {
         errors.push(`Target ${label}: FNP rolls provided (${fnpRolls.length}) must equal ${fnpNeeded}.`);
       }
       for (const r of fnpRolls) {
