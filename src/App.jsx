@@ -964,7 +964,7 @@ function AttackCalculator() {
   if (attacksFixed) {
     if (!isNum(attacksValue)) missingWeapon.push("Attacks (fixed)");
   } else {
-    if (parseDiceList(attacksRolls).length === 0) missingWeapon.push("Attacks rolls");
+    if (!parseDiceSpec(attacksValue).ok) missingWeapon.push("Attacks expression");
   }
   if (!isNum(toHit)) missingWeapon.push("To Hit");
   if (!isNum(strength)) missingWeapon.push("Strength");
