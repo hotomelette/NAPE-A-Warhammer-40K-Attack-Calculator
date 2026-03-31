@@ -1,7 +1,7 @@
 import React, { useReducer, useState, useEffect, useRef } from "react";
 import { useCalculator } from "./useCalculator.js";
 import { useCalculatorSplit } from "./useCalculatorSplit.js";
-import { parseDiceList, parseDiceSpec, clampModPlusMinusOne, rollDice } from "./calculatorUtils.js";
+import { parseDiceList, parseDiceSpec, clampModPlusMinusOne, rollDice, chooseSaveTarget, clampMin2Plus } from "./calculatorUtils.js";
 import { appReducer, initialState } from "./appReducer.js";
 import { SettingsPanel, getApiKey } from "./SettingsPanel.jsx";
 import { useUnitLookup } from "./useUnitLookup.js";
@@ -893,11 +893,11 @@ function AttackCalculator() {
     saveTarget: splitA.saveTarget,
     failedSaves: splitA.failedSaves,
     failedSavesEffective: splitA.failedSavesEffective,
-    normalDamage: splitA.normalDamage,
-    mortalDamage: splitA.mortalDamage,
-    totalPreFnp: splitA.totalPreFnp,
-    ignored: splitA.ignored,
-    totalPostFnp: splitA.totalPostFnp,
+    normalDamage: activeSplitResults.reduce((s, r) => s + (r?.normalDamage ?? 0), 0),
+    mortalDamage: activeSplitResults.reduce((s, r) => s + (r?.mortalDamage ?? 0), 0),
+    totalPreFnp: activeSplitResults.reduce((s, r) => s + (r?.totalPreFnp ?? 0), 0),
+    ignored: activeSplitResults.reduce((s, r) => s + (r?.ignored ?? 0), 0),
+    totalPostFnp: activeSplitResults.reduce((s, r) => s + (r?.totalPostFnp ?? 0), 0),
     errors: [
       ...displayComputed.errors.filter(e => !e.includes("Save rolls") && !e.includes("Damage rolls") && !e.includes("FNP")),
       ...activeSplitResults.flatMap(r => r ? r.errors || [] : []),
@@ -1238,38 +1238,110 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
     }
     await pause(120);
 
-    // Phase 4: Saves
-    let saveRollsFinal = [];
-    let failedSaves = 0;
-    if (totalWounds > 0) {
-      saveRollsFinal = Array.from({ length: totalWounds }, () => Math.ceil(Math.random() * 6));
-      await animateField(setSaveRollsText, saveRollsFinal, 6);
-      failedSaves = saveRollsFinal.filter(d => d < saveTarget).length;
-    }
-    await pause(120);
-
-    const failedEffective = Math.max(0, failedSaves - (ignoreFirstFailedSave ? 1 : 0));
-
-    // Phase 5: Variable damage
+    // Phases 4-6: Saves → Damage → FNP (split-aware)
     const dmgSpec = parseDiceSpec(damageValue);
-    let totalDmg = 0;
-    if (!damageFixed && dmgSpec.hasDie) {
-      const totalDmgDice = failedEffective + mortalWoundAttacks;
-      if (totalDmgDice > 0) {
-        const rolls = Array.from({ length: totalDmgDice }, () => Math.ceil(Math.random() * dmgSpec.sides));
-        await animateField(setDamageRolls, rolls, dmgSpec.sides);
-        totalDmg = rolls.reduce((s, d) => s + d + dmgSpec.mod, 0);
-        await pause(120);
-      }
-    } else if (damageFixed) {
-      const d = Number(damageValue) || 0;
-      totalDmg = (failedEffective + mortalWoundAttacks) * d;
-    }
 
-    // Phase 6: FNP
-    if (fnpEnabled && fnp !== "" && totalDmg > 0) {
-      const fnpRolls = Array.from({ length: totalDmg }, () => Math.ceil(Math.random() * 6));
-      await animateField(setFnpRollsText, fnpRolls, 6);
+    if (!splitEnabled || extraTargets.length === 0) {
+      // ── Non-split path ──
+      let saveRollsFinal = [];
+      let failedSaves = 0;
+      if (totalWounds > 0) {
+        saveRollsFinal = Array.from({ length: totalWounds }, () => Math.ceil(Math.random() * 6));
+        await animateField(setSaveRollsText, saveRollsFinal, 6);
+        failedSaves = saveRollsFinal.filter(d => d < saveTarget).length;
+      }
+      await pause(120);
+      const failedEffective = Math.max(0, failedSaves - (ignoreFirstFailedSave ? 1 : 0));
+      let totalDmg = 0;
+      if (!damageFixed && dmgSpec.hasDie) {
+        const totalDmgDice = failedEffective + mortalWoundAttacks;
+        if (totalDmgDice > 0) {
+          const rolls = Array.from({ length: totalDmgDice }, () => Math.ceil(Math.random() * dmgSpec.sides));
+          await animateField(setDamageRolls, rolls, dmgSpec.sides);
+          totalDmg = rolls.reduce((s, d) => s + d + dmgSpec.mod, 0);
+          await pause(120);
+        }
+      } else if (damageFixed) {
+        totalDmg = (failedEffective + mortalWoundAttacks) * (Number(damageValue) || 0);
+      }
+      if (fnpEnabled && fnp !== "" && totalDmg > 0) {
+        const fnpRolls = Array.from({ length: totalDmg }, () => Math.ceil(Math.random() * 6));
+        await animateField(setFnpRollsText, fnpRolls, 6);
+      }
+    } else {
+      // ── Split path ──
+      const extraWoundsAllocated = extraTargets.reduce((s, t) => s + Math.max(0, parseInt(t.wounds) || 0), 0);
+      const t1WoundsCount = Math.max(0, totalWounds - Math.min(extraWoundsAllocated, totalWounds));
+
+      // T1 saves
+      let t1Failed = 0;
+      if (t1WoundsCount > 0) {
+        const t1Saves = Array.from({ length: t1WoundsCount }, () => Math.ceil(Math.random() * 6));
+        await animateField(setSaveRollsText, t1Saves, 6);
+        t1Failed = t1Saves.filter(d => d < saveTarget).length;
+        await pause(80);
+      } else {
+        setSaveRollsText("");
+      }
+
+      // Extra target saves
+      const extFailed = [];
+      for (let i = 0; i < extraTargets.length; i++) {
+        const t = extraTargets[i];
+        const wN = Math.max(0, parseInt(t.wounds) || 0);
+        if (wN === 0) { extFailed.push(0); setSplitTargetField(i, "saveRollsText", ""); continue; }
+        const tInv = t.invulnSave === "" ? null : Number(t.invulnSave);
+        const tArmorBase = Number(t.armorSave) || 7;
+        const tArmorMod = t.inCover ? clampMin2Plus(tArmorBase - 1) : tArmorBase;
+        const tSaveTarget = clampMin2Plus(chooseSaveTarget(tArmorMod, tInv, t.ignoreAp ? 0 : apNum));
+        const tSaves = Array.from({ length: wN }, () => Math.ceil(Math.random() * 6));
+        await animateField(v => setSplitTargetField(i, "saveRollsText", v), tSaves, 6);
+        extFailed.push(tSaves.filter(d => d < tSaveTarget).length);
+        await pause(80);
+      }
+      await pause(40);
+
+      // T1 damage
+      const t1FailedEff = Math.max(0, t1Failed - (ignoreFirstFailedSave ? 1 : 0));
+      let t1Dmg = 0;
+      if (!damageFixed && dmgSpec.hasDie) {
+        const t1DmgDice = t1FailedEff + mortalWoundAttacks;
+        if (t1DmgDice > 0) {
+          const t1DmgRolls = Array.from({ length: t1DmgDice }, () => Math.ceil(Math.random() * dmgSpec.sides));
+          await animateField(setDamageRolls, t1DmgRolls, dmgSpec.sides);
+          t1Dmg = t1DmgRolls.reduce((s, d) => s + d + dmgSpec.mod, 0);
+          await pause(80);
+        } else { setDamageRolls(""); }
+      } else if (damageFixed) {
+        t1Dmg = (t1FailedEff + mortalWoundAttacks) * (Number(damageValue) || 0);
+        setDamageRolls("");
+      }
+      if (fnpEnabled && fnp !== "" && t1Dmg > 0) {
+        const t1FnpRolls = Array.from({ length: t1Dmg }, () => Math.ceil(Math.random() * 6));
+        await animateField(setFnpRollsText, t1FnpRolls, 6);
+        await pause(80);
+      } else { setFnpRollsText(""); }
+
+      // Extra target damage + FNP
+      for (let i = 0; i < extraTargets.length; i++) {
+        const t = extraTargets[i];
+        const failedEff = Math.max(0, (extFailed[i] || 0) - (t.ignoreFirstFailedSave ? 1 : 0));
+        let tDmg = 0;
+        if (!damageFixed && dmgSpec.hasDie && failedEff > 0) {
+          const extDmgRolls = Array.from({ length: failedEff }, () => Math.ceil(Math.random() * dmgSpec.sides));
+          await animateField(v => setSplitTargetField(i, "damageRolls", v), extDmgRolls, dmgSpec.sides);
+          tDmg = extDmgRolls.reduce((s, d) => s + d + dmgSpec.mod, 0);
+          await pause(80);
+        } else if (damageFixed) {
+          tDmg = failedEff * (Number(damageValue) || 0);
+          setSplitTargetField(i, "damageRolls", "");
+        } else { setSplitTargetField(i, "damageRolls", ""); }
+        if (t.fnpEnabled && t.fnp !== "" && tDmg > 0) {
+          const tFnpRolls = Array.from({ length: tDmg }, () => Math.ceil(Math.random() * 6));
+          await animateField(v => setSplitTargetField(i, "fnpRollsText", v), tFnpRolls, 6);
+          await pause(80);
+        } else { setSplitTargetField(i, "fnpRollsText", ""); }
+      }
     }
 
     setIsRollingAll(false);
@@ -1773,6 +1845,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                         const next = e.target.checked;
                         setTwinLinked(next);
                         if (next) setRerollWoundFails(true);
+                        if (!next) setRerollWoundFails(false);
                       }}
                       title="Twin-linked: reroll failed wound rolls for this weapon."
                     />
@@ -1859,7 +1932,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
 
             {/* ── Split Volley Toggle ── */}
             {!simpleMode && (
-            <div className={`rounded-2xl p-4 border ${theme === "dark" ? "bg-slate-900 border-gray-700" : "bg-white border-gray-200"}`}>
+            <div className={`rounded-2xl p-4 border ${theme === "dark" ? "bg-slate-900 border-gray-700 text-gray-100" : "bg-white border-gray-200 text-gray-900"}`}>
               <div className="flex items-center justify-between">
                 <div>
                   <div className="font-extrabold text-lg">Split Volley</div>
@@ -1877,7 +1950,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                 <div className="mt-4 space-y-4">
 
                   {/* Wound allocation summary */}
-                  <div className={`rounded-xl p-3 border ${theme === "dark" ? "bg-gray-900/60 border-gray-700" : "bg-gray-50 border-gray-200"}`}>
+                  <div className={`rounded-xl p-3 border ${theme === "dark" ? "bg-gray-900/60 border-gray-700" : "bg-gray-50 border-gray-200 text-gray-900"}`}>
                     <div className="flex items-center justify-between mb-2">
                       <div className="text-sm font-semibold">Wound allocation</div>
                       <div className={`text-xs font-bold ${extraWoundsSum <= totalSavableWounds ? (theme === "dark" ? "text-green-400" : "text-green-700") : (theme === "dark" ? "text-red-400" : "text-red-600")}`}>
@@ -1915,23 +1988,23 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
 
                   {/* Extra target stats panels */}
                   {extraTargets.map((t, i) => (
-                    <div key={i} className={`rounded-xl p-3 border ${theme === "dark" ? "bg-gray-900/40 border-gray-700" : "bg-gray-50 border-gray-200"}`}>
+                    <div key={i} className={`rounded-xl p-3 border ${theme === "dark" ? "bg-gray-900/40 border-gray-700" : "bg-gray-50 border-gray-200 text-gray-900"}`}>
                       <div className={`text-sm font-extrabold mb-3 ${theme === "dark" ? "text-amber-400" : "text-amber-700"}`}>🎯 Target {i + 2} — Stats</div>
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <StatLabel label="T" full="Toughness" example="e.g. 4" required={!t.toughness} theme={theme} />
                           <input type="text" inputMode="numeric" inputMode="numeric" value={t.toughness} onChange={e => setSplitTargetField(i, "toughness", e.target.value)}
-                            placeholder="T e.g. 4" className={`w-full rounded border p-2 font-bold ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300"} ${!t.toughness ? "border-red-500/60" : ""}`} />
+                            placeholder="T e.g. 4" className={`w-full rounded border p-2 font-bold ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300 text-gray-900"} ${!t.toughness ? "border-red-500/60" : ""}`} />
                         </div>
                         <div>
                           <StatLabel label="Sv+" full="Armour Save" example="e.g. 3 (means 3+)" required={!t.armorSave} theme={theme} />
                           <input type="text" inputMode="numeric" inputMode="numeric" value={t.armorSave} onChange={e => setSplitTargetField(i, "armorSave", e.target.value)}
-                            placeholder="Sv+ e.g. 3" className={`w-full rounded border p-2 font-bold ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300"} ${!t.armorSave ? "border-red-500/60" : ""}`} />
+                            placeholder="Sv+ e.g. 3" className={`w-full rounded border p-2 font-bold ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300 text-gray-900"} ${!t.armorSave ? "border-red-500/60" : ""}`} />
                         </div>
                         <div>
                           <StatLabel label="Inv+" full="Invuln Save" example="e.g. 5 (means 5+)" theme={theme} />
                           <input type="text" inputMode="numeric" inputMode="numeric" value={t.invulnSave} onChange={e => setSplitTargetField(i, "invulnSave", e.target.value)}
-                            placeholder="Inv+ e.g. 5" className={`w-full rounded border p-2 font-bold ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300"}`} />
+                            placeholder="Inv+ e.g. 5" className={`w-full rounded border p-2 font-bold ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300 text-gray-900"}`} />
                         </div>
                         <div>
                           <StatLabel label="FNP+" full="Feel No Pain" example="e.g. 5 (means 5+)" theme={theme} />
@@ -1939,7 +2012,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                             <input type="checkbox" checked={t.fnpEnabled} onChange={e => setSplitTargetField(i, "fnpEnabled", e.target.checked)} className="h-4 w-4 accent-amber-400" />
                             <input type="text" inputMode="numeric" inputMode="numeric" value={t.fnp} onChange={e => setSplitTargetField(i, "fnp", e.target.value)}
                               disabled={!t.fnpEnabled} placeholder="FNP+ e.g. 5"
-                              className={`flex-1 rounded border p-2 font-bold disabled:opacity-40 ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300"}`} />
+                              className={`flex-1 rounded border p-2 font-bold disabled:opacity-40 ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300 text-gray-900"}`} />
                           </div>
                         </div>
                       </div>
@@ -2172,15 +2245,17 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                                           </Field>
                             ) : null}
 
-                          </Section>
-
                           {splitEnabled && extraTargets.map((t, i) => {
                             const sr = splitResults[i + 1];
                             const woundsN = Math.max(0, parseInt(t.wounds) || 0);
+                            const saveCountMismatch = parseDiceList(t.saveRollsText).length > 0 && parseDiceList(t.saveRollsText).length !== woundsN && woundsN > 0;
                             return (
-                              <Section key={i} theme={theme} title={`🎯 Target ${i + 2} — Dice`}>
+                              <div key={i} className={`border-t mt-2 pt-3 ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}>
+                                <div className={`text-sm font-extrabold tracking-wide mt-2 mb-2 uppercase ${theme === "dark" ? "text-amber-300/80" : "text-amber-700/80"}`}>
+                                  🎯 Target {i + 2} — Dice
+                                </div>
                                 <div className={`text-xs mb-2 ${theme === "dark" ? "text-amber-400" : "text-amber-600"}`}>
-                                  {woundsN} wounds allocated → Target {i + 2} saves
+                                  {woundsN} wounds allocated
                                 </div>
                                 <Field
                                   label={<CounterLabel prefix={`Save rolls (T${i + 2})`} need={woundsN} entered={parseDiceList(t.saveRollsText).length} remaining={woundsN - parseDiceList(t.saveRollsText).length} theme={theme} />}
@@ -2189,7 +2264,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                                 >
                                   <div className="flex gap-2">
                                     <input
-                                      className={`flex-1 rounded border p-2 text-lg font-semibold ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100 placeholder:text-gray-500" : "bg-white border-gray-300 text-gray-900"} ${parseDiceList(t.saveRollsText).length !== woundsN && woundsN > 0 ? "border-red-500 ring-2 ring-red-200" : ""}`}
+                                      className={`flex-1 rounded border p-2 text-lg font-semibold ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100 placeholder:text-gray-500" : "bg-white border-gray-300 text-gray-900"} ${saveCountMismatch ? "border-red-500 ring-2 ring-red-200" : ""}`}
                                       value={t.saveRollsText}
                                       onChange={e => setSplitTargetField(i, "saveRollsText", e.target.value)}
                                       placeholder="e.g. 5 2 6 ..."
@@ -2237,9 +2312,11 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                                     </div>
                                   </Field>
                                 )}
-                              </Section>
+                              </div>
                             );
                           })}
+
+                          </Section>
 
 <Section theme={theme} title="Results" action={
   <div className="flex gap-2">
@@ -2340,6 +2417,11 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                       onClick={() => setSecretClicks((c) => c + 1)}
                     >
                       {dmgStr}
+                      {splitEnabled && activeSplitResults.length > 1 && allowDamageTotals && (
+                        <div className={`text-base font-bold mt-1 whitespace-nowrap ${theme === "dark" ? "text-amber-400/80" : "text-amber-700/80"}`}>
+                          {activeSplitResults.map((r, i) => r ? `T${i+1}: ${r.totalPostFnp}` : null).filter(Boolean).join(' · ')}
+                        </div>
+                      )}
                     </div>
                   {easterEgg ? (
                     <div className={`mt-3 rounded-xl border p-3 text-center ${easterEgg?.style === "dbz" ? "border-yellow-300 bg-gradient-to-r from-purple-700 via-indigo-600 to-yellow-500 text-white" : "border-amber-300 bg-amber-50 text-gray-900"}`}>
@@ -2412,39 +2494,33 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
 
                 </div>
 
-                {/* ── Split Volley Results ── */}
-                {splitEnabled && splitB && (
-                  <div className={`mt-4 rounded-xl border p-3 ${theme === "dark" ? "border-amber-700/50 bg-amber-900/20" : "border-amber-300 bg-amber-50"}`}>
-                    <div className={`text-xs font-extrabold uppercase tracking-widest mb-3 ${theme === "dark" ? "text-amber-400" : "text-amber-700"}`}>
-                      ⚔️ Split Volley Summary
-                    </div>
-                    <div className="grid grid-cols-3 gap-2 text-center">
-                      <div className={`rounded-lg p-2 border ${theme === "dark" ? "bg-slate-900 border-gray-700" : "bg-white border-gray-200"}`}>
-                        <div className={`text-xs uppercase tracking-widest mb-1 ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>🎯 Target A</div>
-                        <div className={`text-2xl font-black ${theme === "dark" ? "text-amber-400" : "text-amber-700"}`}>{allowDamageTotals ? (splitA ? splitA.totalPostFnp : 0) : "–"}</div>
-                        <div className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>dmg</div>
-                      </div>
-                      <div className={`rounded-lg p-2 border ${theme === "dark" ? "bg-slate-900 border-gray-700" : "bg-white border-gray-200"}`}>
-                        <div className={`text-xs uppercase tracking-widest mb-1 ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>🎯 Target B</div>
-                        <div className={`text-2xl font-black ${theme === "dark" ? "text-orange-400" : "text-orange-700"}`}>{allowDamageTotals ? splitB.totalPostFnp : "–"}</div>
-                        <div className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>dmg</div>
-                      </div>
-                      <div className={`rounded-lg p-2 border ${theme === "dark" ? "bg-amber-900/40 border-amber-700/50" : "bg-amber-100 border-amber-300"}`}>
-                        <div className={`text-xs uppercase tracking-widest mb-1 ${theme === "dark" ? "text-amber-400" : "text-amber-700"}`}>Total</div>
-                        <div className={`text-2xl font-black ${theme === "dark" ? "text-amber-300" : "text-amber-800"}`}>{allowDamageTotals ? (splitA ? splitA.totalPostFnp : 0) + splitB.totalPostFnp : "–"}</div>
-                        <div className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>dmg</div>
-                      </div>
-                    </div>
-                    {splitB.errors.length > 0 && (
-                      <div className="mt-2 text-xs text-red-400 space-y-0.5">
-                        {splitB.errors.map((e, i) => <div key={i}>⚠ {e}</div>)}
-                      </div>
-                    )}
-                  </div>
-                )}
-
                 </div>
               </Section>
+
+              {/* ── Split Volley Summary (full-width, outside Results Section) ── */}
+              {splitEnabled && activeSplitResults.length > 1 && (
+                <div className={`rounded-xl border p-3 ${theme === "dark" ? "border-amber-700/50 bg-amber-900/20" : "border-amber-300 bg-amber-50"}`}>
+                  <div className={`text-xs font-extrabold uppercase tracking-widest mb-3 ${theme === "dark" ? "text-amber-400" : "text-amber-700"}`}>
+                    ⚔️ Split Volley Summary
+                  </div>
+                  <div className="grid gap-2 text-center" style={{ gridTemplateColumns: `repeat(${activeSplitResults.length + 1}, 1fr)` }}>
+                    {activeSplitResults.map((r, i) => r && (
+                      <div key={i} className={`rounded-lg p-2 border ${theme === "dark" ? "bg-slate-900 border-gray-700" : "bg-white border-gray-200"}`}>
+                        <div className={`text-xs uppercase tracking-widest mb-1 ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>🎯 Target {i + 1}</div>
+                        <div className={`text-2xl font-black ${theme === "dark" ? "text-amber-400" : "text-amber-700"}`}>{allowDamageTotals ? r.totalPostFnp : "–"}</div>
+                        <div className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>dmg</div>
+                      </div>
+                    ))}
+                    <div className={`rounded-lg p-2 border ${theme === "dark" ? "bg-amber-900/40 border-amber-700/50" : "bg-amber-100 border-amber-300"}`}>
+                      <div className={`text-xs uppercase tracking-widest mb-1 ${theme === "dark" ? "text-amber-400" : "text-amber-700"}`}>Total</div>
+                      <div className={`text-2xl font-black ${theme === "dark" ? "text-amber-300" : "text-amber-800"}`}>
+                        {allowDamageTotals ? activeSplitResults.reduce((s, r) => s + (r ? r.totalPostFnp : 0), 0) : "–"}
+                      </div>
+                      <div className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>dmg</div>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {showLog && (
                 <Section theme={theme} title="Step-by-step log">

@@ -56,6 +56,7 @@ export function useCalculatorSplit({
     let failedSaves = 0;
     for (let i = 0; i < savableWounds; i++) {
       const unmod = saveRolls[i];
+      if (unmod === undefined) continue; // not yet entered; count error covers it
       if (!(unmod >= 1 && unmod <= 6)) {
         errors.push(`Target ${label}: Save roll #${i + 1} is not a valid D6 result (1-6).`);
         continue;
@@ -104,12 +105,14 @@ export function useCalculatorSplit({
       if (devastatingWounds && mortalWoundAttacks > 0) {
         for (let i = 0; i < mortalWoundAttacks; i++) {
           const d = damageDice[idx++];
+          if (d === undefined) continue; // not yet entered
           if (!(d >= 1 && d <= dmgSides)) { errors.push(`Target ${label}: Damage roll #${idx} invalid.`); continue; }
           mortalDamage += applyDamageMods(d + (dmgSpec.mod || 0));
         }
       }
       for (let i = 0; i < failedSavesEffective; i++) {
         const d = damageDice[idx++];
+        if (d === undefined) continue; // not yet entered
         if (!(d >= 1 && d <= dmgSides)) { errors.push(`Target ${label}: Damage roll #${idx} invalid.`); continue; }
         normalDamage += applyDamageMods(d + (dmgSpec.mod || 0));
       }
