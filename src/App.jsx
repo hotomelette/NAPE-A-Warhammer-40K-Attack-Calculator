@@ -83,17 +83,15 @@ function InlineStatField({ label, children }) {
   );
 }
 
-function RollAllButton({ onClick, disabled, isRolling, isReady }) {
+function RollButton({ onClick, disabled, isRolling, isReady, emoji, label, readyClass, rollingClass }) {
   const cls = isRolling
-    ? "flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-extrabold border transition bg-amber-600 border-amber-400 text-gray-950 animate-pulse cursor-wait"
+    ? `flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-extrabold border transition ${rollingClass} animate-pulse cursor-wait`
     : isReady
-      ? "flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-extrabold border transition bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 border-amber-400/40 text-gray-950"
+      ? `flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-extrabold border transition ${readyClass}`
       : "flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-extrabold border transition bg-transparent border-gray-500 text-gray-400 cursor-not-allowed opacity-60";
   return (
-    <button type="button" onClick={onClick} disabled={disabled}
-      title={isReady ? "Roll all dice at once" : "Enter weapon and target stats first"}
-      className={cls}>
-      {isRolling ? "🎲 Rolling…" : "🎲 Roll all"}
+    <button type="button" onClick={onClick} disabled={disabled} className={cls}>
+      {isRolling ? `${emoji} Rolling…` : `${emoji} ${label}`}
     </button>
   );
 }
@@ -1859,11 +1857,15 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                                 >
                                   Clear dice
                                 </button>
-                                <RollAllButton
+                                <RollButton
                                   onClick={rollAll}
-                                  disabled={!statsReady || isRollingAll}
+                                  disabled={!statsReady || isRollingAll || isRollingWeapon || isRollingTarget}
                                   isRolling={isRollingAll}
                                   isReady={statsReady}
+                                  emoji="🎲"
+                                  label="Roll all"
+                                  readyClass="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 border-amber-400/40 text-gray-950"
+                                  rollingClass="bg-amber-600 border-amber-400 text-gray-950"
                                 />
                               </div>
                             }>
