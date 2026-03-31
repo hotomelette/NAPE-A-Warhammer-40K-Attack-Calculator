@@ -1311,7 +1311,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
 
     // Phase 2: Hits
     let hitRollsFinal = [];
-    let normalHits = 0, lethalAutoWounds = 0, sustainedExtra = 0;
+    let normalHits = 0, sustainedExtra = 0;
     if (!torrent) {
       hitRollsFinal = Array.from({ length: attacksTotal }, () => Math.ceil(Math.random() * 6));
       await animateField(setHitRollsText, hitRollsFinal, 6);
@@ -1327,7 +1327,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
       for (const d of hitRollsFinal) {
         if (d >= critHitT) {
           if (sustainedHits) sustainedExtra += Number(sustainedHitsN) || 1;
-          if (lethalHits) lethalAutoWounds++; else normalHits++;
+          if (!lethalHits) normalHits++;
         } else if (d >= toHitNum) normalHits++;
       }
       normalHits += sustainedExtra;
@@ -1338,13 +1338,19 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
 
     // Phase 3: Wounds
     if (normalHits > 0) {
-      const woundRollsFinal = Array.from({ length: normalHits }, () => Math.ceil(Math.random() * 6));
+      let woundRollsFinal = Array.from({ length: normalHits }, () => Math.ceil(Math.random() * 6));
       await animateField(setWoundRollsText, woundRollsFinal, 6);
       if (twinLinked || rerollWoundOnes || rerollWoundFails) {
         const eligible = woundRollsFinal.filter(d => (twinLinked || rerollWoundOnes) ? d === 1 : d < woundTarget);
         if (eligible.length > 0) {
           const rr = Array.from({ length: eligible.length }, () => Math.ceil(Math.random() * 6));
           await pause(80); await animateField(setWoundRerollRollsText, rr, 6);
+          let ri = 0;
+          woundRollsFinal = woundRollsFinal.map(d =>
+            ((twinLinked || rerollWoundOnes) && d === 1) || (rerollWoundFails && d < woundTarget)
+              ? (rr[ri++] ?? d)
+              : d
+          );
         }
       }
     }
