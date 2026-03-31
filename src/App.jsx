@@ -821,6 +821,8 @@ function AttackCalculator() {
 
   // Transient animation state — declared early because displayComputed depends on it
   const [isRollingAll, setIsRollingAll] = useState(false);
+  const [isRollingWeapon, setIsRollingWeapon] = useState(false);
+  const [isRollingTarget, setIsRollingTarget] = useState(false);
 
   // In split mode, useCalculator only needs to run through the wound phase.
   // Passes empty strings for save/damage/fnp so it doesn't error on counts —
@@ -847,7 +849,7 @@ function AttackCalculator() {
 
   // Freeze display during Roll All animation to prevent UI thrash
   const lastStableComputed = useRef(null);
-  const displayComputed = isRollingAll
+  const displayComputed = (isRollingAll || isRollingWeapon || isRollingTarget)
     ? (lastStableComputed.current || computed)
     : (() => { lastStableComputed.current = computed; return computed; })();
 
@@ -1147,7 +1149,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
 
   // ── Roll All ──
   const rollAll = async () => {
-    if (isRollingAll || !statsReady) return;
+    if (isRollingAll || isRollingWeapon || isRollingTarget || !statsReady) return;
     setIsRollingAll(true);
 
     const attackSpecNow = parseDiceSpec(attacksValue);
