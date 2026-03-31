@@ -1275,6 +1275,88 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
     setIsRollingAll(false);
   };
 
+  const rollWeapon = async () => {
+    if (isRollingAll || isRollingWeapon || isRollingTarget || !statsReady) return;
+    setIsRollingWeapon(true);
+
+    const attackSpecNow = parseDiceSpec(attacksValue);
+    const toHitNum = Number(toHit);
+    const critHitT = Number(critHitThreshold) || 6;
+    const strengthNum = Number(strength);
+    const toughnessNum = Number(toughness);
+    const woundTarget = strengthNum >= toughnessNum * 2 ? 2 : strengthNum > toughnessNum ? 3 : strengthNum === toughnessNum ? 4 : strengthNum * 2 <= toughnessNum ? 6 : 5;
+
+    const { flushSync } = await import("react-dom");
+    const animateField = (setter, finalRolls, sides) => new Promise(resolve => {
+      if (finalRolls.length === 0) { resolve(); return; }
+      let step = 0;
+      const ticker = setInterval(() => {
+        flushSync(() => {
+          setter(Array.from({ length: finalRolls.length }, () => Math.ceil(Math.random() * sides)).join(" "));
+        });
+        if (++step >= 10) { clearInterval(ticker); flushSync(() => setter(finalRolls.join(" "))); resolve(); }
+      }, 60);
+    });
+    const pause = (ms) => new Promise(r => setTimeout(r, ms));
+
+    // Phase 1: Attack dice (only when variable)
+    let attacksTotal = attacksFixed ? (Number(attacksValue) || 0) : 0;
+    if (!attacksFixed && attackSpecNow.n > 0) {
+      const rolls = Array.from({ length: attackSpecNow.n }, () => Math.ceil(Math.random() * attackSpecNow.sides));
+      await animateField(setAttacksRolls, rolls, attackSpecNow.sides);
+      attacksTotal = rolls.reduce((s, d) => s + d, 0) + attackSpecNow.mod;
+      await pause(120);
+    }
+    if (attacksTotal <= 0) { setIsRollingWeapon(false); return; }
+
+    // Phase 2: Hits
+    let hitRollsFinal = [];
+    let normalHits = 0, lethalAutoWounds = 0, sustainedExtra = 0;
+    if (!torrent) {
+      hitRollsFinal = Array.from({ length: attacksTotal }, () => Math.ceil(Math.random() * 6));
+      await animateField(setHitRollsText, hitRollsFinal, 6);
+      if (rerollHitOnes || rerollHitFails) {
+        const eligible = hitRollsFinal.filter(d => rerollHitOnes ? d === 1 : d < toHitNum);
+        if (eligible.length > 0) {
+          const rr = Array.from({ length: eligible.length }, () => Math.ceil(Math.random() * 6));
+          await pause(80); await animateField(setHitRerollRollsText, rr, 6);
+          let ri = 0;
+          hitRollsFinal = hitRollsFinal.map(d => ((rerollHitOnes && d === 1) || (rerollHitFails && d < toHitNum)) ? (rr[ri++] ?? d) : d);
+        }
+      }
+      for (const d of hitRollsFinal) {
+        if (d >= critHitT) {
+          if (sustainedHits) sustainedExtra += Number(sustainedHitsN) || 1;
+          if (lethalHits) lethalAutoWounds++; else normalHits++;
+        } else if (d >= toHitNum) normalHits++;
+      }
+      normalHits += sustainedExtra;
+    } else {
+      normalHits = attacksTotal;
+    }
+    await pause(120);
+
+    // Phase 3: Wounds
+    if (normalHits > 0) {
+      const woundRollsFinal = Array.from({ length: normalHits }, () => Math.ceil(Math.random() * 6));
+      await animateField(setWoundRollsText, woundRollsFinal, 6);
+      if (twinLinked || rerollWoundOnes || rerollWoundFails) {
+        const eligible = woundRollsFinal.filter(d => (twinLinked || rerollWoundOnes) ? d === 1 : d < woundTarget);
+        if (eligible.length > 0) {
+          const rr = Array.from({ length: eligible.length }, () => Math.ceil(Math.random() * 6));
+          await pause(80); await animateField(setWoundRerollRollsText, rr, 6);
+        }
+      }
+    }
+
+    // Clear stale target-side fields so the defender knows to roll their half
+    setSaveRollsText("");
+    setDamageRolls("");
+    setFnpRollsText("");
+
+    setIsRollingWeapon(false);
+  };
+
   return (
     <div className={`min-h-screen ${viz.pageBg || "bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950"} p-4 relative overflow-x-hidden`}>
       {/* Animated page-wide emoji backdrop synced to total damage tier */}
