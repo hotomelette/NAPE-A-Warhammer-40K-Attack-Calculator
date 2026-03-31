@@ -1363,6 +1363,62 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
     setIsRollingWeapon(false);
   };
 
+  const rollTarget = async () => {
+    if (isRollingAll || isRollingWeapon || isRollingTarget) return;
+    const currentSaveNeeded = splitEnabled ? target1Wounds : (activeComputed.savableWounds || 0);
+    if (currentSaveNeeded <= 0) return;
+    setIsRollingTarget(true);
+
+    const armorSaveNum = Number(armorSave);
+    const apNum = Number(ap) || 0;
+    const saveTarget = Math.min(7, Math.max(2, ignoreAp ? armorSaveNum : armorSaveNum - apNum - (inCover ? 1 : 0)));
+    const dmgSpec = parseDiceSpec(damageValue);
+
+    const { flushSync } = await import("react-dom");
+    const animateField = (setter, finalRolls, sides) => new Promise(resolve => {
+      if (finalRolls.length === 0) { resolve(); return; }
+      let step = 0;
+      const ticker = setInterval(() => {
+        flushSync(() => {
+          setter(Array.from({ length: finalRolls.length }, () => Math.ceil(Math.random() * sides)).join(" "));
+        });
+        if (++step >= 10) { clearInterval(ticker); flushSync(() => setter(finalRolls.join(" "))); resolve(); }
+      }, 60);
+    });
+    const pause = (ms) => new Promise(r => setTimeout(r, ms));
+
+    // Phase 4: Saves
+    const saveRollsFinal = Array.from({ length: currentSaveNeeded }, () => Math.ceil(Math.random() * 6));
+    await animateField(setSaveRollsText, saveRollsFinal, 6);
+    const failedSaves = saveRollsFinal.filter(d => d < saveTarget).length;
+    const failedEffective = Math.max(0, failedSaves - (ignoreFirstFailedSave ? 1 : 0));
+    await pause(120);
+
+    // Phase 5: Variable damage
+    const mortalWoundAttacks = activeComputed.mortalWoundAttacks || 0;
+    let totalDmg = 0;
+    if (!damageFixed && dmgSpec.hasDie) {
+      const totalDmgDice = failedEffective + mortalWoundAttacks;
+      if (totalDmgDice > 0) {
+        const rolls = Array.from({ length: totalDmgDice }, () => Math.ceil(Math.random() * dmgSpec.sides));
+        await animateField(setDamageRolls, rolls, dmgSpec.sides);
+        totalDmg = rolls.reduce((s, d) => s + d + dmgSpec.mod, 0);
+        await pause(120);
+      }
+    } else if (damageFixed) {
+      const d = Number(damageValue) || 0;
+      totalDmg = (failedEffective + mortalWoundAttacks) * d;
+    }
+
+    // Phase 6: FNP
+    if (fnpEnabled && fnp !== "" && totalDmg > 0) {
+      const fnpRolls = Array.from({ length: totalDmg }, () => Math.ceil(Math.random() * 6));
+      await animateField(setFnpRollsText, fnpRolls, 6);
+    }
+
+    setIsRollingTarget(false);
+  };
+
   return (
     <div className={`min-h-screen ${viz.pageBg || "bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950"} p-4 relative overflow-x-hidden`}>
       {/* Animated page-wide emoji backdrop synced to total damage tier */}
