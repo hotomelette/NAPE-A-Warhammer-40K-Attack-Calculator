@@ -674,7 +674,6 @@ function AttackCalculator() {
     rapidFire, rapidFireX, halfRange,
     torrent, lethalHits, sustainedHits, sustainedHitsN,
     devastatingWounds, precision,
-    hitMod, woundMod,
     blastEnabled, blastUnitSize,
     antiXEnabled, antiXThreshold,
     lance,
