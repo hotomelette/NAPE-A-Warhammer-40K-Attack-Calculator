@@ -678,6 +678,7 @@ function AttackCalculator() {
     blastEnabled, blastUnitSize,
     antiXEnabled, antiXThreshold,
     lance,
+    meltaEnabled, meltaX,
     plusOneToHit, indirectFire,
   } = weapon;
 
@@ -754,6 +755,15 @@ function AttackCalculator() {
   const setSustainedHitsN= v => dispatch({ type: "SET_WEAPON_FIELD", field: "sustainedHitsN",value: v });
   const setDevastatingWounds = v => dispatch({ type: "SET_WEAPON_FIELD", field: "devastatingWounds", value: v });
   const setPrecision     = v => dispatch({ type: "SET_WEAPON_FIELD", field: "precision",     value: v });
+  const setPlusOneToHit   = v => dispatch({ type: "SET_WEAPON_FIELD", field: "plusOneToHit",   value: v });
+  const setIndirectFire   = v => dispatch({ type: "SET_WEAPON_FIELD", field: "indirectFire",   value: v });
+  const setLance          = v => dispatch({ type: "SET_WEAPON_FIELD", field: "lance",           value: v });
+  const setBlastEnabled   = v => dispatch({ type: "SET_WEAPON_FIELD", field: "blastEnabled",   value: v });
+  const setBlastUnitSize  = v => dispatch({ type: "SET_WEAPON_FIELD", field: "blastUnitSize",  value: v });
+  const setMeltaEnabled   = v => dispatch({ type: "SET_WEAPON_FIELD", field: "meltaEnabled",   value: v });
+  const setMeltaX         = v => dispatch({ type: "SET_WEAPON_FIELD", field: "meltaX",         value: v });
+  const setAntiXEnabled   = v => dispatch({ type: "SET_WEAPON_FIELD", field: "antiXEnabled",   value: v });
+  const setAntiXThreshold = v => dispatch({ type: "SET_WEAPON_FIELD", field: "antiXThreshold", value: v });
   const setHitMod        = v => dispatch({ type: "SET_WEAPON_FIELD", field: "hitMod",        value: v });
   const setWoundMod      = v => dispatch({ type: "SET_WEAPON_FIELD", field: "woundMod",      value: v });
 
@@ -771,6 +781,8 @@ function AttackCalculator() {
   const setSaveMod       = v => dispatch({ type: "SET_TARGET_FIELD", field: "saveMod",       value: v });
   const setHasLeaderAttached         = v => dispatch({ type: "SET_TARGET_FIELD", field: "hasLeaderAttached",         value: v });
   const setAllocatePrecisionToLeader = v => dispatch({ type: "SET_TARGET_FIELD", field: "allocatePrecisionToLeader", value: v });
+  const setStealthSmoke    = v => dispatch({ type: "SET_TARGET_FIELD", field: "stealthSmoke",    value: v });
+  const setMinusOneToWound = v => dispatch({ type: "SET_TARGET_FIELD", field: "minusOneToWound", value: v });
 
   // Dice fields
   const setHitRollsText        = v => dispatch({ type: "SET_DICE_FIELD", field: "hitRollsText",        value: v });
@@ -1952,6 +1964,81 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                     <span className="text-xs text-gray-300">(reroll failed wounds)</span>
                   </label>
 
+                  {/* Lance */}
+                  <label className="flex items-center gap-2 min-h-[40px]">
+                    <input type="checkbox" checked={lance} onChange={e => setLance(e.target.checked)} />
+                    <span className="font-semibold">Lance</span>
+                    <span className="text-xs text-gray-300">(AP improves by 1)</span>
+                  </label>
+
+                  {/* Blast */}
+                  <label className="flex items-center gap-2 min-h-[40px]">
+                    <input type="checkbox" checked={blastEnabled} onChange={e => setBlastEnabled(e.target.checked)} />
+                    <span className="font-semibold">Blast</span>
+                    {blastEnabled && (
+                      <input
+                        type="number"
+                        min={1}
+                        className={`w-16 rounded border p-1 text-sm font-bold ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300 text-gray-900"}`}
+                        value={blastUnitSize}
+                        onChange={e => setBlastUnitSize(Number(e.target.value))}
+                        title="Enemy unit size"
+                      />
+                    )}
+                    <span className="text-xs text-gray-300">{blastEnabled ? `(+${Math.floor((blastUnitSize||0)/5)} attacks)` : "(+1 per 5 models)"}</span>
+                  </label>
+
+                  {/* Melta */}
+                  <label className="flex items-center gap-2 min-h-[40px]">
+                    <input type="checkbox" checked={meltaEnabled} onChange={e => setMeltaEnabled(e.target.checked)} />
+                    <span className="font-semibold">Melta</span>
+                    {meltaEnabled && (
+                      <input
+                        type="number"
+                        min={0}
+                        className={`w-14 rounded border p-1 text-sm font-bold ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300 text-gray-900"}`}
+                        value={meltaX}
+                        onChange={e => setMeltaX(Number(e.target.value))}
+                        title="Melta bonus damage"
+                      />
+                    )}
+                    <span className="text-xs text-gray-300">(+X damage, half range)</span>
+                  </label>
+
+                  {/* Anti-X */}
+                  <label className="flex items-center gap-2 min-h-[40px]">
+                    <input type="checkbox" checked={antiXEnabled} onChange={e => {
+                      setAntiXEnabled(e.target.checked);
+                      if (!e.target.checked) dispatch({ type: "SET_WEAPON_FIELD", field: "critWoundThreshold", value: 6 });
+                    }} />
+                    <span className="font-semibold">Anti-X</span>
+                    {antiXEnabled && (
+                      <input
+                        type="number"
+                        min={2}
+                        max={6}
+                        className={`w-14 rounded border p-1 text-sm font-bold ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300 text-gray-900"}`}
+                        value={antiXThreshold}
+                        onChange={e => setAntiXThreshold(Number(e.target.value))}
+                        title="Critical wound on N+"
+                      />
+                    )}
+                    <span className="text-xs text-gray-300">(crit wound on N+, e.g. Anti-Infantry 4+)</span>
+                  </label>
+
+                  {/* +1 To Hit */}
+                  <label className="flex items-center gap-2 min-h-[40px]">
+                    <input type="checkbox" checked={plusOneToHit} onChange={e => setPlusOneToHit(e.target.checked)} />
+                    <span className="font-semibold">+1 To Hit</span>
+                    <span className="text-xs text-gray-300">(Heavy, Guided, Markerlights)</span>
+                  </label>
+
+                  {/* Indirect Fire */}
+                  <label className="flex items-center gap-2 min-h-[40px]">
+                    <input type="checkbox" checked={indirectFire} onChange={e => setIndirectFire(e.target.checked)} />
+                    <span className="font-semibold">Indirect Fire</span>
+                    <span className="text-xs text-gray-300">(-1 to hit, no line of sight)</span>
+                  </label>
 
                 </div>
               </Field>
@@ -2026,6 +2113,18 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                 <label className="flex items-center gap-2"><input type="checkbox" checked={ignoreFirstFailedSave} onChange={e => setIgnoreFirstFailedSave(e.target.checked)} className="accent-amber-400" /> Ignore 1st failed save</label>
                 <label className="flex items-center gap-2"><input type="checkbox" checked={minusOneDamage} onChange={e => setMinusOneDamage(e.target.checked)} className="accent-amber-400" /> -1 Damage</label>
                 <label className="flex items-center gap-2"><input type="checkbox" checked={halfDamage} onChange={e => setHalfDamage(e.target.checked)} className="accent-amber-400" /> Half Damage</label>
+                {/* Stealth / Smoke */}
+                <label className="flex items-center gap-2 min-h-[40px]">
+                  <input type="checkbox" checked={stealthSmoke} onChange={e => setStealthSmoke(e.target.checked)} className="accent-amber-400" />
+                  <span className="font-semibold">Stealth / Smoke</span>
+                  <span className="text-xs text-gray-300">(-1 to hit: Stealth ability or Smokescreen)</span>
+                </label>
+                {/* -1 To Wound */}
+                <label className="flex items-center gap-2 min-h-[40px]">
+                  <input type="checkbox" checked={minusOneToWound} onChange={e => setMinusOneToWound(e.target.checked)} className="accent-amber-400" />
+                  <span className="font-semibold">-1 To Wound</span>
+                  <span className="text-xs text-gray-300">(Transhuman Physiology, similar)</span>
+                </label>
               </div>
             </Section>
 
