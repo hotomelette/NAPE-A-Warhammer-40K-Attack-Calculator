@@ -98,3 +98,25 @@ describe("Anti-X", () => {
     expect(result.current.mortalWoundAttacks).toBe(4);
   });
 });
+
+describe("Lance", () => {
+  it("does not change save target when disabled", () => {
+    const { result } = renderHook(() => useCalculator({ ...base, ap: 0, armorSave: 3, lance: false }));
+    expect(result.current.saveTarget).toBe(3);
+  });
+
+  it("improves AP by 1 (AP 0 → effective AP -1, save target 3 → 4)", () => {
+    // AP 0 with lance = effective AP -1
+    // chooseSaveTarget(3, null, -1) = 3 - (-1) = 4
+    // Rolling 3s: without lance 3>=3 saves, with lance 3>=4 fails
+    const { result } = renderHook(() => useCalculator({
+      ...base,
+      ap: 0,
+      armorSave: 3,
+      lance: true,
+      saveRollsText: "3 3 3 3",
+    }));
+    expect(result.current.saveTarget).toBe(4);
+    expect(result.current.failedSaves).toBe(4);
+  });
+});

@@ -19,7 +19,7 @@ export function useCalculator({
   antiXEnabled, antiXThreshold,
   // Keywords
   torrent, lethalHits, sustainedHits, sustainedHitsN,
-  devastatingWounds, precision,
+  devastatingWounds, precision, lance,
   // Rerolls
   rerollHitOnes, rerollHitFails,
   rerollWoundOnes, rerollWoundFails,
@@ -306,7 +306,7 @@ export function useCalculator({
     const inv = invulnSave === "" ? null : Number(invulnSave);
     const armorBase = Number(armorSave) || 7;
     const armorWithCover = inCover ? clampMin2Plus(armorBase - 1) : armorBase;
-    const apForCalc = ignoreAp ? 0 : Number(ap) || 0;
+    const apForCalc = ignoreAp ? 0 : (Number(ap) || 0) - (lance ? 1 : 0);
     const saveTarget = clampMin2Plus(chooseSaveTarget(armorWithCover, inv, apForCalc));
 
     const saveRolls = parseDiceList(saveRollsText);
@@ -484,7 +484,7 @@ export function useCalculator({
     critHitThreshold, critWoundThreshold,
     antiXEnabled, antiXThreshold,
     torrent, lethalHits, sustainedHits, sustainedHitsN,
-    devastatingWounds, precision,
+    devastatingWounds, precision, lance,
     rerollHitOnes, rerollHitFails,
     rerollWoundOnes, rerollWoundFails, twinLinked,
     hitRerollRollsText, woundRerollRollsText,

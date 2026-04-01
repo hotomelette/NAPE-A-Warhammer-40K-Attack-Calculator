@@ -24,7 +24,7 @@ export function useCalculatorSplit({
   ignoreFirstFailedSave, minusOneDamage, halfDamage,
   fnp, fnpEnabled,
   // Weapon damage
-  ap, damageFixed, damageValue, devastatingWounds,
+  ap, damageFixed, damageValue, devastatingWounds, lance,
   // Dice
   saveRollsText, damageRolls, fnpRollsText,
   // Meta
@@ -45,7 +45,7 @@ export function useCalculatorSplit({
     const inv = invulnSave === "" ? null : Number(invulnSave);
     const armorBase = Number(armorSave) || 7;
     const armorWithCover = inCover ? clampMin2Plus(armorBase - 1) : armorBase;
-    const apForCalc = ignoreAp ? 0 : Number(ap) || 0;
+    const apForCalc = ignoreAp ? 0 : (Number(ap) || 0) - (lance ? 1 : 0);
     const saveTarget = clampMin2Plus(chooseSaveTarget(armorWithCover, inv, apForCalc));
 
     const saveRolls = parseDiceList(saveRollsText);
@@ -158,7 +158,7 @@ export function useCalculatorSplit({
     woundsAllocated, mortalWoundsAllocated,
     armorSave, invulnSave, inCover, ignoreAp, saveMod,
     ignoreFirstFailedSave, minusOneDamage, halfDamage,
-    fnp, fnpEnabled, ap,
+    fnp, fnpEnabled, ap, lance,
     damageFixed, damageValue, devastatingWounds,
     saveRollsText, damageRolls, fnpRollsText,
     label, enabled,

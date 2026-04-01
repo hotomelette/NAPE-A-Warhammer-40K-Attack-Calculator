@@ -677,6 +677,7 @@ function AttackCalculator() {
     hitMod, woundMod,
     blastEnabled, blastUnitSize,
     antiXEnabled, antiXThreshold,
+    lance,
   } = weapon;
 
   const {
@@ -842,7 +843,7 @@ function AttackCalculator() {
     critHitThreshold, critWoundThreshold,
     antiXEnabled, antiXThreshold,
     torrent, lethalHits, sustainedHits, sustainedHitsN,
-    devastatingWounds, precision,
+    devastatingWounds, precision, lance,
     rerollHitOnes, rerollHitFails,
     rerollWoundOnes, rerollWoundFails, twinLinked,
     hitRerollRollsText, woundRerollRollsText,
@@ -871,7 +872,7 @@ function AttackCalculator() {
   const target1Wounds = Math.max(0, totalSavableWounds - Math.min(extraWoundsSum, totalSavableWounds));
 
   // Shared weapon props passed to every split target
-  const sharedWeaponProps = { ap, damageFixed, damageValue, devastatingWounds };
+  const sharedWeaponProps = { ap, damageFixed, damageValue, devastatingWounds, lance };
 
   // Auto-sync wound distribution when total changes or targets added
   const prevTotalRef = React.useRef(totalSavableWounds);
