@@ -1571,39 +1571,27 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
 
   return (
     <div className={`min-h-screen ${viz.pageBg || "bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950"} p-4 relative overflow-x-hidden`}>
-      {/* Animated page-wide emoji backdrop synced to total damage tier */}
-      <div className="pointer-events-none absolute inset-0 opacity-20 mix-blend-screen">
-        {diceReady ? (
-          <div className="absolute inset-0">
-            <div className="nape-marquee">
-              {Array.from({ length: 10 }).map((_, i) => (
-                <div
-                  key={i}
-                  className={i % 2 ? "nape-marquee-row nape-marquee-reverse" : "nape-marquee-row"}
-                >
-                  {Array.from({ length: 24 }).map((__, j) => (
-                    <span key={j} className="mr-3">{viz.emoji}</span>
-                  ))}
-                </div>
-              ))}
-            </div>
-          </div>
-        ) : null}
-      </div>
-      <div className="relative z-10">
-        {/* Full-page emoji backdrop — faint, follows viz state */}
-        {statsReady && (
-          <div className="fixed inset-0 pointer-events-none overflow-hidden" style={{ opacity: diceReady ? 0.04 : 0.02, zIndex: 0 }}>
-            {Array.from({ length: 6 }).map((_, row) => (
-              <div key={row} className={row % 2 ? "nape-marquee-row nape-marquee-reverse" : "nape-marquee-row"}
-                style={{ animationDuration: `${50 + row * 12}s`, fontSize: "2.5rem", lineHeight: 2.5 }}>
-                {Array.from({ length: 30 }).map((_, i) => <span key={i} className="mr-4">{viz.emoji}</span>)}
-                {Array.from({ length: 30 }).map((_, i) => <span key={`d${i}`} className="mr-4">{viz.emoji}</span>)}
+      {/* Animated page-wide emoji backdrop — fixed so it covers full viewport regardless of scroll */}
+      <div className="pointer-events-none fixed inset-0 overflow-hidden opacity-20 mix-blend-screen" style={{ zIndex: 0 }}>
+        {diceReady && (
+          <div style={{ display: "flex", flexDirection: "column", gap: "18px", paddingTop: "40px" }}>
+            {Array.from({ length: 22 }).map((_, i) => (
+              <div
+                key={i}
+                className={i % 2 ? "nape-marquee-row nape-marquee-reverse" : "nape-marquee-row"}
+              >
+                {Array.from({ length: 24 }).map((__, j) => (
+                  <span key={j} className="mr-3">{viz.emoji}</span>
+                ))}
+                {Array.from({ length: 24 }).map((__, j) => (
+                  <span key={`d${j}`} className="mr-3">{viz.emoji}</span>
+                ))}
               </div>
             ))}
           </div>
         )}
-
+      </div>
+      <div className="relative z-10">
       {emperorToast ? (
         <div className="fixed inset-0 z-50 flex items-start justify-center p-6 pointer-events-none">
           <div className="pointer-events-none mt-6 max-w-2xl w-full rounded-2xl border border-amber-300 bg-gradient-to-r from-amber-200 via-yellow-100 to-amber-200 shadow-2xl p-6 text-center">
@@ -1619,9 +1607,9 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
         {/* ── Sticky combined header + live results ── */}
         <div className={`sticky top-0 z-40 border-b border-gray-700/80 shadow-lg ${viz.headerBg}`}>
 
-          {/* Emoji marquee background — mirrors the results panel animation */}
-          {statsReady && (
-            <div className="absolute inset-0 pointer-events-none overflow-hidden" style={{ opacity: diceReady ? 0.12 : 0.06 }}>
+          {/* Emoji marquee background — only when hard total is ready */}
+          {diceReady && (
+            <div className="absolute inset-0 pointer-events-none overflow-hidden" style={{ opacity: 0.12 }}>
               <div className="nape-marquee-row" style={{ animationDuration: "30s", fontSize: "1.5rem", lineHeight: 2 }}>
                 {Array.from({ length: 40 }).map((_, i) => <span key={i} className="mr-3">{viz.emoji}</span>)}
                 {Array.from({ length: 40 }).map((_, i) => <span key={`d${i}`} className="mr-3">{viz.emoji}</span>)}
@@ -1654,19 +1642,26 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
               <div className="flex items-center gap-2 shrink-0">
                 <span className="text-2xl leading-none">{viz.emoji}</span>
                 {splitEnabled && activeSplitResults.length > 1 ? (
-                  <div className="flex items-center gap-1 flex-wrap">
-                    {activeSplitResults.map((r, i) => {
-                      const tReady = splitTargetStatsReady[i];
-                      const val = !tReady ? '?' : (allowDamageTotals && r) ? r.totalPostFnp : '–';
-                      return (
-                        <React.Fragment key={i}>
-                          {i > 0 && <span className={`text-xs font-bold ${theme === "dark" ? "text-gray-500" : "text-gray-400"}`}>+</span>}
-                          <span className={`text-xs font-bold ${tReady ? (theme === "dark" ? "text-amber-300" : "text-amber-600") : (theme === "dark" ? "text-red-400" : "text-red-500")}`}>T{i+1}:{val}</span>
-                        </React.Fragment>
-                      );
-                    })}
-                    <span className={`text-xs font-bold ${theme === "dark" ? "text-gray-500" : "text-gray-400"}`}>=</span>
-                    <span className={`text-3xl font-extrabold tabular-nums leading-none ${viz.totalNumber}`}>{allSplitStatsReady ? dmgStr : `${dmgStr}+`}</span>
+                  <div className="flex flex-col leading-tight">
+                    <div className="flex items-center gap-2">
+                      {activeSplitResults.map((r, i) => (
+                        <span key={i} className={`text-xs font-bold ${splitTargetStatsReady[i] ? (theme === "dark" ? "text-amber-300/70" : "text-amber-600/70") : (theme === "dark" ? "text-red-400/70" : "text-red-500/70")}`}>T{i+1}:</span>
+                      ))}
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {activeSplitResults.map((r, i) => {
+                        const tReady = splitTargetStatsReady[i];
+                        const val = !tReady ? '?' : (allowDamageTotals && r) ? r.totalPostFnp : '–';
+                        return (
+                          <React.Fragment key={i}>
+                            {i > 0 && <span className={`text-sm font-bold ${theme === "dark" ? "text-gray-500" : "text-gray-400"}`}>+</span>}
+                            <span className={`text-lg font-extrabold tabular-nums ${tReady ? (theme === "dark" ? "text-amber-300" : "text-amber-600") : (theme === "dark" ? "text-red-400" : "text-red-500")}`}>{val}</span>
+                          </React.Fragment>
+                        );
+                      })}
+                      <span className={`text-sm font-bold ${theme === "dark" ? "text-gray-500" : "text-gray-400"}`}>=</span>
+                      <span className={`text-4xl font-extrabold tabular-nums leading-none ${viz.totalNumber}`}>{allSplitStatsReady ? dmgStr : `${dmgStr}+`}</span>
+                    </div>
                   </div>
                 ) : (
                   <span className={`text-3xl font-extrabold tabular-nums leading-none ${viz.totalNumber}`}>{dmgStr}</span>
@@ -2458,31 +2453,23 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                 {splitEnabled && activeSplitResults.length > 1 ? (
                   // ── Split view: per-target grid inside the same viz panel ──
                   <div className={`mt-4 rounded-2xl border p-4 ${viz.totalPanel} relative overflow-visible`}>
-                    {statsReady ? (
-                      diceReady && allSplitStatsReady ? (
-                        <div className="absolute inset-0 pointer-events-none opacity-15 overflow-hidden rounded-2xl">
-                          <div className="nape-marquee-row" style={{ animationDuration: "24s" }}>
-                            {Array.from({ length: 28 }).map((_, i) => <span key={`m-${i}`}>{viz.emoji}</span>)}
-                            {Array.from({ length: 28 }).map((_, i) => <span key={`m-dup-${i}`}>{viz.emoji}</span>)}
-                          </div>
-                          <div className="nape-marquee-row nape-marquee-reverse" style={{ animationDuration: "26s" }}>
-                            {Array.from({ length: 28 }).map((_, i) => <span key={`mr-${i}`}>{viz.emoji}</span>)}
-                            {Array.from({ length: 28 }).map((_, i) => <span key={`mr-dup-${i}`}>{viz.emoji}</span>)}
-                          </div>
+                    {diceReady && allSplitStatsReady ? (
+                      <div className="absolute inset-0 pointer-events-none opacity-15 overflow-hidden rounded-2xl">
+                        <div className="nape-marquee-row" style={{ animationDuration: "24s" }}>
+                          {Array.from({ length: 28 }).map((_, i) => <span key={`m-${i}`}>{viz.emoji}</span>)}
+                          {Array.from({ length: 28 }).map((_, i) => <span key={`m-dup-${i}`}>{viz.emoji}</span>)}
                         </div>
-                      ) : (
-                        <div className="absolute inset-0 pointer-events-none opacity-10 overflow-hidden rounded-2xl">
-                          <div className="w-full h-full flex flex-wrap items-start content-start gap-6 text-5xl md:text-6xl leading-none select-none py-6">
-                            {Array.from({ length: 40 }).map((_, i) => <span key={i}>{viz.emoji}</span>)}
-                          </div>
+                        <div className="nape-marquee-row nape-marquee-reverse" style={{ animationDuration: "26s" }}>
+                          {Array.from({ length: 28 }).map((_, i) => <span key={`mr-${i}`}>{viz.emoji}</span>)}
+                          {Array.from({ length: 28 }).map((_, i) => <span key={`mr-dup-${i}`}>{viz.emoji}</span>)}
                         </div>
-                      )
+                      </div>
                     ) : null}
                     <div className="relative">
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <div className={`text-sm uppercase tracking-widest ${viz.totalLabel}`}>
-                            {allSplitStatsReady ? totalLabelText : "Partial Total · Soft"}
+                            {viz.emoji} {allSplitStatsReady ? totalLabelText : "Partial Total · Soft"}
                           </div>
                           <div className={`text-sm ${viz.totalMeta}`}>{viz.title} · {viz.sub}</div>
                           {!allSplitStatsReady
@@ -2497,15 +2484,15 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                           const tDmg = tReady && allowDamageTotals && r ? r.totalPostFnp : null;
                           return (
                             <div key={i} className={`rounded-xl p-2 border text-center ${theme === "dark" ? "bg-slate-900/60 border-gray-700" : "bg-white/60 border-gray-200"}`}>
-                              <div className={`text-xs uppercase tracking-widest mb-1 ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>🎯 T{i + 1}</div>
+                              <div className={`text-xs uppercase tracking-widest mb-1 ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>🎯 Target {i + 1}</div>
                               {!tReady ? (
                                 <>
-                                  <div className={`text-2xl font-black ${theme === "dark" ? "text-gray-500" : "text-gray-400"}`}>?</div>
+                                  <div className={`text-4xl font-black ${theme === "dark" ? "text-gray-500" : "text-gray-400"}`}>?</div>
                                   <div className={`text-xs ${theme === "dark" ? "text-red-400/80" : "text-red-500"}`}>stats missing</div>
                                 </>
                               ) : (
                                 <>
-                                  <div className={`text-2xl font-black ${viz.totalNumber}`}>{tDmg ?? '–'}</div>
+                                  <div className={`text-4xl font-black ${viz.totalNumber}`}>{tDmg ?? '–'}</div>
                                   <div className={`text-xs ${viz.totalMeta}`}>dmg</div>
                                 </>
                               )}
@@ -2517,8 +2504,8 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                           onClick={() => setSecretClicks((c) => c + 1)}
                           title="Konami-style easter egg, (secret) click 5x"
                         >
-                          <div className={`text-xs uppercase tracking-widest mb-1 ${viz.totalLabel}`}>{viz.emoji} Total</div>
-                          <div className={`text-2xl font-black ${viz.totalNumber}`}>
+                          <div className={`text-xs uppercase tracking-widest mb-1 ${viz.totalLabel}`}>Total</div>
+                          <div className={`text-4xl font-black ${viz.totalNumber}`}>
                             {allowDamageTotals ? `${dmgStr}${allSplitStatsReady ? '' : '+'}` : '–'}
                           </div>
                           <div className={`text-xs ${viz.totalMeta}`}>{allSplitStatsReady ? 'dmg' : 'soft'}</div>
@@ -2536,25 +2523,17 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                 ) : (
                   // ── Normal single-target view ──
                   <div className={`mt-4 rounded-2xl border p-4 ${viz.totalPanel} relative overflow-visible inline-block w-max min-w-full`}>
-                    {statsReady ? (
-                      diceReady ? (
-                        <div className="absolute inset-0 pointer-events-none opacity-15 overflow-hidden rounded-2xl">
-                          <div className="nape-marquee-row" style={{ animationDuration: "24s" }}>
-                            {Array.from({ length: 28 }).map((_, i) => <span key={`m-${i}`}>{viz.emoji}</span>)}
-                            {Array.from({ length: 28 }).map((_, i) => <span key={`m-dup-${i}`}>{viz.emoji}</span>)}
-                          </div>
-                          <div className="nape-marquee-row nape-marquee-reverse" style={{ animationDuration: "26s" }}>
-                            {Array.from({ length: 28 }).map((_, i) => <span key={`mr-${i}`}>{viz.emoji}</span>)}
-                            {Array.from({ length: 28 }).map((_, i) => <span key={`mr-dup-${i}`}>{viz.emoji}</span>)}
-                          </div>
+                    {diceReady ? (
+                      <div className="absolute inset-0 pointer-events-none opacity-15 overflow-hidden rounded-2xl">
+                        <div className="nape-marquee-row" style={{ animationDuration: "24s" }}>
+                          {Array.from({ length: 28 }).map((_, i) => <span key={`m-${i}`}>{viz.emoji}</span>)}
+                          {Array.from({ length: 28 }).map((_, i) => <span key={`m-dup-${i}`}>{viz.emoji}</span>)}
                         </div>
-                      ) : (
-                        <div className="absolute inset-0 pointer-events-none opacity-10 overflow-hidden rounded-2xl">
-                          <div className="w-full h-full flex flex-wrap items-start content-start gap-6 text-5xl md:text-6xl leading-none select-none py-6">
-                            {Array.from({ length: 40 }).map((_, i) => <span key={i}>{viz.emoji}</span>)}
-                          </div>
+                        <div className="nape-marquee-row nape-marquee-reverse" style={{ animationDuration: "26s" }}>
+                          {Array.from({ length: 28 }).map((_, i) => <span key={`mr-${i}`}>{viz.emoji}</span>)}
+                          {Array.from({ length: 28 }).map((_, i) => <span key={`mr-dup-${i}`}>{viz.emoji}</span>)}
                         </div>
-                      )
+                      </div>
                     ) : null}
                     <div className="relative">
                     <div className="flex items-start justify-between gap-3">
