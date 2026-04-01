@@ -675,6 +675,7 @@ function AttackCalculator() {
     torrent, lethalHits, sustainedHits, sustainedHitsN,
     devastatingWounds, precision,
     hitMod, woundMod,
+    blastEnabled, blastUnitSize,
   } = weapon;
 
   const {
@@ -834,6 +835,7 @@ function AttackCalculator() {
   const computed = useCalculator({
     attacksFixed, attacksValue, attacksRolls,
     rapidFire, rapidFireX, halfRange,
+    blastEnabled, blastUnitSize,
     toHit, hitMod, strength, ap,
     damageFixed, damageValue, damageRolls,
     critHitThreshold, critWoundThreshold,

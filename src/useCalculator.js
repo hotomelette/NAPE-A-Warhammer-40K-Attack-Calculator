@@ -11,6 +11,7 @@ export function useCalculator({
   // Weapon
   attacksFixed, attacksValue, attacksRolls,
   rapidFire, rapidFireX, halfRange,
+  blastEnabled, blastUnitSize,
   toHit, hitMod,
   strength, ap,
   damageFixed, damageValue, damageRolls,
@@ -83,6 +84,15 @@ export function useCalculator({
     if (rapidFire && halfRange && rfX > 0) {
       A += rfX;
       log.push(`Rapid Fire: half range enabled. +${rfX} attacks. A => ${A}`);
+    }
+
+    // Blast: add floor(unitSize / 5) attacks
+    if (blastEnabled) {
+      const bonus = Math.floor(Number(blastUnitSize) || 0) / 5 | 0;
+      if (bonus > 0) {
+        A += bonus;
+        log.push(`Blast: unit size ${blastUnitSize}, +${bonus} attacks. A => ${A}`);
+      }
     }
 
     // Step 2: Hits
@@ -463,6 +473,7 @@ export function useCalculator({
   }, [
     attacksFixed, attacksValue, attacksRolls,
     rapidFire, rapidFireX, halfRange,
+    blastEnabled, blastUnitSize,
     toHit, hitMod, strength, ap,
     damageFixed, damageValue, damageRolls,
     critHitThreshold, critWoundThreshold,
