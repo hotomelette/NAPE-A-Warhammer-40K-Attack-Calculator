@@ -906,7 +906,7 @@ function AttackCalculator() {
     ignored: activeSplitResults.reduce((s, r) => s + (r?.ignored ?? 0), 0),
     totalPostFnp: activeSplitResults.reduce((s, r) => s + (r?.totalPostFnp ?? 0), 0),
     errors: [
-      ...displayComputed.errors.filter(e => !e.includes("Save rolls") && !e.includes("Damage rolls") && !e.includes("FNP")),
+      ...displayComputed.errors.filter(e => !e.includes("Save roll") && !e.includes("Damage roll") && !e.includes("FNP")),
       ...activeSplitResults.flatMap(r => r ? r.errors || [] : []),
     ],
     log: [...displayComputed.log, ...activeSplitResults.flatMap(r => r ? r.log || [] : [])],

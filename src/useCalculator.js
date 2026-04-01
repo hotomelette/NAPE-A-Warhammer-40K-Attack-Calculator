@@ -103,6 +103,7 @@ export function useCalculator({
     } else {
       for (let i = 0; i < A; i++) {
         const unmod = hitRolls[i];
+        if (unmod === undefined) continue;
         if (!(unmod >= 1 && unmod <= 6)) {
           errors.push(`Hit roll #${i + 1} is not a valid D6 result (1-6).`);
           continue;
@@ -207,6 +208,7 @@ export function useCalculator({
 
     for (let i = 0; i < woundRollPool; i++) {
       const unmod = woundRolls[i];
+      if (unmod === undefined) continue;
       if (!(unmod >= 1 && unmod <= 6)) {
         errors.push(`Wound roll #${i + 1} is not a valid D6 result (1-6).`);
         continue;
@@ -300,6 +302,7 @@ export function useCalculator({
     let failedSaves = 0;
     for (let i = 0; i < savableWounds; i++) {
       const unmod = saveRolls[i];
+      if (unmod === undefined) continue;
       if (!(unmod >= 1 && unmod <= 6)) {
         errors.push(`Save roll #${i + 1} is not a valid D6 result (1-6).`);
         continue;
@@ -368,6 +371,7 @@ export function useCalculator({
           const d = damageDice[idx++];
           const dmgSpec = parseDiceSpec(damageValue);
           const dmgSides = dmgSpec.hasDie ? dmgSpec.sides : 6;
+          if (d === undefined) continue;
           if (!(d >= 1 && d <= dmgSides)) {
             errors.push(`Damage roll #${idx} is not a valid D${dmgSides} result (1-${dmgSides}).`);
             continue;
@@ -381,6 +385,7 @@ export function useCalculator({
         const d = damageDice[idx++];
         const dmgSpec2 = parseDiceSpec(damageValue);
         const dmgSides2 = dmgSpec2.hasDie ? dmgSpec2.sides : 6;
+        if (d === undefined) continue;
         if (!(d >= 1 && d <= dmgSides2)) {
           errors.push(`Damage roll #${idx} is not a valid D${dmgSides2} result (1-${dmgSides2}).`);
           continue;
@@ -404,6 +409,7 @@ export function useCalculator({
       }
       for (let i = 0; i < totalPreFnp; i++) {
         const r = fnpRolls[i];
+        if (r === undefined) continue;
         if (!(r >= 1 && r <= 6)) {
           errors.push(`FNP roll #${i + 1} is not a valid D6 result (1-6).`);
           continue;
