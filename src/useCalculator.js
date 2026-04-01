@@ -35,6 +35,8 @@ export function useCalculator({
   fnp, fnpEnabled, fnpRollsText,
   // Dice rolls
   hitRollsText, woundRollsText, saveRollsText,
+  // Melta
+  meltaEnabled, meltaX,
   // Precision / Leader
   hasLeaderAttached, allocatePrecisionToLeader,
 }) {
@@ -342,6 +344,7 @@ export function useCalculator({
     // Many rules are explicit about order. If a specific datasheet differs, treat this as a limitation.
     const applyDamageMods = (d) => {
       let out = d;
+      if (meltaEnabled) out += Math.max(0, Number(meltaX) || 0);
       if (halfDamage) out = Math.ceil(out / 2);
       if (minusOneDamage) out = Math.max(1, out - 1);
       return out;
@@ -493,6 +496,7 @@ export function useCalculator({
     ignoreFirstFailedSave, minusOneDamage, halfDamage,
     fnp, fnpEnabled, fnpRollsText,
     hitRollsText, woundRollsText, saveRollsText,
+    meltaEnabled, meltaX,
     hasLeaderAttached, allocatePrecisionToLeader,
   ]);
 }

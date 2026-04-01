@@ -853,6 +853,7 @@ function AttackCalculator() {
     fnp, fnpEnabled, fnpRollsText,
     hitRollsText, woundRollsText,
     saveRollsText: splitEnabled ? "" : saveRollsText,
+    meltaEnabled, meltaX,
     hasLeaderAttached, allocatePrecisionToLeader,
   });
 
@@ -872,7 +873,7 @@ function AttackCalculator() {
   const target1Wounds = Math.max(0, totalSavableWounds - Math.min(extraWoundsSum, totalSavableWounds));
 
   // Shared weapon props passed to every split target
-  const sharedWeaponProps = { ap, damageFixed, damageValue, devastatingWounds, lance };
+  const sharedWeaponProps = { ap, damageFixed, damageValue, devastatingWounds, lance, meltaEnabled, meltaX };
 
   // Auto-sync wound distribution when total changes or targets added
   const prevTotalRef = React.useRef(totalSavableWounds);

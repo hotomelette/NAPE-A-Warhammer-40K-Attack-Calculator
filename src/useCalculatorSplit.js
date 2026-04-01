@@ -25,6 +25,7 @@ export function useCalculatorSplit({
   fnp, fnpEnabled,
   // Weapon damage
   ap, damageFixed, damageValue, devastatingWounds, lance,
+  meltaEnabled, meltaX,
   // Dice
   saveRollsText, damageRolls, fnpRollsText,
   // Meta
@@ -73,6 +74,7 @@ export function useCalculatorSplit({
     // ── Damage ──
     const applyDamageMods = (d) => {
       let out = d;
+      if (meltaEnabled) out += Math.max(0, Number(meltaX) || 0);
       if (halfDamage) out = Math.ceil(out / 2);
       if (minusOneDamage) out = Math.max(1, out - 1);
       return out;
@@ -160,6 +162,7 @@ export function useCalculatorSplit({
     ignoreFirstFailedSave, minusOneDamage, halfDamage,
     fnp, fnpEnabled, ap, lance,
     damageFixed, damageValue, devastatingWounds,
+    meltaEnabled, meltaX,
     saveRollsText, damageRolls, fnpRollsText,
     label, enabled,
   ]);

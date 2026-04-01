@@ -120,3 +120,32 @@ describe("Lance", () => {
     expect(result.current.failedSaves).toBe(4);
   });
 });
+
+describe("Melta", () => {
+  it("does not add damage when disabled", () => {
+    const { result } = renderHook(() => useCalculator({ ...base, meltaEnabled: false, meltaX: 2 }));
+    expect(result.current.totalPostFnp).toBe(4);
+  });
+
+  it("adds meltaX to each wound's damage when enabled", () => {
+    const { result } = renderHook(() => useCalculator({
+      ...base,
+      meltaEnabled: true,
+      meltaX: 2,
+      damageValue: 1,
+    }));
+    // 4 failed saves × (1 + 2) = 12
+    expect(result.current.totalPostFnp).toBe(12);
+  });
+
+  it("stacks with fixed damage correctly", () => {
+    const { result } = renderHook(() => useCalculator({
+      ...base,
+      meltaEnabled: true,
+      meltaX: 3,
+      damageValue: 2,
+    }));
+    // 4 failed saves × (2 + 3) = 20
+    expect(result.current.totalPostFnp).toBe(20);
+  });
+});
