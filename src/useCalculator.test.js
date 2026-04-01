@@ -72,3 +72,29 @@ describe("Blast", () => {
     expect(result.current.A).toBe(7);
   });
 });
+
+describe("Anti-X", () => {
+  it("does not change crit wound threshold when disabled", () => {
+    const { result } = renderHook(() => useCalculator({
+      ...base,
+      devastatingWounds: true,
+      antiXEnabled: false,
+      antiXThreshold: 5,
+      woundRollsText: "5 5 5 5",
+    }));
+    expect(result.current.critWounds).toBe(0);
+    expect(result.current.mortalWoundAttacks).toBe(0);
+  });
+
+  it("lowers crit wound threshold when enabled", () => {
+    const { result } = renderHook(() => useCalculator({
+      ...base,
+      devastatingWounds: true,
+      antiXEnabled: true,
+      antiXThreshold: 5,
+      woundRollsText: "5 5 5 5",
+    }));
+    expect(result.current.critWounds).toBe(4);
+    expect(result.current.mortalWoundAttacks).toBe(4);
+  });
+});

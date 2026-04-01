@@ -676,6 +676,7 @@ function AttackCalculator() {
     devastatingWounds, precision,
     hitMod, woundMod,
     blastEnabled, blastUnitSize,
+    antiXEnabled, antiXThreshold,
   } = weapon;
 
   const {
@@ -839,6 +840,7 @@ function AttackCalculator() {
     toHit, hitMod, strength, ap,
     damageFixed, damageValue, damageRolls,
     critHitThreshold, critWoundThreshold,
+    antiXEnabled, antiXThreshold,
     torrent, lethalHits, sustainedHits, sustainedHitsN,
     devastatingWounds, precision,
     rerollHitOnes, rerollHitFails,

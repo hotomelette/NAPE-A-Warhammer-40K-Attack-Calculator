@@ -16,6 +16,7 @@ export function useCalculator({
   strength, ap,
   damageFixed, damageValue, damageRolls,
   critHitThreshold, critWoundThreshold,
+  antiXEnabled, antiXThreshold,
   // Keywords
   torrent, lethalHits, sustainedHits, sustainedHitsN,
   devastatingWounds, precision,
@@ -44,6 +45,10 @@ export function useCalculator({
     const hitModCapped = clampModPlusMinusOne(Number(hitMod) || 0);
     const saveModCapped = clampModPlusMinusOne(Number(saveMod) || 0);
     const woundModNum = Number(woundMod) || 0;
+
+    const effectiveCritWoundThreshold = antiXEnabled
+      ? Math.max(2, Math.min(6, Number(antiXThreshold) || 6))
+      : (Number(critWoundThreshold) || 6);
 
     // Step 1: Attacks
     let A = 0;
@@ -226,7 +231,7 @@ export function useCalculator({
       const success = meets(needed, unmod, woundModNum);
       if (success) {
         woundSuccesses++;
-        if (unmod >= (Number(critWoundThreshold) || 6)) critWounds++;
+        if (unmod >= effectiveCritWoundThreshold) critWounds++;
       }
     }
 
@@ -272,7 +277,7 @@ export function useCalculator({
           const success = meets(needed, unmod, woundModNum);
           if (success) {
             newWoundSuccesses++;
-            if (unmod >= (Number(critWoundThreshold) || 6)) newCritWounds++;
+            if (unmod >= effectiveCritWoundThreshold) newCritWounds++;
           }
         }
 
@@ -477,6 +482,7 @@ export function useCalculator({
     toHit, hitMod, strength, ap,
     damageFixed, damageValue, damageRolls,
     critHitThreshold, critWoundThreshold,
+    antiXEnabled, antiXThreshold,
     torrent, lethalHits, sustainedHits, sustainedHitsN,
     devastatingWounds, precision,
     rerollHitOnes, rerollHitFails,
