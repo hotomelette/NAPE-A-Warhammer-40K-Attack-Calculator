@@ -678,6 +678,7 @@ function AttackCalculator() {
     blastEnabled, blastUnitSize,
     antiXEnabled, antiXThreshold,
     lance,
+    plusOneToHit, indirectFire,
   } = weapon;
 
   const {
@@ -687,7 +688,16 @@ function AttackCalculator() {
     ignoreFirstFailedSave, minusOneDamage, halfDamage,
     saveMod,
     hasLeaderAttached, allocatePrecisionToLeader,
+    stealthSmoke, minusOneToWound,
   } = target;
+
+  // Effective hit modifier: sum all sources, cap at ±1 per 10th ed stacking rule
+  const effectiveHitMod = clampModPlusMinusOne(
+    (plusOneToHit ? 1 : 0) - (indirectFire ? 1 : 0) - (stealthSmoke ? 1 : 0)
+  );
+  const effectiveWoundMod = clampModPlusMinusOne(
+    -(minusOneToWound ? 1 : 0)
+  );
 
   const {
     hitRollsText, woundRollsText, saveRollsText, fnpRollsText,
@@ -838,7 +848,7 @@ function AttackCalculator() {
     attacksFixed, attacksValue, attacksRolls,
     rapidFire, rapidFireX, halfRange,
     blastEnabled, blastUnitSize,
-    toHit, hitMod, strength, ap,
+    toHit, hitMod: effectiveHitMod, strength, ap,
     damageFixed, damageValue, damageRolls,
     critHitThreshold, critWoundThreshold,
     antiXEnabled, antiXThreshold,
@@ -848,7 +858,7 @@ function AttackCalculator() {
     rerollWoundOnes, rerollWoundFails, twinLinked,
     hitRerollRollsText, woundRerollRollsText,
     toughness, armorSave, invulnSave,
-    inCover, ignoreAp, woundMod, saveMod,
+    inCover, ignoreAp, woundMod: effectiveWoundMod, saveMod,
     ignoreFirstFailedSave, minusOneDamage, halfDamage,
     fnp, fnpEnabled, fnpRollsText,
     hitRollsText, woundRollsText,
