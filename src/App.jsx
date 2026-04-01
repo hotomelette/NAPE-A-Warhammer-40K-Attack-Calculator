@@ -1244,19 +1244,19 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
       hitRollsFinal = Array.from({ length: attacksTotal }, () => Math.ceil(Math.random() * 6));
       await animateField(setHitRollsText, hitRollsFinal, 6);
       if (rerollHitOnes || rerollHitFails) {
-        const eligible = hitRollsFinal.filter(d => rerollHitOnes ? d === 1 : d < toHitNum);
+        const eligible = hitRollsFinal.filter(d => rerollHitOnes ? d === 1 : d + effectiveHitMod < toHitNum);
         if (eligible.length > 0) {
           const rr = Array.from({ length: eligible.length }, () => Math.ceil(Math.random() * 6));
           await pause(80); await animateField(setHitRerollRollsText, rr, 6);
           let ri = 0;
-          hitRollsFinal = hitRollsFinal.map(d => ((rerollHitOnes && d === 1) || (rerollHitFails && d < toHitNum)) ? (rr[ri++] ?? d) : d);
+          hitRollsFinal = hitRollsFinal.map(d => ((rerollHitOnes && d === 1) || (rerollHitFails && d + effectiveHitMod < toHitNum)) ? (rr[ri++] ?? d) : d);
         }
       }
       for (const d of hitRollsFinal) {
         if (d >= critHitT) {
           if (sustainedHits) sustainedExtra += Number(sustainedHitsN) || 1;
           if (lethalHits) lethalAutoWounds++; else normalHits++;
-        } else if (d >= toHitNum) normalHits++;
+        } else if (d + effectiveHitMod >= toHitNum) normalHits++;
       }
       normalHits += sustainedExtra;
     } else {
@@ -1271,17 +1271,17 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
       woundRollsFinal = Array.from({ length: normalHits }, () => Math.ceil(Math.random() * 6));
       await animateField(setWoundRollsText, woundRollsFinal, 6);
       if (twinLinked || rerollWoundOnes || rerollWoundFails) {
-        const eligible = woundRollsFinal.filter(d => (twinLinked || rerollWoundOnes) ? d === 1 : d < woundTarget);
+        const eligible = woundRollsFinal.filter(d => (twinLinked || rerollWoundOnes) ? d === 1 : d + effectiveWoundMod < woundTarget);
         if (eligible.length > 0) {
           const rr = Array.from({ length: eligible.length }, () => Math.ceil(Math.random() * 6));
           await pause(80); await animateField(setWoundRerollRollsText, rr, 6);
           let ri = 0;
-          woundRollsFinal = woundRollsFinal.map(d => ((twinLinked || rerollWoundOnes) && d === 1) || (rerollWoundFails && d < woundTarget) ? (rr[ri++] ?? d) : d);
+          woundRollsFinal = woundRollsFinal.map(d => ((twinLinked || rerollWoundOnes) && d === 1) || (rerollWoundFails && d + effectiveWoundMod < woundTarget) ? (rr[ri++] ?? d) : d);
         }
       }
       for (const d of woundRollsFinal) {
         if (d >= critWoundT) { if (devastatingWounds) mortalWoundAttacks++; else totalWounds++; }
-        else if (d >= woundTarget) totalWounds++;
+        else if (d + effectiveWoundMod >= woundTarget) totalWounds++;
       }
     }
     await pause(120);
@@ -1447,19 +1447,19 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
       hitRollsFinal = Array.from({ length: attacksTotal }, () => Math.ceil(Math.random() * 6));
       await animateField(setHitRollsText, hitRollsFinal, 6);
       if (rerollHitOnes || rerollHitFails) {
-        const eligible = hitRollsFinal.filter(d => rerollHitOnes ? d === 1 : d < toHitNum);
+        const eligible = hitRollsFinal.filter(d => rerollHitOnes ? d === 1 : d + effectiveHitMod < toHitNum);
         if (eligible.length > 0) {
           const rr = Array.from({ length: eligible.length }, () => Math.ceil(Math.random() * 6));
           await pause(80); await animateField(setHitRerollRollsText, rr, 6);
           let ri = 0;
-          hitRollsFinal = hitRollsFinal.map(d => ((rerollHitOnes && d === 1) || (rerollHitFails && d < toHitNum)) ? (rr[ri++] ?? d) : d);
+          hitRollsFinal = hitRollsFinal.map(d => ((rerollHitOnes && d === 1) || (rerollHitFails && d + effectiveHitMod < toHitNum)) ? (rr[ri++] ?? d) : d);
         }
       }
       for (const d of hitRollsFinal) {
         if (d >= critHitT) {
           if (sustainedHits) sustainedExtra += Number(sustainedHitsN) || 1;
           if (!lethalHits) normalHits++;
-        } else if (d >= toHitNum) normalHits++;
+        } else if (d + effectiveHitMod >= toHitNum) normalHits++;
       }
       normalHits += sustainedExtra;
     } else {
