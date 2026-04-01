@@ -31,6 +31,16 @@ export const initialWeapon = {
   precision: false,
   hitMod: 0,
   woundMod: 0,
+  // New keywords
+  plusOneToHit: false,
+  indirectFire: false,
+  lance: false,
+  blastEnabled: false,
+  blastUnitSize: 10,
+  meltaEnabled: false,
+  meltaX: 0,
+  antiXEnabled: false,
+  antiXThreshold: 5,
 };
 
 export const initialTarget = {
@@ -45,6 +55,8 @@ export const initialTarget = {
   minusOneDamage: false,
   halfDamage: false,
   saveMod: 0,
+  stealthSmoke: false,
+  minusOneToWound: false,
   hasLeaderAttached: false,
   allocatePrecisionToLeader: false,
 };
