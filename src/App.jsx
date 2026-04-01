@@ -785,7 +785,10 @@ function AttackCalculator() {
   const setStrictMode      = v => dispatch({ type: "SET_UI_FIELD", field: "strictMode",      value: v });
   const setPreserveHooks   = v => dispatch({ type: "SET_UI_FIELD", field: "preserveHooks",   value: v });
   const toggleTheme        = () => dispatch({ type: "TOGGLE_THEME" });
-  const toggleSimpleMode   = () => dispatch({ type: "TOGGLE_SIMPLE_MODE" });
+  const toggleSimpleMode = () => {
+    if (!simpleMode) dispatch({ type: "CLEAR_SPLIT" });
+    dispatch({ type: "TOGGLE_SIMPLE_MODE" });
+  };
 
   // Easter egg fields
   const setSecretClicks     = v => dispatch({ type: "SET_EASTER_FIELD", field: "secretClicks",     value: v });
@@ -987,6 +990,17 @@ function AttackCalculator() {
   if (!isNum(armorSave)) missingTarget.push("Armor save");
 
   const statsReady = missingWeapon.length === 0 && missingTarget.length === 0;
+
+  // Per-target stats readiness for split view: T1 uses shared statsReady,
+  // extra targets need at minimum armorSave (toughness/weapon stats are shared).
+  // A target with 0 wounds allocated counts as ready (nothing to compute).
+  const splitTargetStatsReady = activeSplitResults.map((_, i) => {
+    if (i === 0) return statsReady;
+    const t = extraTargets[i - 1];
+    if (!t) return false;
+    return Math.max(0, parseInt(t.wounds) || 0) === 0 || !!t.armorSave;
+  });
+  const allSplitStatsReady = splitTargetStatsReady.every(Boolean);
   const diceReady =
     statsReady &&
     activeComputed.errors.length === 0 &&
@@ -1639,18 +1653,28 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
             ) : (
               <div className="flex items-center gap-2 shrink-0">
                 <span className="text-2xl leading-none">{viz.emoji}</span>
-                <span className={`text-3xl font-extrabold tabular-nums leading-none ${viz.totalNumber}`}>{dmgStr}</span>
+                {splitEnabled && activeSplitResults.length > 1 ? (
+                  <div className="flex items-center gap-1 flex-wrap">
+                    {activeSplitResults.map((r, i) => {
+                      const tReady = splitTargetStatsReady[i];
+                      const val = !tReady ? '?' : (allowDamageTotals && r) ? r.totalPostFnp : '–';
+                      return (
+                        <React.Fragment key={i}>
+                          {i > 0 && <span className={`text-xs font-bold ${theme === "dark" ? "text-gray-500" : "text-gray-400"}`}>+</span>}
+                          <span className={`text-xs font-bold ${tReady ? (theme === "dark" ? "text-amber-300" : "text-amber-600") : (theme === "dark" ? "text-red-400" : "text-red-500")}`}>T{i+1}:{val}</span>
+                        </React.Fragment>
+                      );
+                    })}
+                    <span className={`text-xs font-bold ${theme === "dark" ? "text-gray-500" : "text-gray-400"}`}>=</span>
+                    <span className={`text-3xl font-extrabold tabular-nums leading-none ${viz.totalNumber}`}>{allSplitStatsReady ? dmgStr : `${dmgStr}+`}</span>
+                  </div>
+                ) : (
+                  <span className={`text-3xl font-extrabold tabular-nums leading-none ${viz.totalNumber}`}>{dmgStr}</span>
+                )}
                 <div className="flex flex-col leading-tight">
                   <span className={`text-xs uppercase tracking-widest ${viz.totalLabel}`}>{totalLabelText}</span>
                   <span className={`text-xs ${viz.totalMeta}`}>{diceReady ? "final" : "preview"}</span>
                 </div>
-                {splitEnabled && activeSplitResults.length > 1 && (
-                  <div className="flex items-center gap-2 ml-2">
-                    {activeSplitResults.map((r, i) => r && (
-                      <span key={i} className="text-xs font-bold text-amber-300">T{i+1}: {allowDamageTotals ? r.totalPostFnp : "–"}</span>
-                    ))}
-                  </div>
-                )}
               </div>
             )}
 
@@ -2431,74 +2455,138 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
 
                 
                 {/* Prominent total damage panel (full width) */}
-                  <div className={`mt-4 rounded-2xl border p-4 ${viz.totalPanel} relative overflow-visible inline-block w-max min-w-full`}>
-                    {/* Backdrop state cue: soft = static tile, final = animated marquee */}
+                {splitEnabled && activeSplitResults.length > 1 ? (
+                  // ── Split view: per-target grid inside the same viz panel ──
+                  <div className={`mt-4 rounded-2xl border p-4 ${viz.totalPanel} relative overflow-visible`}>
                     {statsReady ? (
-                      diceReady ? (
+                      diceReady && allSplitStatsReady ? (
                         <div className="absolute inset-0 pointer-events-none opacity-15 overflow-hidden rounded-2xl">
                           <div className="nape-marquee-row" style={{ animationDuration: "24s" }}>
-                            {Array.from({ length: 28 }).map((_, i) => (
-                              <span key={`m-${i}`}>{viz.emoji}</span>
-                            ))}
-                            {Array.from({ length: 28 }).map((_, i) => (
-                              <span key={`m-dup-${i}`}>{viz.emoji}</span>
-                            ))}
+                            {Array.from({ length: 28 }).map((_, i) => <span key={`m-${i}`}>{viz.emoji}</span>)}
+                            {Array.from({ length: 28 }).map((_, i) => <span key={`m-dup-${i}`}>{viz.emoji}</span>)}
                           </div>
                           <div className="nape-marquee-row nape-marquee-reverse" style={{ animationDuration: "26s" }}>
-                            {Array.from({ length: 28 }).map((_, i) => (
-                              <span key={`mr-${i}`}>{viz.emoji}</span>
-                            ))}
-                            {Array.from({ length: 28 }).map((_, i) => (
-                              <span key={`mr-dup-${i}`}>{viz.emoji}</span>
-                            ))}
+                            {Array.from({ length: 28 }).map((_, i) => <span key={`mr-${i}`}>{viz.emoji}</span>)}
+                            {Array.from({ length: 28 }).map((_, i) => <span key={`mr-dup-${i}`}>{viz.emoji}</span>)}
                           </div>
                         </div>
                       ) : (
                         <div className="absolute inset-0 pointer-events-none opacity-10 overflow-hidden rounded-2xl">
                           <div className="w-full h-full flex flex-wrap items-start content-start gap-6 text-5xl md:text-6xl leading-none select-none py-6">
-                            {Array.from({ length: 40 }).map((_, i) => (
-                              <span key={i}>{viz.emoji}</span>
-                            ))}
+                            {Array.from({ length: 40 }).map((_, i) => <span key={i}>{viz.emoji}</span>)}
                           </div>
                         </div>
                       )
                     ) : null}
-
-                  <div className="relative">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className={`text-sm uppercase tracking-widest ${viz.totalLabel}`}>{totalLabelText}</div>
-                      <div className={`text-sm ${viz.totalMeta}`}>{viz.title} · {viz.sub}</div>
-                      {softNote ? <div className={`text-xs ${viz.totalMeta} mt-1`}>{softNote}</div> : null}
-                    </div>
-                    <div className={`text-sm ${viz.totalMeta}`}>{diceReady ? 'final · post-mitigation' : 'preview'}</div>
-                  </div>
-                  <div className="mt-2 flex items-end justify-between gap-4 overflow-visible">
-                    <div className="text-6xl md:text-7xl leading-none">{viz.emoji}</div>
-                    <div
-                      className={`${dmgSizeClass} font-extrabold ${viz.totalNumber} tabular-nums whitespace-nowrap text-left overflow-visible cursor-pointer`}
-                      title="Konami-style easter egg, (secret) click 5x"
-                      onClick={() => setSecretClicks((c) => c + 1)}
-                    >
-                      {dmgStr}
-                      {splitEnabled && activeSplitResults.length > 1 && allowDamageTotals && (
-                        <div className={`text-base font-bold mt-1 whitespace-nowrap ${theme === "dark" ? "text-amber-400/80" : "text-amber-700/80"}`}>
-                          {activeSplitResults.map((r, i) => r ? `T${i+1}: ${r.totalPostFnp}` : null).filter(Boolean).join(' · ')}
+                    <div className="relative">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className={`text-sm uppercase tracking-widest ${viz.totalLabel}`}>
+                            {allSplitStatsReady ? totalLabelText : "Partial Total · Soft"}
+                          </div>
+                          <div className={`text-sm ${viz.totalMeta}`}>{viz.title} · {viz.sub}</div>
+                          {!allSplitStatsReady
+                            ? <div className={`text-xs mt-1 ${theme === "dark" ? "text-red-400" : "text-red-500"}`}>Some targets missing stats — total is a minimum estimate</div>
+                            : softNote ? <div className={`text-xs ${viz.totalMeta} mt-1`}>{softNote}</div> : null}
                         </div>
-                      )}
-                    </div>
-                  {easterEgg ? (
-                    <div className={`mt-3 rounded-xl border p-3 text-center ${easterEgg?.style === "dbz" ? "border-yellow-300 bg-gradient-to-r from-purple-700 via-indigo-600 to-yellow-500 text-white" : "border-amber-300 bg-amber-50 text-gray-900"}`}>
-                      <div className={`text-lg font-extrabold ${easterEgg?.style === "dbz" ? "drop-shadow" : ""}`}>{easterEgg.title}</div>
-                      <div className="text-2xl">{easterEgg.emoji}</div>
-                      {easterEgg.note ? (
-                        <div className={`mt-1 text-xs ${easterEgg?.style === "dbz" ? "text-white/90 drop-shadow" : "text-gray-700"}`}>{easterEgg.note}</div>
+                        <div className={`text-sm ${viz.totalMeta}`}>{diceReady && allSplitStatsReady ? 'final · post-mitigation' : 'preview'}</div>
+                      </div>
+                      <div className="mt-3 grid gap-2" style={{ gridTemplateColumns: `repeat(${activeSplitResults.length + 1}, 1fr)` }}>
+                        {activeSplitResults.map((r, i) => {
+                          const tReady = splitTargetStatsReady[i];
+                          const tDmg = tReady && allowDamageTotals && r ? r.totalPostFnp : null;
+                          return (
+                            <div key={i} className={`rounded-xl p-2 border text-center ${theme === "dark" ? "bg-slate-900/60 border-gray-700" : "bg-white/60 border-gray-200"}`}>
+                              <div className={`text-xs uppercase tracking-widest mb-1 ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>🎯 T{i + 1}</div>
+                              {!tReady ? (
+                                <>
+                                  <div className={`text-2xl font-black ${theme === "dark" ? "text-gray-500" : "text-gray-400"}`}>?</div>
+                                  <div className={`text-xs ${theme === "dark" ? "text-red-400/80" : "text-red-500"}`}>stats missing</div>
+                                </>
+                              ) : (
+                                <>
+                                  <div className={`text-2xl font-black ${viz.totalNumber}`}>{tDmg ?? '–'}</div>
+                                  <div className={`text-xs ${viz.totalMeta}`}>dmg</div>
+                                </>
+                              )}
+                            </div>
+                          );
+                        })}
+                        <div
+                          className={`rounded-xl p-2 border text-center cursor-pointer ${theme === "dark" ? "bg-slate-900/60 border-gray-600" : "bg-white/60 border-gray-300"}`}
+                          onClick={() => setSecretClicks((c) => c + 1)}
+                          title="Konami-style easter egg, (secret) click 5x"
+                        >
+                          <div className={`text-xs uppercase tracking-widest mb-1 ${viz.totalLabel}`}>{viz.emoji} Total</div>
+                          <div className={`text-2xl font-black ${viz.totalNumber}`}>
+                            {allowDamageTotals ? `${dmgStr}${allSplitStatsReady ? '' : '+'}` : '–'}
+                          </div>
+                          <div className={`text-xs ${viz.totalMeta}`}>{allSplitStatsReady ? 'dmg' : 'soft'}</div>
+                        </div>
+                      </div>
+                      {easterEgg ? (
+                        <div className={`mt-3 rounded-xl border p-3 text-center ${easterEgg?.style === "dbz" ? "border-yellow-300 bg-gradient-to-r from-purple-700 via-indigo-600 to-yellow-500 text-white" : "border-amber-300 bg-amber-50 text-gray-900"}`}>
+                          <div className={`text-lg font-extrabold ${easterEgg?.style === "dbz" ? "drop-shadow" : ""}`}>{easterEgg.title}</div>
+                          <div className="text-2xl">{easterEgg.emoji}</div>
+                          {easterEgg.note ? <div className={`mt-1 text-xs ${easterEgg?.style === "dbz" ? "text-white/90 drop-shadow" : "text-gray-700"}`}>{easterEgg.note}</div> : null}
+                        </div>
                       ) : null}
                     </div>
-                  ) : null}
                   </div>
+                ) : (
+                  // ── Normal single-target view ──
+                  <div className={`mt-4 rounded-2xl border p-4 ${viz.totalPanel} relative overflow-visible inline-block w-max min-w-full`}>
+                    {statsReady ? (
+                      diceReady ? (
+                        <div className="absolute inset-0 pointer-events-none opacity-15 overflow-hidden rounded-2xl">
+                          <div className="nape-marquee-row" style={{ animationDuration: "24s" }}>
+                            {Array.from({ length: 28 }).map((_, i) => <span key={`m-${i}`}>{viz.emoji}</span>)}
+                            {Array.from({ length: 28 }).map((_, i) => <span key={`m-dup-${i}`}>{viz.emoji}</span>)}
+                          </div>
+                          <div className="nape-marquee-row nape-marquee-reverse" style={{ animationDuration: "26s" }}>
+                            {Array.from({ length: 28 }).map((_, i) => <span key={`mr-${i}`}>{viz.emoji}</span>)}
+                            {Array.from({ length: 28 }).map((_, i) => <span key={`mr-dup-${i}`}>{viz.emoji}</span>)}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="absolute inset-0 pointer-events-none opacity-10 overflow-hidden rounded-2xl">
+                          <div className="w-full h-full flex flex-wrap items-start content-start gap-6 text-5xl md:text-6xl leading-none select-none py-6">
+                            {Array.from({ length: 40 }).map((_, i) => <span key={i}>{viz.emoji}</span>)}
+                          </div>
+                        </div>
+                      )
+                    ) : null}
+                    <div className="relative">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className={`text-sm uppercase tracking-widest ${viz.totalLabel}`}>{totalLabelText}</div>
+                        <div className={`text-sm ${viz.totalMeta}`}>{viz.title} · {viz.sub}</div>
+                        {softNote ? <div className={`text-xs ${viz.totalMeta} mt-1`}>{softNote}</div> : null}
+                      </div>
+                      <div className={`text-sm ${viz.totalMeta}`}>{diceReady ? 'final · post-mitigation' : 'preview'}</div>
+                    </div>
+                    <div className="mt-2 flex items-end justify-between gap-4 overflow-visible">
+                      <div className="text-6xl md:text-7xl leading-none">{viz.emoji}</div>
+                      <div
+                        className={`${dmgSizeClass} font-extrabold ${viz.totalNumber} tabular-nums whitespace-nowrap text-left overflow-visible cursor-pointer`}
+                        title="Konami-style easter egg, (secret) click 5x"
+                        onClick={() => setSecretClicks((c) => c + 1)}
+                      >
+                        {dmgStr}
+                      </div>
+                    {easterEgg ? (
+                      <div className={`mt-3 rounded-xl border p-3 text-center ${easterEgg?.style === "dbz" ? "border-yellow-300 bg-gradient-to-r from-purple-700 via-indigo-600 to-yellow-500 text-white" : "border-amber-300 bg-amber-50 text-gray-900"}`}>
+                        <div className={`text-lg font-extrabold ${easterEgg?.style === "dbz" ? "drop-shadow" : ""}`}>{easterEgg.title}</div>
+                        <div className="text-2xl">{easterEgg.emoji}</div>
+                        {easterEgg.note ? (
+                          <div className={`mt-1 text-xs ${easterEgg?.style === "dbz" ? "text-white/90 drop-shadow" : "text-gray-700"}`}>{easterEgg.note}</div>
+                        ) : null}
+                      </div>
+                    ) : null}
+                    </div>
+                    </div>
                   </div>
-                </div>
+                )}
 
                 <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
                   <div className={`rounded-lg border p-2 ${theme === "dark" ? "bg-gray-900 border-gray-700 text-gray-100" : "bg-white border-gray-200 text-gray-900"}`}>
@@ -2561,30 +2649,6 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                 </div>
               </Section>
 
-              {/* ── Split Volley Summary (full-width, outside Results Section) ── */}
-              {splitEnabled && activeSplitResults.length > 1 && (
-                <div className={`rounded-xl border p-3 ${theme === "dark" ? "border-amber-700/50 bg-amber-900/20" : "border-amber-300 bg-amber-50"}`}>
-                  <div className={`text-xs font-extrabold uppercase tracking-widest mb-3 ${theme === "dark" ? "text-amber-400" : "text-amber-700"}`}>
-                    ⚔️ Split Volley Summary
-                  </div>
-                  <div className="grid gap-2 text-center" style={{ gridTemplateColumns: `repeat(${activeSplitResults.length + 1}, 1fr)` }}>
-                    {activeSplitResults.map((r, i) => r && (
-                      <div key={i} className={`rounded-lg p-2 border ${theme === "dark" ? "bg-slate-900 border-gray-700" : "bg-white border-gray-200"}`}>
-                        <div className={`text-xs uppercase tracking-widest mb-1 ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>🎯 Target {i + 1}</div>
-                        <div className={`text-2xl font-black ${theme === "dark" ? "text-amber-400" : "text-amber-700"}`}>{allowDamageTotals ? r.totalPostFnp : "–"}</div>
-                        <div className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>dmg</div>
-                      </div>
-                    ))}
-                    <div className={`rounded-lg p-2 border ${theme === "dark" ? "bg-amber-900/40 border-amber-700/50" : "bg-amber-100 border-amber-300"}`}>
-                      <div className={`text-xs uppercase tracking-widest mb-1 ${theme === "dark" ? "text-amber-400" : "text-amber-700"}`}>Total</div>
-                      <div className={`text-2xl font-black ${theme === "dark" ? "text-amber-300" : "text-amber-800"}`}>
-                        {allowDamageTotals ? activeSplitResults.reduce((s, r) => s + (r ? r.totalPostFnp : 0), 0) : "–"}
-                      </div>
-                      <div className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>dmg</div>
-                    </div>
-                  </div>
-                </div>
-              )}
 
               {showLog && (
                 <Section theme={theme} title="Step-by-step log">
