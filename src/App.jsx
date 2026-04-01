@@ -2397,12 +2397,17 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                                 label={<CounterLabel prefix="Wound reroll dice" need={woundRerollNeeded} entered={woundRerollEntered} remaining={woundRerollNeeded - woundRerollEntered} theme={theme} />}
                                 hint="Enter rerolled wound dice in order for each eligible reroll. Eligibility is determined from the initial wound rolls."
                               >
-                                <input
-                                  className={`w-full rounded border p-2 text-lg font-semibold ${hasWoundRerollCountError ? "border-red-500 ring-2 ring-red-200" : ""}`}
-                                  value={woundRerollRollsText}
-                                  onChange={(e) => setWoundRerollRollsText(e.target.value)}
-                                  placeholder="e.g. 5 4 ..."
-                                />
+                                <div className="flex gap-2">
+                                  <input
+                                    className={`flex-1 rounded border p-2 text-lg font-semibold ${hasWoundRerollCountError ? "border-red-500 ring-2 ring-red-200" : ""}`}
+                                    value={woundRerollRollsText}
+                                    onChange={(e) => setWoundRerollRollsText(e.target.value)}
+                                    placeholder="e.g. 5 4 ..."
+                                  />
+                                  <button type="button" title="Roll for me" disabled={woundRerollNeeded === 0}
+                                    onClick={() => setWoundRerollRollsText(rollDice(woundRerollNeeded, 6))}
+                                    className="rounded-lg bg-amber-500 hover:bg-amber-400 disabled:opacity-30 text-gray-950 px-3 font-bold text-lg transition">🎲</button>
+                                </div>
                               </Field>
                             ) : null}
 
