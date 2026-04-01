@@ -1235,6 +1235,9 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
       attacksTotal = rolls.reduce((s, d) => s + d, 0) + attackSpecNow.mod;
       await pause(120);
     }
+    const rfXNum = Math.max(0, Number(rapidFireX) || 0);
+    if (rapidFire && halfRange && rfXNum > 0) attacksTotal += rfXNum;
+    if (blastEnabled) attacksTotal += Math.floor(Number(blastUnitSize) || 0) / 5 | 0;
     if (attacksTotal <= 0) { setIsRollingAll(false); return; }
 
     // Phase 2: Hits
@@ -1271,12 +1274,12 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
       woundRollsFinal = Array.from({ length: normalHits }, () => Math.ceil(Math.random() * 6));
       await animateField(setWoundRollsText, woundRollsFinal, 6);
       if (twinLinked || rerollWoundOnes || rerollWoundFails) {
-        const eligible = woundRollsFinal.filter(d => (twinLinked || rerollWoundOnes) ? d === 1 : d + effectiveWoundMod < woundTarget);
+        const eligible = woundRollsFinal.filter(d => (rerollWoundOnes && !twinLinked) ? d === 1 : d + effectiveWoundMod < woundTarget);
         if (eligible.length > 0) {
           const rr = Array.from({ length: eligible.length }, () => Math.ceil(Math.random() * 6));
           await pause(80); await animateField(setWoundRerollRollsText, rr, 6);
           let ri = 0;
-          woundRollsFinal = woundRollsFinal.map(d => ((twinLinked || rerollWoundOnes) && d === 1) || (rerollWoundFails && d + effectiveWoundMod < woundTarget) ? (rr[ri++] ?? d) : d);
+          woundRollsFinal = woundRollsFinal.map(d => (rerollWoundOnes && !twinLinked && d === 1) || ((rerollWoundFails || twinLinked) && d + effectiveWoundMod < woundTarget) ? (rr[ri++] ?? d) : d);
         }
       }
       for (const d of woundRollsFinal) {
@@ -1438,6 +1441,9 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
       attacksTotal = rolls.reduce((s, d) => s + d, 0) + attackSpecNow.mod;
       await pause(120);
     }
+    const rfXNum = Math.max(0, Number(rapidFireX) || 0);
+    if (rapidFire && halfRange && rfXNum > 0) attacksTotal += rfXNum;
+    if (blastEnabled) attacksTotal += Math.floor(Number(blastUnitSize) || 0) / 5 | 0;
     if (attacksTotal <= 0) { setIsRollingWeapon(false); return; }
 
     // Phase 2: Hits
@@ -1472,13 +1478,13 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
       let woundRollsFinal = Array.from({ length: normalHits }, () => Math.ceil(Math.random() * 6));
       await animateField(setWoundRollsText, woundRollsFinal, 6);
       if (twinLinked || rerollWoundOnes || rerollWoundFails) {
-        const eligible = woundRollsFinal.filter(d => (twinLinked || rerollWoundOnes) ? d === 1 : d < woundTarget);
+        const eligible = woundRollsFinal.filter(d => (rerollWoundOnes && !twinLinked) ? d === 1 : d < woundTarget);
         if (eligible.length > 0) {
           const rr = Array.from({ length: eligible.length }, () => Math.ceil(Math.random() * 6));
           await pause(80); await animateField(setWoundRerollRollsText, rr, 6);
           let ri = 0;
           woundRollsFinal = woundRollsFinal.map(d =>
-            ((twinLinked || rerollWoundOnes) && d === 1) || (rerollWoundFails && d < woundTarget)
+            (rerollWoundOnes && !twinLinked && d === 1) || ((rerollWoundFails || twinLinked) && d < woundTarget)
               ? (rr[ri++] ?? d)
               : d
           );
@@ -1890,16 +1896,16 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                       />
                       <span className="font-semibold">Rapid Fire</span>
                     </label>
-                    <span className="text-xs text-gray-300">X:</span>
-                    <input
-                      className="w-16 rounded border p-2 text-sm"
-                      type="number"
-                      min={0}
-                      value={rapidFireX}
-                      onChange={(e) => setRapidFireX(e.target.value)}
-                      disabled={!rapidFire}
-                      title="Rapid Fire X: if the target is within half range, add X attacks to A before rolling hits."
-                    />
+                    {rapidFire && (
+                      <input
+                        className={`w-14 rounded border p-1 text-sm font-bold ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300 text-gray-900"}`}
+                        type="number"
+                        min={0}
+                        value={rapidFireX}
+                        onChange={(e) => setRapidFireX(e.target.value)}
+                        title="Rapid Fire X: if the target is within half range, add X attacks to A before rolling hits."
+                      />
+                    )}
                     <label className={`flex items-center gap-2 ${!rapidFire || Number(rapidFireX || 0) <= 0 ? "opacity-50" : ""}`}>
                       <input
                         type="checkbox"
@@ -1924,22 +1930,21 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                     <span className="text-xs text-gray-300">(crit hit auto-wounds)</span>
                   </label>
 
-                  <div className="flex items-center gap-2 self-start min-h-[40px]">
-                    <label className="flex items-center gap-2">
-                      <input type="checkbox" checked={sustainedHits} onChange={(e) => setSustainedHits(e.target.checked)} />
-                      <span className="font-semibold">Sustained Hits</span>
-                    </label>
-                    <span className="text-xs text-gray-300">X:</span>
-                    <input
-                      className="w-16 rounded border p-2 text-sm"
-                      type="number"
-                      min={1}
-                      value={sustainedHitsN}
-                      onChange={(e) => setSustainedHitsN(e.target.value)}
-                      disabled={!sustainedHits}
-                      title="Sustained Hits X: each critical hit adds X extra hits. Extra hits are not critical hits."
-                    />
-                  </div>
+                  <label className="flex items-center gap-2 min-h-[40px]">
+                    <input type="checkbox" checked={sustainedHits} onChange={(e) => setSustainedHits(e.target.checked)} />
+                    <span className="font-semibold">Sustained Hits</span>
+                    {sustainedHits && (
+                      <input
+                        className={`w-14 rounded border p-1 text-sm font-bold ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300 text-gray-900"}`}
+                        type="number"
+                        min={1}
+                        value={sustainedHitsN}
+                        onChange={(e) => setSustainedHitsN(e.target.value)}
+                        title="Sustained Hits X: each critical hit adds X extra hits. Extra hits are not critical hits."
+                      />
+                    )}
+                    <span className="text-xs text-gray-300">(crit hit = extra hits)</span>
+                  </label>
 
                   <label className="flex items-center gap-2 min-h-[40px]">
                     <input type="checkbox" checked={devastatingWounds} onChange={(e) => setDevastatingWounds(e.target.checked)} />
