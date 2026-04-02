@@ -261,21 +261,23 @@ function DisambiguationChips({ options, loading, onChoose, theme, label }) {
   );
 }
 
-function HistoryDropdown({ history, onFillWeapon, onFillTarget, theme }) {
+function HistoryDropdown({ history, onFillWeapon, onFillTarget, theme, mode }) {
   const [open, setOpen] = useState(false);
-  const [expanded, setExpanded] = useState(null); // id of expanded unit
-
-  if (history.history.length === 0) return null;
+  const [expanded, setExpanded] = useState(null);
 
   const isDark = theme === "dark";
+  const visibleEntries = mode === "defender"
+    ? history.history.filter(e => e.targetFields)
+    : history.history.filter(e => e.weapons.length > 0);
+
+  if (visibleEntries.length === 0) return null;
+
   const panelCls = `absolute z-50 mt-1 w-72 rounded-lg border shadow-lg p-2 flex flex-col gap-1 max-h-80 overflow-y-auto
     ${isDark ? "bg-gray-900 border-gray-700 text-gray-100" : "bg-white border-gray-200 text-gray-900"}`;
-  const unitCls = `flex items-center justify-between rounded px-2 py-1 text-sm cursor-pointer
-    ${isDark ? "hover:bg-gray-800" : "hover:bg-gray-100"}`;
+  const rowCls = `flex items-center rounded px-2 py-1 ${isDark ? "hover:bg-gray-800" : "hover:bg-gray-100"}`;
   const chipCls = `rounded px-2 py-0.5 text-xs font-medium cursor-pointer
     ${isDark ? "bg-gray-700 hover:bg-amber-600 text-gray-200" : "bg-gray-100 hover:bg-amber-200 text-gray-800"}`;
-  const targetChipCls = `rounded px-2 py-0.5 text-xs font-medium cursor-pointer
-    ${isDark ? "bg-blue-900 hover:bg-blue-700 text-blue-200" : "bg-blue-50 hover:bg-blue-200 text-blue-800"}`;
+  const removeBtnCls = `ml-2 flex-shrink-0 text-xs px-1 rounded ${isDark ? "hover:bg-red-900 text-gray-400 hover:text-red-300" : "hover:bg-red-100 text-gray-400 hover:text-red-600"}`;
 
   return (
     <div className="relative">
@@ -290,54 +292,52 @@ function HistoryDropdown({ history, onFillWeapon, onFillTarget, theme }) {
 
       {open && (
         <div className={panelCls}>
-          {history.history.map(entry => (
-            <div key={entry.id}>
-              <div className="flex items-center">
+          {mode === "defender" ? (
+            // Defender: flat list — clicking unit name fills target immediately
+            visibleEntries.map(entry => (
+              <div key={entry.id} className={rowCls}>
                 <button
                   type="button"
-                  className={`${unitCls} flex-1 text-left`}
-                  onClick={() => setExpanded(expanded === entry.id ? null : entry.id)}
+                  className="flex-1 text-left text-sm font-medium truncate"
+                  onClick={() => { onFillTarget(entry.targetFields); setOpen(false); }}
                 >
-                  <span className="font-medium truncate">{entry.unitName}</span>
+                  {entry.unitName}
                 </button>
-                <button
-                  type="button"
-                  className={`ml-2 text-xs px-1 rounded ${isDark ? "hover:bg-red-900 text-gray-400 hover:text-red-300" : "hover:bg-red-100 text-gray-400 hover:text-red-600"}`}
-                  onClick={() => history.removeEntry(entry.id)}
-                  title="Remove"
-                >✕</button>
+                <button type="button" className={removeBtnCls} onClick={() => history.removeEntry(entry.id)} title="Remove">✕</button>
               </div>
-
-              {expanded === entry.id && (
-                <div className="flex flex-wrap gap-1 px-2 pb-1">
-                  {entry.targetFields && (
-                    <button
-                      type="button"
-                      className={targetChipCls}
-                      onClick={() => { onFillTarget(entry.targetFields); setOpen(false); }}
-                      title="Fill target fields with this unit's stats"
-                    >
-                      Use as target
-                    </button>
-                  )}
-                  {entry.weapons.map(w => (
-                    <button
-                      key={w.label}
-                      type="button"
-                      className={chipCls}
-                      onClick={() => { onFillWeapon(w.fields); setOpen(false); }}
-                      title={`Fill weapon fields: ${w.label}`}
-                    >
-                      {w.label}
-                    </button>
-                  ))}
-                  {!entry.targetFields && entry.weapons.length === 0 && (
-                    <span className={`text-xs ${isDark ? "text-gray-500" : "text-gray-400"}`}>No data cached yet</span>
-                  )}
+            ))
+          ) : (
+            // Attacker: expand unit to see weapon chips
+            visibleEntries.map(entry => (
+              <div key={entry.id}>
+                <div className={rowCls}>
+                  <button
+                    type="button"
+                    className="flex-1 text-left text-sm font-medium truncate"
+                    onClick={() => setExpanded(expanded === entry.id ? null : entry.id)}
+                  >
+                    {entry.unitName}
+                  </button>
+                  <button type="button" className={removeBtnCls} onClick={() => history.removeEntry(entry.id)} title="Remove">✕</button>
                 </div>
-              )}
-            </div>
-          ))}
+                {expanded === entry.id && (
+                  <div className="flex flex-wrap gap-1 px-2 pb-1">
+                    {entry.weapons.map(w => (
+                      <button
+                        key={w.label}
+                        type="button"
+                        className={chipCls}
+                        onClick={() => { onFillWeapon(w.fields); setOpen(false); }}
+                        title={`Fill weapon fields: ${w.label}`}
+                      >
+                        {w.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))
+          )}
 
           <button
             type="button"
@@ -1847,6 +1847,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                       onFillWeapon={(fields) => dispatch({ type: "LOAD_WEAPON", weapon: fields })}
                       onFillTarget={(fields) => dispatch({ type: "LOAD_TARGET", target: fields })}
                       theme={theme}
+                      mode="attacker"
                     />
                   </div>
                   {unitLookup.attackerError && <span className="text-xs text-red-400">{unitLookup.attackerError}</span>}
@@ -2175,6 +2176,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                       onFillWeapon={(fields) => dispatch({ type: "LOAD_WEAPON", weapon: fields })}
                       onFillTarget={(fields) => dispatch({ type: "LOAD_TARGET", target: fields })}
                       theme={theme}
+                      mode="defender"
                     />
                   </div>
                   {unitLookup.defenderError && <span className="text-xs text-red-400">{unitLookup.defenderError}</span>}

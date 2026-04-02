@@ -26,6 +26,8 @@ export function useUnitLookup(getApiKey, history) {
   const [defenderPageCache, setDefenderPageCache] = useState(null);
   // Cache target fields captured during attacker disambiguation
   const [attackerTargetFieldsCache, setAttackerTargetFieldsCache] = useState(null);
+  // Cache pre-fetched weapon fields from all_stats response (label → fields)
+  const [attackerWeaponsCache, setAttackerWeaponsCache] = useState(null);
 
   const fillAttacker = useCallback(async (dispatch) => {
     setAttackerLoading(true);
@@ -33,14 +35,30 @@ export function useUnitLookup(getApiKey, history) {
     setAttackerOptions(null);
     setAttackerPageCache(null);
     setAttackerTargetFieldsCache(null);
+    setAttackerWeaponsCache(null);
     try {
       const apiKey = getApiKey();
       const result = await fetchAttackerStats(attackerText, apiKey);
-      if (result.type === "disambiguation") {
+
+      if (result.type === "all_stats") {
+        // All weapon stats returned at once — cache everything immediately
+        const weaponMap = {};
+        result.weapons.forEach(w => { weaponMap[w.label] = w.fields; });
+        setAttackerWeaponsCache(weaponMap);
+        setAttackerOptions(result.weapons.map(w => w.label));
+        setAttackerPageCache(result.pageCache);
+        setAttackerTargetFieldsCache(result.targetFields ?? null);
+        if (history) {
+          if (result.targetFields) {
+            history.addOrUpdateEntry(attackerText, attackerText, result.targetFields, result.pageCache?.wahapediaUrl ?? "");
+          }
+          result.weapons.forEach(w => history.addWeapon(attackerText, w.label, w.fields));
+        }
+      } else if (result.type === "disambiguation") {
+        // Fallback: old options format (names only)
         setAttackerOptions(result.options);
         setAttackerPageCache(result.pageCache);
         setAttackerTargetFieldsCache(result.targetFields ?? null);
-        // Save target data to history immediately if we have it
         if (result.targetFields && history) {
           history.addOrUpdateEntry(attackerText, attackerText, result.targetFields, result.pageCache?.wahapediaUrl ?? "");
         }
@@ -48,8 +66,6 @@ export function useUnitLookup(getApiKey, history) {
         const { fields, targetFields, meta } = result;
         dispatch({ type: "LOAD_WEAPON", weapon: fields });
         setAttackerMeta(meta);
-        setAttackerOptions(null);
-        setAttackerPageCache(null);
         setLastFilled("attacker");
         if (history) {
           if (targetFields) history.addOrUpdateEntry(attackerText, meta.resolvedName, targetFields, meta.wahapediaUrl ?? "");
@@ -68,6 +84,18 @@ export function useUnitLookup(getApiKey, history) {
     setAttackerLoading(true);
     setAttackerError(null);
     try {
+      // Use pre-fetched weapon data if available (all_stats path — no API call needed)
+      if (attackerWeaponsCache && attackerWeaponsCache[choice]) {
+        const fields = attackerWeaponsCache[choice];
+        dispatch({ type: "LOAD_WEAPON", weapon: fields });
+        setAttackerMeta({ resolvedName: choice, wahapediaUrl: attackerPageCache?.wahapediaUrl ?? "", source: "cache" });
+        setLastFilled("attacker");
+        setAttackerOptions(null);
+        setAttackerPageCache(null);
+        setAttackerWeaponsCache(null);
+        return;
+      }
+      // Fallback: API call (old disambiguation path)
       const apiKey = getApiKey();
       const result = await fetchAttackerStatsFromPage(attackerText, choice, attackerPageCache, apiKey);
       const { fields, targetFields, meta } = result;
@@ -87,7 +115,7 @@ export function useUnitLookup(getApiKey, history) {
     } finally {
       setAttackerLoading(false);
     }
-  }, [attackerText, attackerPageCache, attackerTargetFieldsCache, getApiKey, history]);
+  }, [attackerText, attackerPageCache, attackerTargetFieldsCache, attackerWeaponsCache, getApiKey, history]);
 
   const fillDefender = useCallback(async (dispatch) => {
     setDefenderLoading(true);
