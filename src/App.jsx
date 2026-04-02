@@ -1937,33 +1937,13 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                         <input className={`flex-1 rounded border p-2 text-xl font-bold ${damageFixed && !isNum(damageValue) ? "border-red-500 ring-2 ring-red-200" : ""} ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300 text-gray-900"}`} type="number" value={damageValue} onChange={(e) => setDamageValue(e.target.value)} placeholder="e.g. 2" />
                       ) : (
                         <input
-                          className={`flex-1 rounded border p-2 text-lg font-semibold`}
-                          placeholder="e.g. D3, D6, D3+1"
+                          className={`flex-1 rounded border p-2 text-lg font-semibold ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300 text-gray-900"}`}
+                          placeholder="e.g. D3, D6, D6+1"
                           value={damageValue}
                           onChange={(e) => setDamageValue(e.target.value.replace(/[^0-9dD+]/g, "").toUpperCase())}
                         />
                       )}
                     </div>
-                    {!damageFixed && (
-                      <div className="flex gap-2">
-                        <input
-                          className={`flex-1 rounded border p-2 text-lg font-semibold ${!damageFixed && damageRolls.trim() === "" ? "border-red-500 ring-2 ring-red-200" : ""}`}
-                          placeholder={`Roll 1 die per failed save${parseDiceSpec(damageValue).hasDie ? ` (${damageValue})` : ""}`}
-                          value={damageRolls}
-                          onChange={(e) => setDamageRolls(e.target.value)}
-                        />
-                        <button
-                          type="button"
-                          title="Roll damage dice"
-                          disabled={!parseDiceSpec(damageValue).hasDie || saveNeeded === 0}
-                          onClick={() => {
-                            const sp = parseDiceSpec(damageValue);
-                            if (sp.hasDie) setDamageRolls(rollDice(saveNeeded, sp.sides));
-                          }}
-                          className="rounded-lg bg-amber-500 hover:bg-amber-400 disabled:opacity-30 text-gray-950 px-3 font-bold text-lg transition"
-                        >🎲</button>
-                      </div>
-                    )}
                   </div>
                 </InlineStatField>
               </div>
@@ -2535,6 +2515,41 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                                   </div>
                                 </Field>
                               </>
+
+                            {!damageFixed && (
+                              <Field
+                                label={
+                                  <CounterLabel
+                                    prefix={`Damage rolls${parseDiceSpec(damageValue).mod > 0 ? ` (+${parseDiceSpec(damageValue).mod} added after)` : ""}`}
+                                    need={activeComputed.failedSavesEffective}
+                                    entered={parseDiceList(damageRolls).length}
+                                    remaining={Math.max(0, activeComputed.failedSavesEffective - parseDiceList(damageRolls).length)}
+                                    theme={theme}
+                                  />
+                                }
+                                hint={`One die per failed save${parseDiceSpec(damageValue).mod > 0 ? `. +${parseDiceSpec(damageValue).mod} modifier is added per die automatically` : ""}.`}
+                                theme={theme}
+                              >
+                                <div className="flex gap-2">
+                                  <input
+                                    className={`flex-1 rounded border p-2 text-lg font-semibold ${
+                                      activeComputed.failedSavesEffective > 0 && parseDiceList(damageRolls).length !== activeComputed.failedSavesEffective
+                                        ? "border-red-500 ring-2 ring-red-200" : ""
+                                    }`}
+                                    value={damageRolls}
+                                    onChange={(e) => setDamageRolls(e.target.value)}
+                                    placeholder="e.g. 3 5 2 ..."
+                                  />
+                                  <button type="button" title="Roll for me"
+                                    disabled={activeComputed.failedSavesEffective === 0}
+                                    onClick={() => {
+                                      const sp = parseDiceSpec(damageValue);
+                                      setDamageRolls(rollDice(activeComputed.failedSavesEffective, sp.sides));
+                                    }}
+                                    className="rounded-lg bg-amber-500 hover:bg-amber-400 disabled:opacity-30 text-gray-950 px-3 font-bold text-lg transition">🎲</button>
+                                </div>
+                              </Field>
+                            )}
 
                             {fnpEnabled ? (
                             <Field
