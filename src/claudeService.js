@@ -240,6 +240,7 @@ export async function fetchAttackerStats(description, apiKey) {
     ? `Unit: ${description}\n\nWahapedia datasheet:\n${pageContent}`
     : description;
 
+  // Promise.all: [0] weapon extraction, [1] best-effort target extraction (never rejects)
   const [weaponMsg, targetResult] = await Promise.all([
     client.messages.create({
       model: CLAUDE_MODEL,
@@ -291,6 +292,7 @@ export async function fetchAttackerStatsFromPage(description, chosenWeapon, page
     ? `Unit: ${description}\n\nWahapedia datasheet:\n${pageText}`
     : description;
 
+  // Promise.all: [0] weapon extraction, [1] best-effort target extraction (never rejects)
   const [weaponMsg, targetResult] = await Promise.all([
     client.messages.create({
       model: CLAUDE_MODEL,

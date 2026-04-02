@@ -163,6 +163,65 @@ describe("fromPage helper exports", () => {
   });
 });
 
+describe("fetchAttackerStatsFromPage — parallel target extraction", () => {
+  afterEach(() => vi.resetAllMocks());
+
+  const pageCache = {
+    pageText: "some datasheet text",
+    wahapediaUrl: "https://wahapedia.ru/wh40k10ed/factions/t-au-empire/Crisis-Battlesuits",
+    source: "live",
+    fetchedAt: "2026-04-01T00:00:00.000Z",
+  };
+
+  it("returns targetFields when the parallel defender call succeeds", async () => {
+    // No resolveWahapediaPath call — goes straight to Promise.all
+    // Call 1: weapon extraction
+    // Call 2: defender extraction
+    const mockCreate = vi.fn()
+      .mockResolvedValueOnce({ content: [{ text: JSON.stringify({
+        type: "stats", resolvedName: "Crisis Suit with Plasma Rifle",
+        attacks: 2, bs: 4, strength: 7, ap: -2, damage: 2,
+      })}]})
+      .mockResolvedValueOnce({ content: [{ text: JSON.stringify({
+        type: "stats", resolvedName: "Crisis Suit",
+        toughness: 5, save: 3, invulnSave: 5,
+      })}]});
+    vi.mocked(Anthropic).mockImplementation(function() {
+      return { messages: { create: mockCreate } };
+    });
+
+    const { fetchAttackerStatsFromPage } = await import("./claudeService.js");
+    const result = await fetchAttackerStatsFromPage(
+      "crisis battlesuits", "Plasma Rifle", pageCache, "test-key"
+    );
+
+    expect(result.type).toBe("stats");
+    expect(result.targetFields).toMatchObject({ toughness: "5", armorSave: "3", invulnSave: "5" });
+  });
+
+  it("returns targetFields: null when the defender call fails", async () => {
+    // Call 1: weapon extraction succeeds
+    // Call 2: defender extraction rejects
+    const mockCreate = vi.fn()
+      .mockResolvedValueOnce({ content: [{ text: JSON.stringify({
+        type: "stats", resolvedName: "Crisis Suit with Missile Pod",
+        attacks: 2, bs: 4, strength: 7, ap: -2, damage: "D3",
+      })}]})
+      .mockRejectedValueOnce(new Error("timeout"));
+    vi.mocked(Anthropic).mockImplementation(function() {
+      return { messages: { create: mockCreate } };
+    });
+
+    const { fetchAttackerStatsFromPage } = await import("./claudeService.js");
+    const result = await fetchAttackerStatsFromPage(
+      "crisis battlesuits", "Missile Pod", pageCache, "test-key"
+    );
+
+    expect(result.type).toBe("stats");
+    expect(result.targetFields).toBeNull();
+  });
+});
+
 describe("fetchAttackerStats — parallel target extraction", () => {
   afterEach(() => vi.resetAllMocks());
 
