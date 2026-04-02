@@ -1,5 +1,8 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
+import Anthropic from "@anthropic-ai/sdk";
 import { mapToWeaponFields, mapToTargetFields } from "./claudeService.js";
+
+vi.mock("@anthropic-ai/sdk");
 
 describe("mapToWeaponFields", () => {
   it("maps numeric attacker fields from Claude JSON", () => {
@@ -157,5 +160,79 @@ describe("fromPage helper exports", () => {
   it("fetchDefenderStatsFromPage is exported", async () => {
     const mod = await import("./claudeService.js");
     expect(typeof mod.fetchDefenderStatsFromPage).toBe("function");
+  });
+});
+
+describe("fetchAttackerStats — parallel target extraction", () => {
+  afterEach(() => vi.resetAllMocks());
+
+  it("returns targetFields when defender call succeeds", async () => {
+    // Call 1: resolveWahapediaPath (returns "unknown" → null, skips page fetch)
+    // Call 2: weapon extraction (via Promise.all)
+    // Call 3: defender extraction (via Promise.all)
+    const mockCreate = vi.fn()
+      .mockResolvedValueOnce({ content: [{ text: "unknown" }] })
+      .mockResolvedValueOnce({ content: [{ text: JSON.stringify({
+        type: "stats", resolvedName: "Crisis Suit with Plasma Rifle",
+        attacks: 2, bs: 4, strength: 7, ap: -2, damage: 2,
+      })}]})
+      .mockResolvedValueOnce({ content: [{ text: JSON.stringify({
+        type: "stats", resolvedName: "Crisis Suit",
+        toughness: 5, save: 3,
+      })}]});
+    vi.mocked(Anthropic).mockImplementation(function() {
+      return { messages: { create: mockCreate } };
+    });
+
+    const { fetchAttackerStats } = await import("./claudeService.js");
+    const result = await fetchAttackerStats("crisis suit plasma", "test-key");
+
+    expect(result.type).toBe("stats");
+    expect(result.targetFields).toMatchObject({ toughness: "5", armorSave: "3" });
+  });
+
+  it("returns targetFields: null when defender call fails gracefully", async () => {
+    // Call 1: resolveWahapediaPath → "unknown" → null
+    // Call 2: weapon extraction
+    // Call 3: defender extraction → rejects
+    const mockCreate = vi.fn()
+      .mockResolvedValueOnce({ content: [{ text: "unknown" }] })
+      .mockResolvedValueOnce({ content: [{ text: JSON.stringify({
+        type: "stats", resolvedName: "Crisis Suit",
+        attacks: 2, bs: 4, strength: 7, ap: -2, damage: 2,
+      })}]})
+      .mockRejectedValueOnce(new Error("timeout"));
+    vi.mocked(Anthropic).mockImplementation(function() {
+      return { messages: { create: mockCreate } };
+    });
+
+    const { fetchAttackerStats } = await import("./claudeService.js");
+    const result = await fetchAttackerStats("crisis suit", "test-key");
+
+    expect(result.type).toBe("stats");
+    expect(result.targetFields).toBeNull();
+  });
+
+  it("includes targetFields in disambiguation result", async () => {
+    // Call 1: resolveWahapediaPath → "unknown" → null
+    // Call 2: weapon extraction → options (disambiguation)
+    // Call 3: defender extraction → stats
+    const mockCreate = vi.fn()
+      .mockResolvedValueOnce({ content: [{ text: "unknown" }] })
+      .mockResolvedValueOnce({ content: [{ text: JSON.stringify({
+        type: "options", options: ["Plasma Rifle", "Missile Pod"],
+      })}]})
+      .mockResolvedValueOnce({ content: [{ text: JSON.stringify({
+        type: "stats", toughness: 5, save: 3,
+      })}]});
+    vi.mocked(Anthropic).mockImplementation(function() {
+      return { messages: { create: mockCreate } };
+    });
+
+    const { fetchAttackerStats } = await import("./claudeService.js");
+    const result = await fetchAttackerStats("crisis suit", "test-key");
+
+    expect(result.type).toBe("disambiguation");
+    expect(result.targetFields).toMatchObject({ toughness: "5", armorSave: "3" });
   });
 });

@@ -233,22 +233,40 @@ export async function fetchAttackerStats(description, apiKey) {
   const client = new Anthropic({ apiKey, dangerouslyAllowBrowser: true });
   const { pageContent, source, wahapediaUrl, fetchedAt } = await resolveAndFetch(description, client);
 
-  const userContent = pageContent
+  const weaponContent = pageContent
     ? `Unit/weapon: ${description}\n\nWahapedia datasheet:\n${pageContent}`
     : description;
-  const msg = await client.messages.create({
-    model: CLAUDE_MODEL,
-    max_tokens: 512,
-    temperature: 0,
-    system: ATTACKER_SYSTEM_PROMPT,
-    messages: [{ role: "user", content: userContent }],
-  });
-  const raw = parseJson(msg.content[0].text);
+  const targetContent = pageContent
+    ? `Unit: ${description}\n\nWahapedia datasheet:\n${pageContent}`
+    : description;
+
+  const [weaponMsg, targetResult] = await Promise.all([
+    client.messages.create({
+      model: CLAUDE_MODEL,
+      max_tokens: 512,
+      temperature: 0,
+      system: ATTACKER_SYSTEM_PROMPT,
+      messages: [{ role: "user", content: weaponContent }],
+    }),
+    client.messages.create({
+      model: CLAUDE_MODEL,
+      max_tokens: 256,
+      temperature: 0,
+      system: DEFENDER_SYSTEM_PROMPT,
+      messages: [{ role: "user", content: targetContent }],
+    }).then(msg => {
+      const raw = parseJson(msg.content[0].text);
+      return raw.type === "options" ? null : mapToTargetFields(raw);
+    }).catch(() => null),
+  ]);
+
+  const raw = parseJson(weaponMsg.content[0].text);
 
   if (raw.type === "options") {
     return {
       type: "disambiguation",
       options: raw.options,
+      targetFields: targetResult,
       pageCache: { pageText: pageContent, wahapediaUrl, source, fetchedAt },
     };
   }
@@ -256,6 +274,7 @@ export async function fetchAttackerStats(description, apiKey) {
   return {
     type: "stats",
     fields: mapToWeaponFields(raw),
+    targetFields: targetResult,
     meta: buildMeta(source, wahapediaUrl, fetchedAt, raw.resolvedName),
   };
 }
@@ -265,24 +284,41 @@ export async function fetchAttackerStatsFromPage(description, chosenWeapon, page
   const client = new Anthropic({ apiKey, dangerouslyAllowBrowser: true });
   const { pageText, wahapediaUrl, source, fetchedAt } = pageCache;
 
-  const userContent = pageText
+  const weaponContent = pageText
     ? `Unit/weapon: ${description} — specifically the ${chosenWeapon}\n\nWahapedia datasheet:\n${pageText}`
     : `${description} — specifically the ${chosenWeapon}`;
+  const targetContent = pageText
+    ? `Unit: ${description}\n\nWahapedia datasheet:\n${pageText}`
+    : description;
 
-  const msg = await client.messages.create({
-    model: CLAUDE_MODEL,
-    max_tokens: 512,
-    temperature: 0,
-    system: ATTACKER_SYSTEM_PROMPT,
-    messages: [{ role: "user", content: userContent }],
-  });
-  const raw = parseJson(msg.content[0].text);
+  const [weaponMsg, targetResult] = await Promise.all([
+    client.messages.create({
+      model: CLAUDE_MODEL,
+      max_tokens: 512,
+      temperature: 0,
+      system: ATTACKER_SYSTEM_PROMPT,
+      messages: [{ role: "user", content: weaponContent }],
+    }),
+    client.messages.create({
+      model: CLAUDE_MODEL,
+      max_tokens: 256,
+      temperature: 0,
+      system: DEFENDER_SYSTEM_PROMPT,
+      messages: [{ role: "user", content: targetContent }],
+    }).then(msg => {
+      const raw = parseJson(msg.content[0].text);
+      return raw.type === "options" ? null : mapToTargetFields(raw);
+    }).catch(() => null),
+  ]);
+
+  const raw = parseJson(weaponMsg.content[0].text);
   if (raw.type === "options") {
     throw new Error(`Unexpected disambiguation response for "${chosenWeapon}" — please try a more specific description`);
   }
   return {
     type: "stats",
     fields: mapToWeaponFields(raw),
+    targetFields: targetResult,
     meta: buildMeta(source, wahapediaUrl, fetchedAt, raw.resolvedName),
   };
 }
