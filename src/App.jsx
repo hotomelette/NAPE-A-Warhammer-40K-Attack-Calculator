@@ -2478,8 +2478,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                               </Field>
                             ) : null}
 
-                            {woundNeeded > 0 && (
-                              <Field
+                            <Field
                                 label={<CounterLabel prefix="Wound rolls" need={woundNeeded} entered={woundEntered} remaining={woundNeeded - woundEntered} theme={theme} />}
                                 hint={`One die per hit (incl. Sustained bonus hits). Lethal Hits skip directly to saves — auto-wounds this volley: ${activeComputed.autoWoundsFromLethal}. Count must match the wound roll pool.`}
                               >
@@ -2495,7 +2494,6 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                                     className="rounded-lg bg-amber-500 hover:bg-amber-400 disabled:opacity-30 text-gray-950 px-3 font-bold text-lg transition">🎲</button>
                                 </div>
                               </Field>
-                            )}
 
                             {(rerollWoundOnes || rerollWoundFails || twinLinked) && woundNeeded > 0 ? (
                               <Field
@@ -2516,9 +2514,8 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                               </Field>
                             ) : null}
 
-                            {saveNeeded > 0 && (
-                              <>
-                                <div className={`text-sm font-extrabold tracking-wide mt-2 mb-0 uppercase ${theme === "dark" ? "text-amber-300/80" : "text-amber-700/80"}`}>🎯 Target 1 — Dice</div>
+                            <>
+                                {splitEnabled && <div className={`text-sm font-extrabold tracking-wide mt-2 mb-0 uppercase ${theme === "dark" ? "text-amber-300/80" : "text-amber-700/80"}`}>🎯 Target 1 — Dice</div>}
                                 <Field
                                   label={<CounterLabel prefix={splitEnabled ? "Save rolls (T1)" : "Save rolls"} need={saveNeeded} entered={saveEntered} remaining={saveNeeded - saveEntered} />}
                                   hint="One die per savable wound. Mortal wounds (Devastating) bypass saves and go straight to damage. Count must equal wounds allocated to this target."
@@ -2536,7 +2533,6 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                                   </div>
                                 </Field>
                               </>
-                            )}
 
                             {fnpNeeded > 0 ? (
                             <Field
