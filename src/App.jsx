@@ -5,6 +5,7 @@ import { parseDiceList, parseDiceSpec, clampModPlusMinusOne, rollDice, chooseSav
 import { appReducer, initialState } from "./appReducer.js";
 import { SettingsPanel, getApiKey } from "./SettingsPanel.jsx";
 import { useUnitLookup } from "./useUnitLookup.js";
+import { useUnitHistory } from "./useUnitHistory.js";
 
 const APP_NAME = "NAPE – A Warhammer 40K Attack Calculator";
 const APP_VERSION = "5.19";
@@ -256,6 +257,91 @@ function DisambiguationChips({ options, loading, onChoose, theme, label }) {
           </button>
         ))}
       </div>
+    </div>
+  );
+}
+
+function HistoryDropdown({ history, onFillWeapon, onFillTarget, theme }) {
+  const [open, setOpen] = useState(false);
+  const [expanded, setExpanded] = useState(null); // id of expanded unit
+
+  if (history.history.length === 0) return null;
+
+  const isDark = theme === "dark";
+  const panelCls = `absolute z-50 mt-1 w-72 rounded-lg border shadow-lg p-2 flex flex-col gap-1 max-h-80 overflow-y-auto
+    ${isDark ? "bg-gray-900 border-gray-700 text-gray-100" : "bg-white border-gray-200 text-gray-900"}`;
+  const unitCls = `flex items-center justify-between rounded px-2 py-1 text-sm cursor-pointer
+    ${isDark ? "hover:bg-gray-800" : "hover:bg-gray-100"}`;
+  const chipCls = `rounded px-2 py-0.5 text-xs font-medium cursor-pointer
+    ${isDark ? "bg-gray-700 hover:bg-amber-600 text-gray-200" : "bg-gray-100 hover:bg-amber-200 text-gray-800"}`;
+  const targetChipCls = `rounded px-2 py-0.5 text-xs font-medium cursor-pointer
+    ${isDark ? "bg-blue-900 hover:bg-blue-700 text-blue-200" : "bg-blue-50 hover:bg-blue-200 text-blue-800"}`;
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className={`rounded border px-2 py-1 text-xs font-semibold transition
+          ${isDark ? "border-gray-600 bg-gray-800 hover:bg-gray-700 text-gray-300" : "border-gray-300 bg-gray-50 hover:bg-gray-100 text-gray-600"}`}
+      >
+        Recent {open ? "▴" : "▾"}
+      </button>
+
+      {open && (
+        <div className={panelCls}>
+          {history.history.map(entry => (
+            <div key={entry.id}>
+              <div className={unitCls} onClick={() => setExpanded(expanded === entry.id ? null : entry.id)}>
+                <span className="font-medium truncate flex-1">{entry.unitName}</span>
+                <button
+                  type="button"
+                  className={`ml-2 text-xs px-1 rounded ${isDark ? "hover:bg-red-900 text-gray-400 hover:text-red-300" : "hover:bg-red-100 text-gray-400 hover:text-red-600"}`}
+                  onClick={(e) => { e.stopPropagation(); history.removeEntry(entry.id); }}
+                  title="Remove"
+                >✕</button>
+              </div>
+
+              {expanded === entry.id && (
+                <div className="flex flex-wrap gap-1 px-2 pb-1">
+                  {entry.targetFields && (
+                    <button
+                      type="button"
+                      className={targetChipCls}
+                      onClick={() => { onFillTarget(entry.targetFields); setOpen(false); }}
+                      title="Fill target fields with this unit's stats"
+                    >
+                      Use as target
+                    </button>
+                  )}
+                  {entry.weapons.map(w => (
+                    <button
+                      key={w.label}
+                      type="button"
+                      className={chipCls}
+                      onClick={() => { onFillWeapon(w.fields); setOpen(false); }}
+                      title={`Fill weapon fields: ${w.label}`}
+                    >
+                      {w.label}
+                    </button>
+                  ))}
+                  {!entry.targetFields && entry.weapons.length === 0 && (
+                    <span className={`text-xs ${isDark ? "text-gray-500" : "text-gray-400"}`}>No data cached yet</span>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+
+          <button
+            type="button"
+            className={`mt-1 text-xs text-center py-1 rounded ${isDark ? "text-gray-500 hover:text-red-400 hover:bg-gray-800" : "text-gray-400 hover:text-red-500 hover:bg-gray-50"}`}
+            onClick={() => { history.clearAll(); setOpen(false); }}
+          >
+            Clear all history
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -650,7 +736,8 @@ function AttackCalculator() {
   // State — consolidated via useReducer
   // ─────────────────────────────────────────
   const [state, dispatch] = useReducer(appReducer, initialState);
-  const unitLookup = useUnitLookup(getApiKey);
+  const unitHistory = useUnitHistory();
+  const unitLookup = useUnitLookup(getApiKey, unitHistory);
   const [hasApiKey, setHasApiKey] = useState(() => !!getApiKey());
   useEffect(() => {
     const sync = () => setHasApiKey(!!getApiKey());
@@ -1749,6 +1836,12 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                       className={`flex-1 rounded border px-2 py-1 text-sm ${theme === "dark" ? "bg-gray-800 border-gray-600 text-gray-100 placeholder-gray-500" : "bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-400"}`}
                     />
                     <FillButton label="Fill" loading={unitLookup.attackerLoading} disabled={!unitLookup.attackerText.trim()} hasKey={hasApiKey} onClick={() => unitLookup.fillAttacker(dispatch)} theme={theme} />
+                    <HistoryDropdown
+                      history={unitHistory}
+                      onFillWeapon={(fields) => dispatch({ type: "LOAD_WEAPON", weapon: fields })}
+                      onFillTarget={(fields) => dispatch({ type: "LOAD_TARGET", target: fields })}
+                      theme={theme}
+                    />
                   </div>
                   {unitLookup.attackerError && <span className="text-xs text-red-400">{unitLookup.attackerError}</span>}
                   {unitLookup.attackerOptions
@@ -2071,6 +2164,12 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                       className={`flex-1 rounded border px-2 py-1 text-sm ${theme === "dark" ? "bg-gray-800 border-gray-600 text-gray-100 placeholder-gray-500" : "bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-400"}`}
                     />
                     <FillButton label="Fill" loading={unitLookup.defenderLoading} disabled={!unitLookup.defenderText.trim()} hasKey={hasApiKey} onClick={() => unitLookup.fillDefender(dispatch)} theme={theme} />
+                    <HistoryDropdown
+                      history={unitHistory}
+                      onFillWeapon={(fields) => dispatch({ type: "LOAD_WEAPON", weapon: fields })}
+                      onFillTarget={(fields) => dispatch({ type: "LOAD_TARGET", target: fields })}
+                      theme={theme}
+                    />
                   </div>
                   {unitLookup.defenderError && <span className="text-xs text-red-400">{unitLookup.defenderError}</span>}
                   {unitLookup.defenderOptions
