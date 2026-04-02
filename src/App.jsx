@@ -2495,7 +2495,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                                 </div>
                               </Field>
 
-                            {(rerollWoundOnes || rerollWoundFails || twinLinked) && woundNeeded > 0 ? (
+                            {(rerollWoundOnes || rerollWoundFails || twinLinked) ? (
                               <Field
                                 label={<CounterLabel prefix="Wound reroll dice" need={woundRerollNeeded} entered={woundRerollEntered} remaining={woundRerollNeeded - woundRerollEntered} theme={theme} />}
                                 hint="Enter rerolled wound dice in order for each eligible reroll. Eligibility is determined from the initial wound rolls."
@@ -2534,7 +2534,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                                 </Field>
                               </>
 
-                            {fnpNeeded > 0 ? (
+                            {fnpEnabled ? (
                             <Field
                                             label={<CounterLabel prefix="FNP rolls" need={fnpNeeded} entered={fnpEntered} remaining={fnpNeeded - fnpEntered} />}
                                             hint="Only if FNP is enabled. One die per point of damage."
