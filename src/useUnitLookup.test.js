@@ -159,3 +159,56 @@ describe("useUnitLookup", () => {
     expect(result.current.defenderMeta).toEqual(resolvedMeta);
   });
 });
+
+describe("history integration", () => {
+  it("saves entry to history after fillAttacker succeeds", async () => {
+    const mockHistory = {
+      addOrUpdateEntry: vi.fn(),
+      addWeapon: vi.fn(),
+      removeEntry: vi.fn(),
+      clearAll: vi.fn(),
+    };
+    // mock fetchAttackerStats to return stats + targetFields
+    vi.mocked(fetchAttackerStats).mockResolvedValue({
+      type: "stats",
+      fields: { attacksFixed: true, attacksValue: "3", toHit: "4", strength: "5", ap: "-1", damageFixed: true, damageValue: "1",
+        torrent: false, lethalHits: false, sustainedHits: false, sustainedHitsN: 1, devastatingWounds: false, twinLinked: false },
+      targetFields: { toughness: "5", armorSave: "3", invulnSave: "", fnpEnabled: false, fnp: "" },
+      meta: { resolvedName: "Crisis Suit", wahapediaUrl: "https://wahapedia.ru/crisis", source: "live" },
+    });
+
+    const { result } = renderHook(() =>
+      useUnitLookup(() => "test-key", mockHistory)
+    );
+    act(() => { result.current.setAttackerText("crisis suit"); });
+    await act(async () => { await result.current.fillAttacker(vi.fn()); });
+
+    expect(mockHistory.addOrUpdateEntry).toHaveBeenCalledWith(
+      "crisis suit", "Crisis Suit",
+      expect.objectContaining({ toughness: "5" }),
+      "https://wahapedia.ru/crisis"
+    );
+    expect(mockHistory.addWeapon).toHaveBeenCalledWith(
+      "crisis suit", "Crisis Suit", expect.any(Object)
+    );
+  });
+
+  it("saves target entry to history after fillDefender succeeds", async () => {
+    const mockHistory = { addOrUpdateEntry: vi.fn(), addWeapon: vi.fn(), removeEntry: vi.fn(), clearAll: vi.fn() };
+    vi.mocked(fetchDefenderStats).mockResolvedValue({
+      type: "stats",
+      fields: { toughness: "6", armorSave: "3", invulnSave: "", fnpEnabled: false, fnp: "" },
+      meta: { resolvedName: "Devilfish", wahapediaUrl: "https://wahapedia.ru/devilfish", source: "live" },
+    });
+
+    const { result } = renderHook(() => useUnitLookup(() => "test-key", mockHistory));
+    act(() => { result.current.setDefenderText("devilfish"); });
+    await act(async () => { await result.current.fillDefender(vi.fn()); });
+
+    expect(mockHistory.addOrUpdateEntry).toHaveBeenCalledWith(
+      "devilfish", "Devilfish",
+      expect.objectContaining({ toughness: "6" }),
+      "https://wahapedia.ru/devilfish"
+    );
+  });
+});

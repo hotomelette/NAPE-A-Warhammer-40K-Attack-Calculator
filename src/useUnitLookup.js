@@ -10,7 +10,7 @@ function classifyError(err) {
   return "Couldn't identify unit — try a different description";
 }
 
-export function useUnitLookup(getApiKey) {
+export function useUnitLookup(getApiKey, history) {
   const [attackerText, setAttackerText] = useState("");
   const [defenderText, setDefenderText] = useState("");
   const [attackerLoading, setAttackerLoading] = useState(false);
@@ -24,25 +24,37 @@ export function useUnitLookup(getApiKey) {
   const [defenderOptions, setDefenderOptions] = useState(null);
   const [attackerPageCache, setAttackerPageCache] = useState(null);
   const [defenderPageCache, setDefenderPageCache] = useState(null);
+  // Cache target fields captured during attacker disambiguation
+  const [attackerTargetFieldsCache, setAttackerTargetFieldsCache] = useState(null);
 
   const fillAttacker = useCallback(async (dispatch) => {
     setAttackerLoading(true);
     setAttackerError(null);
     setAttackerOptions(null);
     setAttackerPageCache(null);
+    setAttackerTargetFieldsCache(null);
     try {
       const apiKey = getApiKey();
       const result = await fetchAttackerStats(attackerText, apiKey);
       if (result.type === "disambiguation") {
         setAttackerOptions(result.options);
         setAttackerPageCache(result.pageCache);
+        setAttackerTargetFieldsCache(result.targetFields ?? null);
+        // Save target data to history immediately if we have it
+        if (result.targetFields && history) {
+          history.addOrUpdateEntry(attackerText, attackerText, result.targetFields, result.pageCache?.wahapediaUrl ?? "");
+        }
       } else {
-        const { fields, meta } = result;
+        const { fields, targetFields, meta } = result;
         dispatch({ type: "LOAD_WEAPON", weapon: fields });
         setAttackerMeta(meta);
         setAttackerOptions(null);
         setAttackerPageCache(null);
         setLastFilled("attacker");
+        if (history) {
+          if (targetFields) history.addOrUpdateEntry(attackerText, meta.resolvedName, targetFields, meta.wahapediaUrl ?? "");
+          history.addWeapon(attackerText, meta.resolvedName, fields);
+        }
       }
     } catch (err) {
       console.error("[UnitLookup] fillAttacker failed:", err);
@@ -50,26 +62,32 @@ export function useUnitLookup(getApiKey) {
     } finally {
       setAttackerLoading(false);
     }
-  }, [attackerText, getApiKey]);
+  }, [attackerText, getApiKey, history]);
 
   const resolveAttacker = useCallback(async (dispatch, choice) => {
     setAttackerLoading(true);
     setAttackerError(null);
     try {
       const apiKey = getApiKey();
-      const { fields, meta } = await fetchAttackerStatsFromPage(attackerText, choice, attackerPageCache, apiKey);
+      const result = await fetchAttackerStatsFromPage(attackerText, choice, attackerPageCache, apiKey);
+      const { fields, targetFields, meta } = result;
       dispatch({ type: "LOAD_WEAPON", weapon: fields });
       setAttackerMeta(meta);
       setLastFilled("attacker");
       setAttackerOptions(null);
       setAttackerPageCache(null);
+      const resolvedTargetFields = targetFields ?? attackerTargetFieldsCache;
+      if (history) {
+        if (resolvedTargetFields) history.addOrUpdateEntry(attackerText, meta.resolvedName, resolvedTargetFields, meta.wahapediaUrl ?? "");
+        history.addWeapon(attackerText, choice, fields);
+      }
     } catch (err) {
       console.error("[UnitLookup] resolveAttacker failed:", err);
       setAttackerError(classifyError(err));
     } finally {
       setAttackerLoading(false);
     }
-  }, [attackerText, attackerPageCache, getApiKey]);
+  }, [attackerText, attackerPageCache, attackerTargetFieldsCache, getApiKey, history]);
 
   const fillDefender = useCallback(async (dispatch) => {
     setDefenderLoading(true);
@@ -89,6 +107,7 @@ export function useUnitLookup(getApiKey) {
         setDefenderOptions(null);
         setDefenderPageCache(null);
         setLastFilled("defender");
+        if (history) history.addOrUpdateEntry(defenderText, meta.resolvedName, fields, meta.wahapediaUrl ?? "");
       }
     } catch (err) {
       console.error("[UnitLookup] fillDefender failed:", err);
@@ -96,7 +115,7 @@ export function useUnitLookup(getApiKey) {
     } finally {
       setDefenderLoading(false);
     }
-  }, [defenderText, getApiKey]);
+  }, [defenderText, getApiKey, history]);
 
   const resolveDefender = useCallback(async (dispatch, choice) => {
     setDefenderLoading(true);
@@ -109,13 +128,14 @@ export function useUnitLookup(getApiKey) {
       setLastFilled("defender");
       setDefenderOptions(null);
       setDefenderPageCache(null);
+      if (history) history.addOrUpdateEntry(defenderText, meta.resolvedName, fields, meta.wahapediaUrl ?? "");
     } catch (err) {
       console.error("[UnitLookup] resolveDefender failed:", err);
       setDefenderError(classifyError(err));
     } finally {
       setDefenderLoading(false);
     }
-  }, [defenderText, defenderPageCache, getApiKey]);
+  }, [defenderText, defenderPageCache, getApiKey, history]);
 
   return {
     attackerText, setAttackerText,
