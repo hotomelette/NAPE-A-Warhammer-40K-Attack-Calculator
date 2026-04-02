@@ -292,12 +292,18 @@ function HistoryDropdown({ history, onFillWeapon, onFillTarget, theme }) {
         <div className={panelCls}>
           {history.history.map(entry => (
             <div key={entry.id}>
-              <div className={unitCls} onClick={() => setExpanded(expanded === entry.id ? null : entry.id)}>
-                <span className="font-medium truncate flex-1">{entry.unitName}</span>
+              <div className="flex items-center">
+                <button
+                  type="button"
+                  className={`${unitCls} flex-1 text-left`}
+                  onClick={() => setExpanded(expanded === entry.id ? null : entry.id)}
+                >
+                  <span className="font-medium truncate">{entry.unitName}</span>
+                </button>
                 <button
                   type="button"
                   className={`ml-2 text-xs px-1 rounded ${isDark ? "hover:bg-red-900 text-gray-400 hover:text-red-300" : "hover:bg-red-100 text-gray-400 hover:text-red-600"}`}
-                  onClick={(e) => { e.stopPropagation(); history.removeEntry(entry.id); }}
+                  onClick={() => history.removeEntry(entry.id)}
                   title="Remove"
                 >✕</button>
               </div>
