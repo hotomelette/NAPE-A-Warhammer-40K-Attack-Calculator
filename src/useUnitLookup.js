@@ -40,28 +40,27 @@ export function useUnitLookup(getApiKey, history) {
       const apiKey = getApiKey();
       const result = await fetchAttackerStats(attackerText, apiKey);
 
-      if (result.type === "all_stats") {
-        // All weapon stats returned at once — cache everything immediately
-        const weaponMap = {};
-        result.weapons.forEach(w => { weaponMap[w.label] = w.fields; });
-        setAttackerWeaponsCache(weaponMap);
-        setAttackerOptions(result.weapons.map(w => w.label));
-        setAttackerPageCache(result.pageCache);
-        setAttackerTargetFieldsCache(result.targetFields ?? null);
-        if (history) {
-          if (result.targetFields) {
-            history.addOrUpdateEntry(attackerText, attackerText, result.targetFields, result.pageCache?.wahapediaUrl ?? "");
-          }
-          result.weapons.forEach(w => history.addWeapon(attackerText, w.label, w.fields));
-        }
-      } else if (result.type === "disambiguation") {
-        // Fallback: old options format (names only)
+      if (result.type === "disambiguation") {
         setAttackerOptions(result.options);
         setAttackerPageCache(result.pageCache);
         setAttackerTargetFieldsCache(result.targetFields ?? null);
         if (result.targetFields && history) {
           history.addOrUpdateEntry(attackerText, attackerText, result.targetFields, result.pageCache?.wahapediaUrl ?? "");
         }
+        // Pre-fetch all weapon stats in parallel using the already-fetched page
+        // (background, non-blocking — cache fills as each resolves)
+        const apiKey = getApiKey();
+        const pageCache = result.pageCache;
+        const searchText = attackerText;
+        Promise.all(result.options.map(async weapon => {
+          try {
+            const r = await fetchAttackerStatsFromPage(searchText, weapon, pageCache, apiKey);
+            if (r?.fields) {
+              if (history) history.addWeapon(searchText, weapon, r.fields);
+              setAttackerWeaponsCache(prev => ({ ...(prev || {}), [weapon]: r.fields }));
+            }
+          } catch { /* silently ignore individual weapon fetch failures */ }
+        }));
       } else {
         const { fields, targetFields, meta } = result;
         dispatch({ type: "LOAD_WEAPON", weapon: fields });

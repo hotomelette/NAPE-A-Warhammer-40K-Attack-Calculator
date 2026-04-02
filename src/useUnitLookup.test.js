@@ -118,17 +118,19 @@ describe("useUnitLookup", () => {
   it("resolveAttacker dispatches LOAD_WEAPON, stores meta, and clears options", async () => {
     const pageCache = { pageText: "datasheet...", wahapediaUrl: "https://wahapedia.ru/wh40k10ed/factions/space-marines/Intercessor-Squad", source: "live", fetchedAt: "2026-02-27T10:00:00Z" };
     fetchAttackerStats.mockResolvedValueOnce({ type: "disambiguation", options: ["Bolt Rifle", "Auto Bolt Rifle"], pageCache });
-    const resolvedMeta = { source: "live", wahapediaUrl: "https://wahapedia.ru/wh40k10ed/factions/space-marines/Intercessor-Squad", fetchedAt: "2026-02-27T10:00:00Z", resolvedName: "Intercessor with Bolt Rifle" };
-    fetchAttackerStatsFromPage.mockResolvedValueOnce({ type: "stats", fields: weaponFields, meta: resolvedMeta });
+    // Background parallel fetches during fillAttacker populate the cache — resolveAttacker uses it directly
+    fetchAttackerStatsFromPage.mockResolvedValue({ type: "stats", fields: weaponFields, meta: { source: "live", wahapediaUrl: pageCache.wahapediaUrl, fetchedAt: pageCache.fetchedAt, resolvedName: "Bolt Rifle" } });
     const dispatch = vi.fn();
     const { result } = renderHook(() => useUnitLookup(getApiKey));
     act(() => result.current.setAttackerText("space marine intercessor"));
     await act(() => result.current.fillAttacker(dispatch));
     await act(() => result.current.resolveAttacker(dispatch, "Bolt Rifle"));
+    // fetchAttackerStatsFromPage is called during background fetch in fillAttacker (not resolveAttacker)
     expect(fetchAttackerStatsFromPage).toHaveBeenCalledWith("space marine intercessor", "Bolt Rifle", pageCache, mockApiKey);
     expect(dispatch).toHaveBeenCalledWith({ type: "LOAD_WEAPON", weapon: weaponFields });
     expect(result.current.attackerOptions).toBeNull();
-    expect(result.current.attackerMeta).toEqual(resolvedMeta);
+    // resolveAttacker uses cache path: meta comes from cache (resolvedName = chosen weapon label)
+    expect(result.current.attackerMeta).toEqual({ resolvedName: "Bolt Rifle", source: "cache", wahapediaUrl: pageCache.wahapediaUrl });
   });
 
   it("stores defenderOptions and does not dispatch when fillDefender gets disambiguation", async () => {

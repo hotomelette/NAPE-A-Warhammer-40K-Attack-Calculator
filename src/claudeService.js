@@ -35,10 +35,10 @@ Rules:
 const ATTACKER_SYSTEM_PROMPT = `You are a Warhammer 40,000 10th edition rules expert.
 Given a weapon description and optionally a Wahapedia datasheet, extract weapon stats.
 
-DISAMBIGUATION: If the input names only a unit without specifying a weapon (e.g. "space marine intercessor", "crisis battlesuits"), return ALL available weapons with full stats. If a specific weapon is clearly named in the input, extract stats directly.
+DISAMBIGUATION: If the input names only a unit without specifying a weapon (e.g. "space marine intercessor", "crisis battlesuits"), return ALL available weapons as options. If a specific weapon is clearly named in the input, extract stats directly.
 
 When disambiguation is needed, return ONLY this JSON:
-{ "type": "all_stats", "weapons": [{ "name": "Weapon Name", "attacks": 2, "bs": 4, "strength": 5, "ap": -1, "damage": 1, "torrent": false, "lethalHits": false, "sustainedHits": false, "sustainedHitsN": 1, "devastatingWounds": false, "twinLinked": false }, ...] }
+{ "type": "options", "options": ["Weapon Name 1", "Weapon Name 2", ...] }
 Include ALL ranged AND melee weapons available to the unit. Use exact weapon names from the datasheet.
 
 When a specific weapon is identified, return ONLY this JSON:
@@ -263,20 +263,6 @@ export async function fetchAttackerStats(description, apiKey) {
 
   const raw = parseJson(weaponMsg.content[0].text);
 
-  if (raw.type === "all_stats") {
-    const weapons = (raw.weapons || []).map(w => ({
-      label: w.name,
-      fields: mapToWeaponFields(w),
-    }));
-    return {
-      type: "all_stats",
-      weapons,
-      targetFields: targetResult,
-      pageCache: { pageText: pageContent, wahapediaUrl, source, fetchedAt },
-    };
-  }
-
-  // Fallback: old options format (names only, no pre-fetched stats)
   if (raw.type === "options") {
     return {
       type: "disambiguation",
