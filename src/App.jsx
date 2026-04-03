@@ -108,9 +108,9 @@ function Section({ title, theme, children, action }) {
       : "text-xl md:text-2xl font-extrabold tracking-wide border-b border-gray-200 pb-2 mb-3";
   return (
     <div className={panelClass}>
-      <div className={`flex items-center justify-between gap-2 overflow-visible ${titleClass}`}>
-        <span>{title}</span>
-        {action && <div className="shrink-0">{action}</div>}
+      <div className={`flex flex-wrap items-center justify-between gap-2 ${titleClass}`}>
+        <span className="shrink-0">{title}</span>
+        {action && <div className="flex flex-wrap gap-1.5">{action}</div>}
       </div>
       <div className="space-y-4">{children}</div>
     </div>
@@ -2730,7 +2730,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                         </div>
                         <div className={`text-sm ${viz.totalMeta}`}>{diceReady && allSplitStatsReady ? 'final · post-mitigation' : 'preview'}</div>
                       </div>
-                      <div className="mt-3 grid gap-2" style={{ gridTemplateColumns: `repeat(${activeSplitResults.length + 1}, 1fr)` }}>
+                      <div className="mt-3 grid gap-2" style={{ gridTemplateColumns: `repeat(auto-fill, minmax(80px, 1fr))` }}>
                         {activeSplitResults.map((r, i) => {
                           const tReady = splitTargetStatsReady[i];
                           const tDmg = tReady && allowDamageTotals && r ? r.totalPostFnp : null;
@@ -2774,7 +2774,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                   </div>
                 ) : (
                   // ── Normal single-target view ──
-                  <div className={`mt-4 rounded-2xl border p-4 ${viz.totalPanel} relative overflow-visible inline-block w-max min-w-full`}>
+                  <div className={`mt-4 rounded-2xl border p-4 ${viz.totalPanel} relative overflow-visible w-full`}>
                     {diceReady ? (
                       <div className="absolute inset-0 pointer-events-none opacity-15 overflow-hidden rounded-2xl">
                         <div className="nape-marquee-row" style={{ animationDuration: "24s" }}>
