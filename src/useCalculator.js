@@ -499,7 +499,7 @@ export function useCalculator({
     };
 
   }, [
-    attacksFixed, attacksValue, attacksRolls,
+    attacksFixed, attacksValue, attacksRolls, modelQty,
     rapidFire, rapidFireX, halfRange,
     blastEnabled, blastUnitSize,
     toHit, hitMod, strength, ap,

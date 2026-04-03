@@ -1336,13 +1336,14 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
       }, 60);
     });
     const pause = (ms) => new Promise(r => setTimeout(r, ms));
+    const modelQtyNum = Math.max(1, parseInt(String(modelQty || "1"), 10) || 1);
 
     // Phase 1: Attacks
-    let attacksTotal = attacksFixed ? (Number(attacksValue) || 0) : 0;
+    let attacksTotal = attacksFixed ? (Number(attacksValue) || 0) * modelQtyNum : 0;
     if (!attacksFixed && attackSpecNow.n > 0) {
-      const rolls = Array.from({ length: attackSpecNow.n }, () => Math.ceil(Math.random() * attackSpecNow.sides));
+      const rolls = Array.from({ length: attackSpecNow.n * modelQtyNum }, () => Math.ceil(Math.random() * attackSpecNow.sides));
       await animateField(setAttacksRolls, rolls, attackSpecNow.sides);
-      attacksTotal = rolls.reduce((s, d) => s + d, 0) + attackSpecNow.mod;
+      attacksTotal = rolls.reduce((s, d) => s + d, 0) + attackSpecNow.mod * modelQtyNum;
       await pause(120);
     }
     const rfXNum = Math.max(0, Number(rapidFireX) || 0);
@@ -1544,13 +1545,14 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
       }, 60);
     });
     const pause = (ms) => new Promise(r => setTimeout(r, ms));
+    const modelQtyNum = Math.max(1, parseInt(String(modelQty || "1"), 10) || 1);
 
     // Phase 1: Attack dice (only when variable)
-    let attacksTotal = attacksFixed ? (Number(attacksValue) || 0) : 0;
+    let attacksTotal = attacksFixed ? (Number(attacksValue) || 0) * modelQtyNum : 0;
     if (!attacksFixed && attackSpecNow.n > 0) {
-      const rolls = Array.from({ length: attackSpecNow.n }, () => Math.ceil(Math.random() * attackSpecNow.sides));
+      const rolls = Array.from({ length: attackSpecNow.n * modelQtyNum }, () => Math.ceil(Math.random() * attackSpecNow.sides));
       await animateField(setAttacksRolls, rolls, attackSpecNow.sides);
-      attacksTotal = rolls.reduce((s, d) => s + d, 0) + attackSpecNow.mod;
+      attacksTotal = rolls.reduce((s, d) => s + d, 0) + attackSpecNow.mod * modelQtyNum;
       await pause(120);
     }
     const rfXNum = Math.max(0, Number(rapidFireX) || 0);
