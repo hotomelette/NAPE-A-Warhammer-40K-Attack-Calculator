@@ -476,6 +476,7 @@ export function useCalculator({
       woundRollPool,
       woundRerollNeeded,
       needed,
+      woundTarget: needed,
       saveTarget,
       critHits,
       sustainedExtraHits,

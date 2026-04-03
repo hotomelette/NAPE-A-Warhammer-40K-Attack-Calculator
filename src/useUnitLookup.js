@@ -1,6 +1,14 @@
 import { useState, useCallback } from "react";
 import { fetchAttackerStats, fetchDefenderStats, fetchAttackerStatsFromPage, fetchDefenderStatsFromPage } from "./claudeService.js";
 
+function unitNameFromUrl(wahapediaUrl, fallback) {
+  if (wahapediaUrl && wahapediaUrl !== "https://wahapedia.ru") {
+    const slug = wahapediaUrl.split("/").pop();
+    if (slug && slug.length > 1) return slug.replace(/-/g, " ");
+  }
+  return fallback;
+}
+
 function classifyError(err) {
   const msg = err?.message ?? "";
   if (msg.includes("credit balance is too low"))
@@ -45,7 +53,7 @@ export function useUnitLookup(getApiKey, history) {
         setAttackerPageCache(result.pageCache);
         setAttackerTargetFieldsCache(result.targetFields ?? null);
         if (result.targetFields && history) {
-          history.addOrUpdateEntry(attackerText, attackerText, result.targetFields, result.pageCache?.wahapediaUrl ?? "", result.pageCache?.source);
+          history.addOrUpdateEntry(attackerText, unitNameFromUrl(result.pageCache?.wahapediaUrl, attackerText), result.targetFields, result.pageCache?.wahapediaUrl ?? "", result.pageCache?.source);
         }
         // Pre-fetch all weapon stats in parallel using the already-fetched page
         // (background, non-blocking — cache fills as each resolves)
@@ -67,7 +75,7 @@ export function useUnitLookup(getApiKey, history) {
         setAttackerMeta(meta);
         setLastFilled("attacker");
         if (history) {
-          if (targetFields) history.addOrUpdateEntry(attackerText, attackerText, targetFields, meta.wahapediaUrl ?? "", meta.source);
+          if (targetFields) history.addOrUpdateEntry(attackerText, unitNameFromUrl(meta.wahapediaUrl, attackerText), targetFields, meta.wahapediaUrl ?? "", meta.source);
           history.addWeapon(attackerText, meta.resolvedName, fields);
         }
       }
@@ -105,7 +113,7 @@ export function useUnitLookup(getApiKey, history) {
       setAttackerPageCache(null);
       const resolvedTargetFields = targetFields ?? attackerTargetFieldsCache;
       if (history) {
-        if (resolvedTargetFields) history.addOrUpdateEntry(attackerText, attackerText, resolvedTargetFields, meta.wahapediaUrl ?? "", meta.source);
+        if (resolvedTargetFields) history.addOrUpdateEntry(attackerText, unitNameFromUrl(meta.wahapediaUrl, attackerText), resolvedTargetFields, meta.wahapediaUrl ?? "", meta.source);
         history.addWeapon(attackerText, choice, fields);
       }
     } catch (err) {
@@ -134,7 +142,7 @@ export function useUnitLookup(getApiKey, history) {
         setDefenderOptions(null);
         setDefenderPageCache(null);
         setLastFilled("defender");
-        if (history) history.addOrUpdateEntry(defenderText, defenderText, fields, meta.wahapediaUrl ?? "", meta.source);
+        if (history) history.addOrUpdateEntry(defenderText, unitNameFromUrl(meta.wahapediaUrl, defenderText), fields, meta.wahapediaUrl ?? "", meta.source);
       }
     } catch (err) {
       console.error("[UnitLookup] fillDefender failed:", err);
@@ -155,7 +163,7 @@ export function useUnitLookup(getApiKey, history) {
       setLastFilled("defender");
       setDefenderOptions(null);
       setDefenderPageCache(null);
-      if (history) history.addOrUpdateEntry(defenderText, defenderText, fields, meta.wahapediaUrl ?? "", meta.source);
+      if (history) history.addOrUpdateEntry(defenderText, unitNameFromUrl(meta.wahapediaUrl, defenderText), fields, meta.wahapediaUrl ?? "", meta.source);
     } catch (err) {
       console.error("[UnitLookup] resolveDefender failed:", err);
       setDefenderError(classifyError(err));

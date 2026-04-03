@@ -405,6 +405,27 @@ function CounterLabel({ prefix, need, entered, remaining, theme }) {
 }
 
 
+function DiceColorBar({ rollsText, target, mod = 0, theme }) {
+  if (!target || target <= 0) return null;
+  const rolls = parseDiceList(rollsText);
+  if (rolls.length === 0) return null;
+  const dark = theme === "dark";
+  return (
+    <div className="flex flex-wrap gap-1 mt-1">
+      {rolls.map((d, i) => {
+        const success = d !== 1 && (d + mod) >= target;
+        return (
+          <span key={i} className={`inline-flex items-center justify-center min-w-[1.4rem] h-5 px-0.5 rounded text-xs font-bold leading-none ${
+            success
+              ? (dark ? "bg-green-700/70 text-green-100" : "bg-green-600/80 text-white")
+              : (dark ? "bg-orange-700/70 text-orange-100" : "bg-orange-500/80 text-white")
+          }`}>{d}</span>
+        );
+      })}
+    </div>
+  );
+}
+
 function Chip({ children }) {
   return (
     <span className="inline-flex items-center rounded-full border border-gray-600 px-2 py-0.5 text-xs bg-gray-800 text-gray-100">
@@ -2465,7 +2486,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                             ) : null}
 
               <Field
-                              label={<CounterLabel prefix="Hit rolls" need={hitNeeded} entered={hitEntered} remaining={hitNeeded - hitEntered} theme={theme} />}
+                              label={<CounterLabel prefix={`Hit rolls${isNum(toHit) && !torrent ? ` · ${toHit}+` : torrent ? " · Auto" : ""}`} need={hitNeeded} entered={hitEntered} remaining={hitNeeded - hitEntered} theme={theme} />}
                               hint="One die per attack. Skip if Torrent (auto-hits). Crits trigger Lethal Hits / Sustained Hits. Count must match A exactly."
                             >
                               <div className="flex gap-2">
@@ -2479,6 +2500,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                                   onClick={() => setHitRollsText(rollDice(hitNeeded, 6))}
                                   className="rounded-lg bg-amber-500 hover:bg-amber-400 disabled:opacity-30 text-gray-950 px-3 font-bold text-lg transition">🎲</button>
                               </div>
+                              <DiceColorBar rollsText={hitRollsText} target={Number(toHit)} mod={effectiveHitMod} theme={theme} />
                             </Field>
 
                             {(rerollHitOnes || rerollHitFails) ? (
@@ -2496,7 +2518,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                             ) : null}
 
                             <Field
-                                label={<CounterLabel prefix="Wound rolls" need={woundNeeded} entered={woundEntered} remaining={woundNeeded - woundEntered} theme={theme} />}
+                                label={<CounterLabel prefix={`Wound rolls${activeComputed.woundTarget > 0 ? ` · ${activeComputed.woundTarget}+` : ""}`} need={woundNeeded} entered={woundEntered} remaining={woundNeeded - woundEntered} theme={theme} />}
                                 hint={`One die per hit (incl. Sustained bonus hits). Lethal Hits skip directly to saves — auto-wounds this volley: ${activeComputed.autoWoundsFromLethal}. Count must match the wound roll pool.`}
                               >
                                 <div className="flex gap-2">
@@ -2510,6 +2532,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                                     onClick={() => setWoundRollsText(rollDice(woundNeeded, 6))}
                                     className="rounded-lg bg-amber-500 hover:bg-amber-400 disabled:opacity-30 text-gray-950 px-3 font-bold text-lg transition">🎲</button>
                                 </div>
+                                <DiceColorBar rollsText={woundRollsText} target={activeComputed.woundTarget} mod={effectiveWoundMod} theme={theme} />
                               </Field>
 
                             {(rerollWoundOnes || rerollWoundFails || twinLinked) ? (
@@ -2534,7 +2557,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                             <>
                                 {splitEnabled && <div className={`text-sm font-extrabold tracking-wide mt-2 mb-0 uppercase ${theme === "dark" ? "text-amber-300/80" : "text-amber-700/80"}`}>🎯 Target 1 — Dice</div>}
                                 <Field
-                                  label={<CounterLabel prefix={splitEnabled ? "Save rolls (T1)" : "Save rolls"} need={saveNeeded} entered={saveEntered} remaining={saveNeeded - saveEntered} />}
+                                  label={<CounterLabel prefix={`${splitEnabled ? "Save rolls (T1)" : "Save rolls"}${activeComputed.saveTarget > 0 ? ` · ${activeComputed.saveTarget}+` : ""}`} need={saveNeeded} entered={saveEntered} remaining={saveNeeded - saveEntered} theme={theme} />}
                                   hint="One die per savable wound. Mortal wounds (Devastating) bypass saves and go straight to damage. Count must equal wounds allocated to this target."
                                 >
                                   <div className="flex gap-2">
@@ -2548,12 +2571,13 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                                       onClick={() => setSaveRollsText(rollDice(saveNeeded, 6))}
                                       className="rounded-lg bg-amber-500 hover:bg-amber-400 disabled:opacity-30 text-gray-950 px-3 font-bold text-lg transition">🎲</button>
                                   </div>
+                                  <DiceColorBar rollsText={saveRollsText} target={activeComputed.saveTarget} mod={clampModPlusMinusOne(Number(saveMod) || 0)} theme={theme} />
                                 </Field>
                               </>
 
                             {fnpEnabled ? (
                             <Field
-                                            label={<CounterLabel prefix="FNP rolls" need={fnpNeeded} entered={fnpEntered} remaining={fnpNeeded - fnpEntered} />}
+                                            label={<CounterLabel prefix={`FNP rolls${fnpEnabled && isNum(fnp) ? ` · ${fnp}+` : ""}`} need={fnpNeeded} entered={fnpEntered} remaining={fnpNeeded - fnpEntered} theme={theme} />}
                                             hint="Only if FNP is enabled. One die per point of damage."
                                           >
                                             <div className="flex gap-2">
@@ -2567,6 +2591,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                                                 onClick={() => setFnpRollsText(rollDice(fnpNeeded, 6))}
                                                 className="rounded-lg bg-amber-500 hover:bg-amber-400 disabled:opacity-30 text-gray-950 px-3 font-bold text-lg transition">🎲</button>
                                             </div>
+                                            <DiceColorBar rollsText={fnpRollsText} target={Number(fnp)} theme={theme} />
                                           </Field>
                             ) : null}
 

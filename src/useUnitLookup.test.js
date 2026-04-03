@@ -176,7 +176,7 @@ describe("history integration", () => {
       fields: { attacksFixed: true, attacksValue: "3", toHit: "4", strength: "5", ap: "-1", damageFixed: true, damageValue: "1",
         torrent: false, lethalHits: false, sustainedHits: false, sustainedHitsN: 1, devastatingWounds: false, twinLinked: false },
       targetFields: { toughness: "5", armorSave: "3", invulnSave: "", fnpEnabled: false, fnp: "" },
-      meta: { resolvedName: "Crisis Suit", wahapediaUrl: "https://wahapedia.ru/crisis", source: "live" },
+      meta: { resolvedName: "Crisis Suit", wahapediaUrl: "https://wahapedia.ru/wh40k10ed/factions/t-au-empire/Crisis-Suit", source: "live" },
     });
 
     const { result } = renderHook(() =>
@@ -186,9 +186,9 @@ describe("history integration", () => {
     await act(async () => { await result.current.fillAttacker(vi.fn()); });
 
     expect(mockHistory.addOrUpdateEntry).toHaveBeenCalledWith(
-      "crisis suit", "crisis suit",
+      "crisis suit", "Crisis Suit",
       expect.objectContaining({ toughness: "5" }),
-      "https://wahapedia.ru/crisis",
+      "https://wahapedia.ru/wh40k10ed/factions/t-au-empire/Crisis-Suit",
       "live"
     );
     expect(mockHistory.addWeapon).toHaveBeenCalledWith(
@@ -201,7 +201,7 @@ describe("history integration", () => {
     vi.mocked(fetchDefenderStats).mockResolvedValue({
       type: "stats",
       fields: { toughness: "6", armorSave: "3", invulnSave: "", fnpEnabled: false, fnp: "" },
-      meta: { resolvedName: "Devilfish", wahapediaUrl: "https://wahapedia.ru/devilfish", source: "live" },
+      meta: { resolvedName: "Devilfish", wahapediaUrl: "https://wahapedia.ru/wh40k10ed/factions/t-au-empire/Devilfish", source: "live" },
     });
 
     const { result } = renderHook(() => useUnitLookup(() => "test-key", mockHistory));
@@ -209,9 +209,9 @@ describe("history integration", () => {
     await act(async () => { await result.current.fillDefender(vi.fn()); });
 
     expect(mockHistory.addOrUpdateEntry).toHaveBeenCalledWith(
-      "devilfish", "devilfish",
+      "devilfish", "Devilfish",
       expect.objectContaining({ toughness: "6" }),
-      "https://wahapedia.ru/devilfish",
+      "https://wahapedia.ru/wh40k10ed/factions/t-au-empire/Devilfish",
       "live"
     );
   });
