@@ -41,6 +41,7 @@ export const initialWeapon = {
   meltaX: 0,
   antiXEnabled: false,
   antiXThreshold: 5,
+  modelQty: 1,
 };
 
 export const initialTarget = {

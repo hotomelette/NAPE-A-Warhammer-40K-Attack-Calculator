@@ -786,6 +786,7 @@ function AttackCalculator() {
     lance,
     meltaEnabled, meltaX,
     plusOneToHit, indirectFire,
+    modelQty,
   } = weapon;
 
   const {
@@ -869,6 +870,7 @@ function AttackCalculator() {
   const setMeltaEnabled   = v => dispatch({ type: "SET_WEAPON_FIELD", field: "meltaEnabled",   value: v });
   const setMeltaX         = v => dispatch({ type: "SET_WEAPON_FIELD", field: "meltaX",         value: v });
   const setAntiXEnabled   = v => dispatch({ type: "SET_WEAPON_FIELD", field: "antiXEnabled",   value: v });
+  const setModelQty       = v => dispatch({ type: "SET_WEAPON_FIELD", field: "modelQty",       value: v });
   const setAntiXThreshold = v => dispatch({ type: "SET_WEAPON_FIELD", field: "antiXThreshold", value: v });
   const setHitMod        = v => dispatch({ type: "SET_WEAPON_FIELD", field: "hitMod",        value: v });
   const setWoundMod      = v => dispatch({ type: "SET_WEAPON_FIELD", field: "woundMod",      value: v });
@@ -964,6 +966,7 @@ function AttackCalculator() {
   // those phases are handled by useCalculatorSplit per target instead.
   const computed = useCalculator({
     attacksFixed, attacksValue, attacksRolls,
+    modelQty,
     rapidFire, rapidFireX, halfRange,
     blastEnabled, blastUnitSize,
     toHit, hitMod: effectiveHitMod, strength, ap,
@@ -1904,11 +1907,25 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                     placeholder={attacksFixed ? "e.g. 6" : "e.g. D6+1, 2D6, D3+2"}
                     className={`flex-1 min-w-0 rounded border p-2 text-lg font-semibold ${!isNum(attacksValue) ? "border-red-500 ring-2 ring-red-200" : ""}`}
                   />
+
+                  <label className="inline-flex items-center gap-1.5 shrink-0">
+                    <span className={`text-sm font-semibold ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>× models</span>
+                    <input
+                      type="number"
+                      min="1"
+                      inputMode="numeric"
+                      value={modelQty ?? 1}
+                      onChange={(e) => setModelQty(Math.max(1, parseInt(e.target.value) || 1))}
+                      className={`w-16 rounded border p-2 text-lg font-semibold text-center ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300 text-gray-900"}`}
+                    />
+                  </label>
                 </div>
 
                 <div className="mt-1 text-xs text-gray-300">
                   Computed attacks this volley: <span className="font-semibold">{activeComputed.A}</span>
-                  {!attacksFixed && parseDiceSpec(attacksValue).mod > 0 ? (
+                  {(modelQty ?? 1) > 1 && attacksFixed && isNum(attacksValue) ? (
+                    <span className="ml-2 text-gray-400">({attacksValue} × {modelQty} models)</span>
+                  ) : !attacksFixed && parseDiceSpec(attacksValue).mod > 0 ? (
                     <span className="ml-2 text-gray-400">(dice sum + {parseDiceSpec(attacksValue).mod} modifier)</span>
                   ) : null}
                 </div>

@@ -10,6 +10,7 @@ import { parseDiceList, parseDiceSpec, clampModPlusMinusOne, woundTargetNumber, 
 export function useCalculator({
   // Weapon
   attacksFixed, attacksValue, attacksRolls,
+  modelQty,
   rapidFire, rapidFireX, halfRange,
   blastEnabled, blastUnitSize,
   toHit, hitMod,
@@ -53,15 +54,19 @@ export function useCalculator({
       : (Number(critWoundThreshold) || 6);
 
     // Step 1: Attacks
+    const modelQtyNum = Math.max(1, parseInt(String(modelQty || "1"), 10) || 1);
     let A = 0;
     if (attacksFixed) {
-      A = Math.max(0, parseInt(String(attacksValue || "0"), 10) || 0);
-      log.push(`Attacks fixed: A = ${A}`);
+      const baseA = Math.max(0, parseInt(String(attacksValue || "0"), 10) || 0);
+      A = baseA * modelQtyNum;
+      if (modelQtyNum > 1) log.push(`Attacks fixed: ${baseA} × ${modelQtyNum} models = A = ${A}`);
+      else log.push(`Attacks fixed: A = ${A}`);
     } else {
       // Supports expressions like "2", "2D6", "D6+1", "2D6+2", "D3+3"
       const spec = parseDiceSpec(attacksValue);
-      const diceCount = spec.n;
+      const dicePerModel = spec.n;
       const attackMod = spec.mod || 0;
+      const totalDiceCount = dicePerModel * modelQtyNum;
 
       if (!spec.ok) {
         errors.push('Random attacks: enter a dice expression like "2D6", "D6+1", or "2" (for 2D6).');
@@ -69,10 +74,10 @@ export function useCalculator({
 
       const rolls = parseDiceList(attacksRolls);
 
-      if (diceCount <= 0) {
+      if (dicePerModel <= 0) {
         errors.push('Attacks are random: enter a dice expression (e.g. "D6+1", "2D6", "2").');
-      } else if (rolls.length !== diceCount) {
-        errors.push(`Attack rolls provided (${rolls.length}) must equal dice count (${diceCount}).`);
+      } else if (rolls.length !== totalDiceCount) {
+        errors.push(`Attack rolls provided (${rolls.length}) must equal dice count (${totalDiceCount})${modelQtyNum > 1 ? ` (${dicePerModel} per model × ${modelQtyNum} models)` : ""}.`);
       }
 
       if (rolls.length === 0) {
@@ -80,9 +85,10 @@ export function useCalculator({
       }
 
       const diceSum = rolls.reduce((sum, r) => sum + r, 0);
-      A = diceSum + attackMod;
-      const modStr = attackMod > 0 ? ` + ${attackMod} (modifier)` : "";
-      log.push(`Attacks random: spec = ${attacksValue || "?"}, dice = ${diceCount}D${spec.sides}, rolls = [${rolls.join(", ")}]${modStr}, A = ${A}`);
+      A = diceSum + attackMod * modelQtyNum;
+      const modStr = attackMod > 0 ? ` + ${attackMod * modelQtyNum} (modifier)` : "";
+      const modelStr = modelQtyNum > 1 ? ` × ${modelQtyNum} models` : "";
+      log.push(`Attacks random: spec = ${attacksValue || "?"}${modelStr}, dice = ${totalDiceCount}D${spec.sides}, rolls = [${rolls.join(", ")}]${modStr}, A = ${A}`);
     }
 
     // Rapid Fire: at half range, add X attacks to the weapon's Attacks characteristic.
