@@ -2496,26 +2496,6 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                               </Field>
                             ) : null}
 
-                            <>
-                                {splitEnabled && <div className={`text-sm font-extrabold tracking-wide mt-2 mb-0 uppercase ${theme === "dark" ? "text-amber-300/80" : "text-amber-700/80"}`}>🎯 Target 1 — Dice</div>}
-                                <Field
-                                  label={<CounterLabel prefix={splitEnabled ? "Save rolls (T1)" : "Save rolls"} need={saveNeeded} entered={saveEntered} remaining={saveNeeded - saveEntered} />}
-                                  hint="One die per savable wound. Mortal wounds (Devastating) bypass saves and go straight to damage. Count must equal wounds allocated to this target."
-                                >
-                                  <div className="flex gap-2">
-                                    <input
-                                      className={`flex-1 rounded border p-2 text-lg font-semibold ${hasSaveCountError ? "border-red-500 ring-2 ring-red-200" : ""}`}
-                                      value={saveRollsText}
-                                      onChange={(e) => setSaveRollsText(e.target.value)}
-                                      placeholder="e.g. 5 2 6 ..."
-                                    />
-                                    <button type="button" title="Roll for me" disabled={saveNeeded === 0}
-                                      onClick={() => setSaveRollsText(rollDice(saveNeeded, 6))}
-                                      className="rounded-lg bg-amber-500 hover:bg-amber-400 disabled:opacity-30 text-gray-950 px-3 font-bold text-lg transition">🎲</button>
-                                  </div>
-                                </Field>
-                              </>
-
                             {!damageFixed && (
                               <Field
                                 label={
@@ -2527,7 +2507,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                                     theme={theme}
                                   />
                                 }
-                                hint={`One die per failed save${parseDiceSpec(damageValue).mod > 0 ? `. +${parseDiceSpec(damageValue).mod} modifier is added per die automatically` : ""}.`}
+                                hint={`One die per failed save${parseDiceSpec(damageValue).mod > 0 ? `. +${parseDiceSpec(damageValue).mod} modifier is added per die automatically` : ""}. Count updates after save rolls are entered.`}
                                 theme={theme}
                               >
                                 <div className="flex gap-2">
@@ -2550,6 +2530,26 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                                 </div>
                               </Field>
                             )}
+
+                            <>
+                                {splitEnabled && <div className={`text-sm font-extrabold tracking-wide mt-2 mb-0 uppercase ${theme === "dark" ? "text-amber-300/80" : "text-amber-700/80"}`}>🎯 Target 1 — Dice</div>}
+                                <Field
+                                  label={<CounterLabel prefix={splitEnabled ? "Save rolls (T1)" : "Save rolls"} need={saveNeeded} entered={saveEntered} remaining={saveNeeded - saveEntered} />}
+                                  hint="One die per savable wound. Mortal wounds (Devastating) bypass saves and go straight to damage. Count must equal wounds allocated to this target."
+                                >
+                                  <div className="flex gap-2">
+                                    <input
+                                      className={`flex-1 rounded border p-2 text-lg font-semibold ${hasSaveCountError ? "border-red-500 ring-2 ring-red-200" : ""}`}
+                                      value={saveRollsText}
+                                      onChange={(e) => setSaveRollsText(e.target.value)}
+                                      placeholder="e.g. 5 2 6 ..."
+                                    />
+                                    <button type="button" title="Roll for me" disabled={saveNeeded === 0}
+                                      onClick={() => setSaveRollsText(rollDice(saveNeeded, 6))}
+                                      className="rounded-lg bg-amber-500 hover:bg-amber-400 disabled:opacity-30 text-gray-950 px-3 font-bold text-lg transition">🎲</button>
+                                  </div>
+                                </Field>
+                              </>
 
                             {fnpEnabled ? (
                             <Field
