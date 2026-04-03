@@ -186,9 +186,10 @@ describe("history integration", () => {
     await act(async () => { await result.current.fillAttacker(vi.fn()); });
 
     expect(mockHistory.addOrUpdateEntry).toHaveBeenCalledWith(
-      "crisis suit", "Crisis Suit",
+      "crisis suit", "crisis suit",
       expect.objectContaining({ toughness: "5" }),
-      "https://wahapedia.ru/crisis"
+      "https://wahapedia.ru/crisis",
+      "live"
     );
     expect(mockHistory.addWeapon).toHaveBeenCalledWith(
       "crisis suit", "Crisis Suit", expect.any(Object)
@@ -208,9 +209,10 @@ describe("history integration", () => {
     await act(async () => { await result.current.fillDefender(vi.fn()); });
 
     expect(mockHistory.addOrUpdateEntry).toHaveBeenCalledWith(
-      "devilfish", "Devilfish",
+      "devilfish", "devilfish",
       expect.objectContaining({ toughness: "6" }),
-      "https://wahapedia.ru/devilfish"
+      "https://wahapedia.ru/devilfish",
+      "live"
     );
   });
 });

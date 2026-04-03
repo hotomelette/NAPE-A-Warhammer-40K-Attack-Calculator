@@ -313,7 +313,7 @@ function HistoryDropdown({ history, onFillWeapon, onFillTarget, theme, mode }) {
                 <button
                   type="button"
                   className="flex-1 text-left text-sm font-medium truncate"
-                  onClick={() => { onFillTarget(entry.targetFields, entry.unitName); setOpen(false); }}
+                  onClick={() => { onFillTarget(entry.targetFields, entry.unitName, entry.wahapediaUrl, entry.source); setOpen(false); }}
                 >
                   {entry.unitName}
                 </button>
@@ -341,7 +341,7 @@ function HistoryDropdown({ history, onFillWeapon, onFillTarget, theme, mode }) {
                         key={w.label}
                         type="button"
                         className={chipCls}
-                        onClick={() => { onFillWeapon(w.fields, entry.unitName, w.label); setOpen(false); }}
+                        onClick={() => { onFillWeapon(w.fields, entry.unitName, w.label, entry.wahapediaUrl, entry.source); setOpen(false); }}
                         title={`Fill weapon fields: ${w.label}`}
                       >
                         {w.label}
@@ -821,6 +821,7 @@ function AttackCalculator() {
   const {
     theme, simpleMode, showLog, showLimitations, showCheatSheet,
     showDiceRef, showTableUse, showWizard, strictMode, preserveHooks,
+    showExperimental,
   } = ui;
 
   const {
@@ -917,6 +918,7 @@ function AttackCalculator() {
   const setShowWizard      = v => dispatch({ type: "SET_UI_FIELD", field: "showWizard",      value: v });
   const setStrictMode      = v => dispatch({ type: "SET_UI_FIELD", field: "strictMode",      value: v });
   const setPreserveHooks   = v => dispatch({ type: "SET_UI_FIELD", field: "preserveHooks",   value: v });
+  const setShowExperimental= v => dispatch({ type: "SET_UI_FIELD", field: "showExperimental", value: v });
   const toggleTheme        = () => dispatch({ type: "TOGGLE_THEME" });
   const toggleSimpleMode = () => {
     if (!simpleMode) dispatch({ type: "CLEAR_SPLIT" });
@@ -1859,7 +1861,12 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                     <FillButton label="Fill" loading={unitLookup.attackerLoading} disabled={!unitLookup.attackerText.trim()} hasKey={hasApiKey} onClick={() => unitLookup.fillAttacker(dispatch)} theme={theme} />
                     <HistoryDropdown
                       history={unitHistory}
-                      onFillWeapon={(fields, unitName, weaponLabel) => { dispatch({ type: "LOAD_WEAPON", weapon: fields }); unitLookup.setAttackerText(unitName && weaponLabel ? `${unitName} ${weaponLabel}` : weaponLabel || unitName || ""); }}
+                      onFillWeapon={(fields, unitName, weaponLabel, wahapediaUrl, source) => {
+                        dispatch({ type: "LOAD_WEAPON", weapon: fields });
+                        const label = unitName && weaponLabel ? `${unitName} with ${weaponLabel}` : weaponLabel || unitName || "";
+                        unitLookup.setAttackerText(label);
+                        unitLookup.setAttackerMeta({ resolvedName: label, wahapediaUrl: wahapediaUrl || "https://wahapedia.ru", source: source || "training" });
+                      }}
                       onFillTarget={(fields) => dispatch({ type: "LOAD_TARGET", target: fields })}
                       theme={theme}
                       mode="attacker"
@@ -1977,16 +1984,6 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                 </InlineStatField>
               </div>
 
-              {!simpleMode && (
-              <div className="space-y-2 mt-2">
-                <InlineStatField label={<span className="flex items-center gap-1">Crit Hit <FieldHint hint="Default 6. If the weapon crits on 5+, set 5. Affects Lethal Hits and Sustained Hits triggers." theme={theme} /></span>}>
-                  <input className={`w-full rounded border p-2 text-xl font-bold ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300 text-gray-900"}`} type="number" value={critHitThreshold} onChange={(e) => setCritHitThreshold(e.target.value)} />
-                </InlineStatField>
-                <InlineStatField label={<span className="flex items-center gap-1">Crit Wound <FieldHint hint="Default 6. Anti-X rules (e.g. Anti-Infantry 4+) may lower this. Affects Devastating Wounds trigger." theme={theme} /></span>}>
-                  <input className={`w-full rounded border p-2 text-xl font-bold ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300 text-gray-900"}`} type="number" value={critWoundThreshold} onChange={(e) => setCritWoundThreshold(e.target.value)} />
-                </InlineStatField>
-              </div>
-              )}
 
               {!simpleMode && (
               <Field label="Keywords / Effects" hint="Enable only keywords that apply to this weapon and this firing sequence." theme={theme}>
@@ -2183,7 +2180,11 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                     <HistoryDropdown
                       history={unitHistory}
                       onFillWeapon={(fields) => dispatch({ type: "LOAD_WEAPON", weapon: fields })}
-                      onFillTarget={(fields, unitName) => { dispatch({ type: "LOAD_TARGET", target: fields }); if (unitName) unitLookup.setDefenderText(unitName); }}
+                      onFillTarget={(fields, unitName, wahapediaUrl, source) => {
+                        dispatch({ type: "LOAD_TARGET", target: fields });
+                        if (unitName) unitLookup.setDefenderText(unitName);
+                        unitLookup.setDefenderMeta({ resolvedName: unitName, wahapediaUrl: wahapediaUrl || "https://wahapedia.ru", source: source || "training" });
+                      }}
                       theme={theme}
                       mode="defender"
                     />
@@ -2348,12 +2349,9 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
             </div>
             )}
 
-            {!simpleMode && (
-              <Section theme={theme} title="Rerolls">
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="inline-flex items-center text-xs font-semibold text-amber-200 bg-amber-900/40 border border-amber-700/50 rounded-full px-2 py-0.5">EXPERIMENTAL</div>
-                </div>
-                <div className="grid grid-cols-2 gap-2 text-sm">
+            {!simpleMode && showExperimental && (
+              <Section theme={theme} title="Experimental">
+                <div className="grid grid-cols-2 gap-2 text-sm mb-3">
                   <label className="flex items-center gap-2">
                     <input type="checkbox" checked={rerollHitOnes} onChange={e => setRerollHitOnes(e.target.checked)} />
                     Reroll hit 1s
@@ -2370,6 +2368,14 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                     <input type="checkbox" checked={rerollWoundFails || twinLinked} disabled={twinLinked} onChange={e => setRerollWoundFails(e.target.checked)} />
                     Reroll failed wounds {twinLinked ? <span className="text-xs text-gray-500">(Twin-linked)</span> : null}
                   </label>
+                </div>
+                <div className="space-y-2 border-t border-gray-700/50 pt-3">
+                  <InlineStatField label={<span className="flex items-center gap-1">Crit Hit <FieldHint hint="Default 6. If the weapon crits on 5+, set 5. Affects Lethal Hits and Sustained Hits triggers." theme={theme} /></span>}>
+                    <input className={`w-full rounded border p-2 text-xl font-bold ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300 text-gray-900"}`} type="number" value={critHitThreshold} onChange={(e) => setCritHitThreshold(e.target.value)} />
+                  </InlineStatField>
+                  <InlineStatField label={<span className="flex items-center gap-1">Crit Wound <FieldHint hint="Default 6. Anti-X rules (e.g. Anti-Infantry 4+) may lower this. Affects Devastating Wounds trigger." theme={theme} /></span>}>
+                    <input className={`w-full rounded border p-2 text-xl font-bold ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300 text-gray-900"}`} type="number" value={critWoundThreshold} onChange={(e) => setCritWoundThreshold(e.target.value)} />
+                  </InlineStatField>
                 </div>
               </Section>
             )}
@@ -2924,6 +2930,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                   { label: `Preserve hooks: ${preserveHooks ? "ON" : "OFF"}`, on: preserveHooks, action: () => setPreserveHooks(!preserveHooks), title: "Keep toggle states on Clear" },
                   { label: `Strict: ${strictMode ? "ON" : "OFF"}`, on: strictMode, action: () => setStrictMode(!strictMode), title: "Lock totals until dice complete" },
                   { label: showLog ? "Hide log" : "Show log", on: showLog, action: () => setShowLog(!showLog) },
+                  { label: showExperimental ? "Hide experimental" : "Experimental", on: showExperimental, action: () => setShowExperimental(!showExperimental), title: "Show/hide rerolls and crit thresholds" },
                 ].map(({ label, on, action, title }) => (
                   <button key={label} type="button"
                     className={`rounded px-2 py-1 text-xs font-semibold border transition ${on ? "bg-amber-600/70 text-white border-amber-500/40" : "bg-gray-900 text-gray-300 border-gray-700 hover:bg-gray-800"}`}

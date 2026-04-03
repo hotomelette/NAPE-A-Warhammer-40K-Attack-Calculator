@@ -95,6 +95,7 @@ export const initialUI = {
   showWizard: false,
   strictMode: false,
   preserveHooks: false,
+  showExperimental: false,
 };
 
 export const initialEaster = {

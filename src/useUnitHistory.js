@@ -25,17 +25,17 @@ function saveHistory(entries) {
 export function useUnitHistory() {
   const [history, setHistory] = useState(loadHistory);
 
-  const addOrUpdateEntry = useCallback((searchText, unitName, targetFields, wahapediaUrl) => {
+  const addOrUpdateEntry = useCallback((searchText, unitName, targetFields, wahapediaUrl, source) => {
     const id = normalizeId(searchText);
     setHistory(prev => {
       const existingIdx = prev.findIndex(e => e.id === id);
       let next;
       if (existingIdx >= 0) {
         const existing = prev[existingIdx];
-        const updated = { ...existing, unitName, targetFields, wahapediaUrl, timestamp: new Date().toISOString() };
+        const updated = { ...existing, unitName, targetFields, wahapediaUrl, source, timestamp: new Date().toISOString() };
         next = [updated, ...prev.filter((_, i) => i !== existingIdx)].slice(0, MAX_ENTRIES);
       } else {
-        const entry = { id, unitName, targetFields, wahapediaUrl, timestamp: new Date().toISOString(), weapons: [] };
+        const entry = { id, unitName, targetFields, wahapediaUrl, source, timestamp: new Date().toISOString(), weapons: [] };
         next = [entry, ...prev].slice(0, MAX_ENTRIES);
       }
       saveHistory(next);

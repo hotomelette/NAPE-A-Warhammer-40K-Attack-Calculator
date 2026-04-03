@@ -67,7 +67,7 @@ export function useUnitLookup(getApiKey, history) {
         setAttackerMeta(meta);
         setLastFilled("attacker");
         if (history) {
-          if (targetFields) history.addOrUpdateEntry(attackerText, meta.resolvedName, targetFields, meta.wahapediaUrl ?? "");
+          if (targetFields) history.addOrUpdateEntry(attackerText, attackerText, targetFields, meta.wahapediaUrl ?? "", meta.source);
           history.addWeapon(attackerText, meta.resolvedName, fields);
         }
       }
@@ -105,7 +105,7 @@ export function useUnitLookup(getApiKey, history) {
       setAttackerPageCache(null);
       const resolvedTargetFields = targetFields ?? attackerTargetFieldsCache;
       if (history) {
-        if (resolvedTargetFields) history.addOrUpdateEntry(attackerText, meta.resolvedName, resolvedTargetFields, meta.wahapediaUrl ?? "");
+        if (resolvedTargetFields) history.addOrUpdateEntry(attackerText, attackerText, resolvedTargetFields, meta.wahapediaUrl ?? "", meta.source);
         history.addWeapon(attackerText, choice, fields);
       }
     } catch (err) {
@@ -134,7 +134,7 @@ export function useUnitLookup(getApiKey, history) {
         setDefenderOptions(null);
         setDefenderPageCache(null);
         setLastFilled("defender");
-        if (history) history.addOrUpdateEntry(defenderText, meta.resolvedName, fields, meta.wahapediaUrl ?? "");
+        if (history) history.addOrUpdateEntry(defenderText, defenderText, fields, meta.wahapediaUrl ?? "", meta.source);
       }
     } catch (err) {
       console.error("[UnitLookup] fillDefender failed:", err);
@@ -155,7 +155,7 @@ export function useUnitLookup(getApiKey, history) {
       setLastFilled("defender");
       setDefenderOptions(null);
       setDefenderPageCache(null);
-      if (history) history.addOrUpdateEntry(defenderText, meta.resolvedName, fields, meta.wahapediaUrl ?? "");
+      if (history) history.addOrUpdateEntry(defenderText, defenderText, fields, meta.wahapediaUrl ?? "", meta.source);
     } catch (err) {
       console.error("[UnitLookup] resolveDefender failed:", err);
       setDefenderError(classifyError(err));
@@ -170,7 +170,8 @@ export function useUnitLookup(getApiKey, history) {
     attackerLoading, defenderLoading,
     attackerError, defenderError,
     lastFilled, fillAttacker, fillDefender,
-    attackerMeta, defenderMeta,
+    attackerMeta, setAttackerMeta,
+    defenderMeta, setDefenderMeta,
     attackerOptions, defenderOptions,
     resolveAttacker, resolveDefender,
   };
