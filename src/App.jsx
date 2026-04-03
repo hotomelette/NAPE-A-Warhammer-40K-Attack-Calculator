@@ -313,7 +313,7 @@ function HistoryDropdown({ history, onFillWeapon, onFillTarget, theme, mode }) {
                 <button
                   type="button"
                   className="flex-1 text-left text-sm font-medium truncate"
-                  onClick={() => { onFillTarget(entry.targetFields); setOpen(false); }}
+                  onClick={() => { onFillTarget(entry.targetFields, entry.unitName); setOpen(false); }}
                 >
                   {entry.unitName}
                 </button>
@@ -341,7 +341,7 @@ function HistoryDropdown({ history, onFillWeapon, onFillTarget, theme, mode }) {
                         key={w.label}
                         type="button"
                         className={chipCls}
-                        onClick={() => { onFillWeapon(w.fields); setOpen(false); }}
+                        onClick={() => { onFillWeapon(w.fields, entry.unitName, w.label); setOpen(false); }}
                         title={`Fill weapon fields: ${w.label}`}
                       >
                         {w.label}
@@ -1755,16 +1755,16 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
 
               <div className="max-w-screen-2xl mx-auto space-y-4 px-1 sm:px-2 overflow-x-hidden overflow-y-visible">
         {/* ── Sticky combined header + live results ── */}
-        <div className={`sticky top-0 z-40 border-b border-gray-700/80 shadow-lg rounded-b-2xl ${viz.headerBg}`}>
+        <div className={`sticky top-0 z-40 border-b border-gray-700/80 shadow-lg rounded-2xl ${viz.headerBg}`}>
 
           {/* Emoji marquee background — only when hard total is ready */}
           {diceReady && (
             <div className="absolute inset-0 pointer-events-none overflow-hidden" style={{ opacity: 0.12 }}>
-              <div className="nape-marquee-row" style={{ animationDuration: "30s", fontSize: "1.5rem", lineHeight: 2 }}>
+              <div className="nape-marquee-row" style={{ animationDuration: "30s", fontSize: "0.9rem", lineHeight: 1.5 }}>
                 {Array.from({ length: 40 }).map((_, i) => <span key={i} className="mr-3">{viz.emoji}</span>)}
                 {Array.from({ length: 40 }).map((_, i) => <span key={`d${i}`} className="mr-3">{viz.emoji}</span>)}
               </div>
-              <div className="nape-marquee-row nape-marquee-reverse" style={{ animationDuration: "36s", fontSize: "1.5rem", lineHeight: 2 }}>
+              <div className="nape-marquee-row nape-marquee-reverse" style={{ animationDuration: "36s", fontSize: "0.9rem", lineHeight: 1.5 }}>
                 {Array.from({ length: 40 }).map((_, i) => <span key={i} className="mr-3">{viz.emoji}</span>)}
                 {Array.from({ length: 40 }).map((_, i) => <span key={`d${i}`} className="mr-3">{viz.emoji}</span>)}
               </div>
@@ -1854,7 +1854,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                     <FillButton label="Fill" loading={unitLookup.attackerLoading} disabled={!unitLookup.attackerText.trim()} hasKey={hasApiKey} onClick={() => unitLookup.fillAttacker(dispatch)} theme={theme} />
                     <HistoryDropdown
                       history={unitHistory}
-                      onFillWeapon={(fields) => dispatch({ type: "LOAD_WEAPON", weapon: fields })}
+                      onFillWeapon={(fields, unitName, weaponLabel) => { dispatch({ type: "LOAD_WEAPON", weapon: fields }); unitLookup.setAttackerText(unitName && weaponLabel ? `${unitName} ${weaponLabel}` : weaponLabel || unitName || ""); }}
                       onFillTarget={(fields) => dispatch({ type: "LOAD_TARGET", target: fields })}
                       theme={theme}
                       mode="attacker"
@@ -2164,7 +2164,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                     <HistoryDropdown
                       history={unitHistory}
                       onFillWeapon={(fields) => dispatch({ type: "LOAD_WEAPON", weapon: fields })}
-                      onFillTarget={(fields) => dispatch({ type: "LOAD_TARGET", target: fields })}
+                      onFillTarget={(fields, unitName) => { dispatch({ type: "LOAD_TARGET", target: fields }); if (unitName) unitLookup.setDefenderText(unitName); }}
                       theme={theme}
                       mode="defender"
                     />
