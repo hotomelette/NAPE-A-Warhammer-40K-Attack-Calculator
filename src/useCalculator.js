@@ -361,7 +361,7 @@ export function useCalculator({
         ? mortalWoundAttacks + failedSavesEffective
         : failedSavesEffective;
 
-    if (!damageFixed && expectedVarDice > 0 && damageDice.length !== expectedVarDice) {
+    if (!damageFixed && expectedVarDice > 0 && damageDice.length < expectedVarDice) {
       errors.push(
         `Damage rolls provided (${damageDice.length}) must equal ${expectedVarDice} (${devastatingWounds ? "Dev Wounds dice + failed saves" : "failed saves"}).`
       );

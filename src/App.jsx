@@ -1567,6 +1567,9 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
     await pause(120);
 
     // Phase 3: Wounds
+    const critHitTW = Number(critHitThreshold) || 6;
+    const critWoundTW = Number(critWoundThreshold) || 6;
+    let totalWoundsW = 0, mortalWoundAttacksW = 0;
     if (normalHits > 0) {
       let woundRollsFinal = Array.from({ length: normalHits }, () => Math.ceil(Math.random() * 6));
       await animateField(setWoundRollsText, woundRollsFinal, 6);
@@ -1583,11 +1586,25 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
           );
         }
       }
+      for (const d of woundRollsFinal) {
+        if (d >= critWoundTW) { if (devastatingWounds) mortalWoundAttacksW++; else totalWoundsW++; }
+        else if (d + effectiveWoundMod >= woundTarget) totalWoundsW++;
+      }
+    }
+
+    // Phase 4: Pre-roll damage dice (attacker rolls; count = total wounds before saves)
+    const dmgSpecW = parseDiceSpec(damageValue);
+    const totalDmgDiceW = totalWoundsW + mortalWoundAttacksW;
+    if (!damageFixed && dmgSpecW.hasDie && totalDmgDiceW > 0) {
+      const rolls = Array.from({ length: totalDmgDiceW }, () => Math.ceil(Math.random() * dmgSpecW.sides));
+      await animateField(setDamageRolls, rolls, dmgSpecW.sides);
+      await pause(80);
+    } else {
+      setDamageRolls("");
     }
 
     // Clear stale target-side fields so the defender knows to roll their half
     setSaveRollsText("");
-    setDamageRolls("");
     setFnpRollsText("");
 
     setIsRollingWeapon(false);
@@ -2513,7 +2530,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                                 <div className="flex gap-2">
                                   <input
                                     className={`flex-1 rounded border p-2 text-lg font-semibold ${
-                                      activeComputed.failedSavesEffective > 0 && parseDiceList(damageRolls).length !== activeComputed.failedSavesEffective
+                                      activeComputed.failedSavesEffective > 0 && parseDiceList(damageRolls).length < activeComputed.failedSavesEffective
                                         ? "border-red-500 ring-2 ring-red-200" : ""
                                     }`}
                                     value={damageRolls}
