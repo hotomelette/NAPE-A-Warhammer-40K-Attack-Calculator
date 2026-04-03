@@ -129,8 +129,8 @@ describe("useUnitLookup", () => {
     expect(fetchAttackerStatsFromPage).toHaveBeenCalledWith("space marine intercessor", "Bolt Rifle", pageCache, mockApiKey);
     expect(dispatch).toHaveBeenCalledWith({ type: "LOAD_WEAPON", weapon: weaponFields });
     expect(result.current.attackerOptions).toBeNull();
-    // resolveAttacker uses cache path: meta comes from cache (resolvedName = chosen weapon label)
-    expect(result.current.attackerMeta).toEqual({ resolvedName: "Bolt Rifle", source: "cache", wahapediaUrl: pageCache.wahapediaUrl });
+    // resolveAttacker uses cache path: source comes from pageCache (reflects actual live/training status)
+    expect(result.current.attackerMeta).toEqual({ resolvedName: "Bolt Rifle", source: pageCache.source, wahapediaUrl: pageCache.wahapediaUrl });
   });
 
   it("stores defenderOptions and does not dispatch when fillDefender gets disambiguation", async () => {

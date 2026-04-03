@@ -45,7 +45,7 @@ export function useUnitLookup(getApiKey, history) {
         setAttackerPageCache(result.pageCache);
         setAttackerTargetFieldsCache(result.targetFields ?? null);
         if (result.targetFields && history) {
-          history.addOrUpdateEntry(attackerText, attackerText, result.targetFields, result.pageCache?.wahapediaUrl ?? "");
+          history.addOrUpdateEntry(attackerText, attackerText, result.targetFields, result.pageCache?.wahapediaUrl ?? "", result.pageCache?.source);
         }
         // Pre-fetch all weapon stats in parallel using the already-fetched page
         // (background, non-blocking — cache fills as each resolves)
@@ -87,7 +87,7 @@ export function useUnitLookup(getApiKey, history) {
       if (attackerWeaponsCache && attackerWeaponsCache[choice]) {
         const fields = attackerWeaponsCache[choice];
         dispatch({ type: "LOAD_WEAPON", weapon: fields });
-        setAttackerMeta({ resolvedName: choice, wahapediaUrl: attackerPageCache?.wahapediaUrl ?? "", source: "cache" });
+        setAttackerMeta({ resolvedName: choice, wahapediaUrl: attackerPageCache?.wahapediaUrl ?? "", source: attackerPageCache?.source ?? "training" });
         setLastFilled("attacker");
         setAttackerOptions(null);
         setAttackerPageCache(null);
