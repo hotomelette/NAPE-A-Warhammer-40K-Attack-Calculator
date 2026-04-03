@@ -100,8 +100,8 @@ function RollButton({ onClick, disabled, isRolling, isReady, emoji, label, ready
 function Section({ title, theme, children, action }) {
   const panelClass =
     theme === "dark"
-      ? "rounded-2xl bg-slate-900 shadow p-4 border border-gray-700 text-gray-100 overflow-visible"
-      : "rounded-2xl bg-white shadow p-4 border border-gray-200 text-gray-900 overflow-visible";
+      ? "rounded-2xl bg-slate-900 shadow p-3 sm:p-4 border border-gray-700 text-gray-100 overflow-x-hidden overflow-y-visible"
+      : "rounded-2xl bg-white shadow p-3 sm:p-4 border border-gray-200 text-gray-900 overflow-x-hidden overflow-y-visible";
   const titleClass =
     theme === "dark"
       ? "text-xl md:text-2xl font-extrabold tracking-wide border-b border-gray-700 pb-2 mb-3"
@@ -119,19 +119,33 @@ function Section({ title, theme, children, action }) {
 
 function FieldHint({ hint, theme }) {
   const [show, setShow] = React.useState(false);
+  const [pos, setPos] = React.useState({ top: 0, left: 0 });
+  const btnRef = React.useRef(null);
   if (!hint) return null;
+
+  const computePos = () => {
+    if (!btnRef.current) return;
+    const rect = btnRef.current.getBoundingClientRect();
+    const W = 224;
+    let left = rect.right - W;
+    left = Math.max(8, Math.min(left, window.innerWidth - W - 8));
+    setPos({ top: rect.bottom + 6, left });
+  };
+
   return (
-    <span className="relative inline-flex" style={{ overflow: "visible" }}>
+    <span className="relative inline-flex">
       <span
-        onMouseEnter={() => setShow(true)}
+        ref={btnRef}
+        onMouseEnter={() => { computePos(); setShow(true); }}
         onMouseLeave={() => setShow(false)}
+        onClick={(e) => { e.stopPropagation(); computePos(); setShow(s => !s); }}
         className={`cursor-help rounded border px-1 py-0.5 select-none ${theme === "dark" ? "border-gray-600 text-gray-400 hover:text-gray-200" : "border-gray-300 text-gray-500 hover:text-gray-700"}`}
         style={{ fontSize: "10px", lineHeight: 1 }}
       >?</span>
       {show && (
         <span
-          className={`absolute right-0 top-6 z-[9999] w-64 rounded-lg border p-2 text-xs font-normal shadow-2xl ${theme === "dark" ? "bg-gray-900 border-gray-600 text-gray-200" : "bg-white border-gray-300 text-gray-700"}`}
-          style={{ position: "absolute", pointerEvents: "none", whiteSpace: "normal" }}
+          className={`fixed z-[9999] rounded-lg border p-2 text-xs font-normal shadow-2xl ${theme === "dark" ? "bg-gray-900 border-gray-600 text-gray-200" : "bg-white border-gray-300 text-gray-700"}`}
+          style={{ top: pos.top, left: pos.left, width: "14rem", maxWidth: "calc(100vw - 1rem)", pointerEvents: "none", whiteSpace: "normal" }}
         >{hint}</span>
       )}
     </span>
@@ -272,7 +286,7 @@ function HistoryDropdown({ history, onFillWeapon, onFillTarget, theme, mode }) {
 
   if (visibleEntries.length === 0) return null;
 
-  const panelCls = `absolute z-50 mt-1 w-72 rounded-lg border shadow-lg p-2 flex flex-col gap-1 max-h-80 overflow-y-auto
+  const panelCls = `absolute z-50 mt-1 w-72 max-w-[calc(100vw-1rem)] left-0 rounded-lg border shadow-lg p-2 flex flex-col gap-1 max-h-60 overflow-y-auto
     ${isDark ? "bg-gray-900 border-gray-700 text-gray-100" : "bg-white border-gray-200 text-gray-900"}`;
   const rowCls = `flex items-center rounded px-2 py-1 ${isDark ? "hover:bg-gray-800" : "hover:bg-gray-100"}`;
   const chipCls = `rounded px-2 py-0.5 text-xs font-medium cursor-pointer
@@ -1739,9 +1753,9 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
 
 
 
-              <div className="max-w-screen-2xl mx-auto space-y-4 px-2 overflow-visible">
+              <div className="max-w-screen-2xl mx-auto space-y-4 px-1 sm:px-2 overflow-x-hidden overflow-y-visible">
         {/* ── Sticky combined header + live results ── */}
-        <div className={`sticky top-0 z-40 border-b border-gray-700/80 shadow-lg ${viz.headerBg}`}>
+        <div className={`sticky top-0 z-40 border-b border-gray-700/80 shadow-lg rounded-b-2xl ${viz.headerBg}`}>
 
           {/* Emoji marquee background — only when hard total is ready */}
           {diceReady && (
@@ -1758,7 +1772,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
           )}
 
           {/* Header content row */}
-          <div className="relative z-10 max-w-screen-2xl mx-auto px-3 py-2 flex items-center gap-3 flex-wrap">
+          <div className="relative z-10 max-w-screen-2xl mx-auto px-2 sm:px-3 py-2 flex items-center gap-2 sm:gap-3 flex-wrap overflow-hidden">
 
             {/* NAPE chip */}
             <span className="text-xs font-extrabold tracking-widest px-2 py-0.5 rounded border border-gray-600 text-gray-300 bg-gray-900/60 shrink-0">NAPE</span>
@@ -1811,20 +1825,6 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
 
             {/* Spacer */}
             <div className="flex-1" />
-
-            {/* Mode toggles */}
-            <button type="button"
-              className={`rounded px-2 py-1 text-xs font-bold border transition shrink-0 ${simpleMode ? "bg-emerald-600/80 text-white border-emerald-500/40" : "bg-gray-900/80 text-gray-300 border-gray-700 hover:bg-gray-800"}`}
-              onClick={toggleSimpleMode} title="Toggle Simple/Complex mode">
-              {simpleMode ? "Simple" : "Complex"}
-            </button>
-            <button type="button"
-              className={`rounded px-2 py-1 text-xs font-bold border transition shrink-0 ${theme === "dark" ? "bg-slate-800 border-gray-600 text-gray-300 hover:bg-slate-700" : "bg-gray-100 border-gray-300 text-gray-700 hover:bg-gray-200"}`}
-              onClick={toggleTheme}
-              title="Toggle dark/light theme">
-              {theme === "dark" ? "🌙 Dark" : "☀️ Light"}
-            </button>
-            <SettingsPanel theme={theme} />
           </div>
         </div>
 
@@ -1849,7 +1849,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                       onChange={e => unitLookup.setAttackerText(e.target.value)}
                       onKeyDown={e => e.key === "Enter" && !unitLookup.attackerLoading && unitLookup.attackerText.trim() && unitLookup.fillAttacker(dispatch)}
                       placeholder="e.g. intercessor bolt rifle, crisis suit plasma rifle"
-                      className={`flex-1 rounded border px-2 py-1 text-sm ${theme === "dark" ? "bg-gray-800 border-gray-600 text-gray-100 placeholder-gray-500" : "bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-400"}`}
+                      className={`flex-1 min-w-0 rounded border px-2 py-1 text-sm ${theme === "dark" ? "bg-gray-800 border-gray-600 text-gray-100 placeholder-gray-500" : "bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-400"}`}
                     />
                     <FillButton label="Fill" loading={unitLookup.attackerLoading} disabled={!unitLookup.attackerText.trim()} hasKey={hasApiKey} onClick={() => unitLookup.fillAttacker(dispatch)} theme={theme} />
                     <HistoryDropdown
@@ -1902,7 +1902,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                     }}
                     inputMode="text"
                     placeholder={attacksFixed ? "e.g. 6" : "e.g. D6+1, 2D6, D3+2"}
-                    className={`flex-1 rounded border p-2 text-lg font-semibold ${!isNum(attacksValue) ? "border-red-500 ring-2 ring-red-200" : ""}`}
+                    className={`flex-1 min-w-0 rounded border p-2 text-lg font-semibold ${!isNum(attacksValue) ? "border-red-500 ring-2 ring-red-200" : ""}`}
                   />
                 </div>
 
@@ -1944,10 +1944,10 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                         Fixed
                       </label>
                       {damageFixed ? (
-                        <input className={`flex-1 rounded border p-2 text-xl font-bold ${damageFixed && !isNum(damageValue) ? "border-red-500 ring-2 ring-red-200" : ""} ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300 text-gray-900"}`} type="number" value={damageValue} onChange={(e) => setDamageValue(e.target.value)} placeholder="e.g. 2" />
+                        <input className={`flex-1 min-w-0 rounded border p-2 text-xl font-bold ${damageFixed && !isNum(damageValue) ? "border-red-500 ring-2 ring-red-200" : ""} ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300 text-gray-900"}`} type="number" value={damageValue} onChange={(e) => setDamageValue(e.target.value)} placeholder="e.g. 2" />
                       ) : (
                         <input
-                          className={`flex-1 rounded border p-2 text-lg font-semibold ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300 text-gray-900"}`}
+                          className={`flex-1 min-w-0 rounded border p-2 text-lg font-semibold ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300 text-gray-900"}`}
                           placeholder="e.g. D3, D6, D6+1"
                           value={damageValue}
                           onChange={(e) => setDamageValue(e.target.value.replace(/[^0-9dD+]/g, "").toUpperCase())}
@@ -2158,7 +2158,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                       onChange={e => unitLookup.setDefenderText(e.target.value)}
                       onKeyDown={e => e.key === "Enter" && !unitLookup.defenderLoading && unitLookup.defenderText.trim() && unitLookup.fillDefender(dispatch)}
                       placeholder="e.g. doomstalker, ork boy, space marine"
-                      className={`flex-1 rounded border px-2 py-1 text-sm ${theme === "dark" ? "bg-gray-800 border-gray-600 text-gray-100 placeholder-gray-500" : "bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-400"}`}
+                      className={`flex-1 min-w-0 rounded border px-2 py-1 text-sm ${theme === "dark" ? "bg-gray-800 border-gray-600 text-gray-100 placeholder-gray-500" : "bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-400"}`}
                     />
                     <FillButton label="Fill" loading={unitLookup.defenderLoading} disabled={!unitLookup.defenderText.trim()} hasKey={hasApiKey} onClick={() => unitLookup.fillDefender(dispatch)} theme={theme} />
                     <HistoryDropdown
@@ -2204,7 +2204,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                       onChange={e => { const on = e.target.checked; setFnpEnabled(on); if (!on) { setFnp(""); setFnpRollsText(""); } }} />
                     <input type="text" inputMode="numeric" value={fnp} onChange={e => setFnp(e.target.value)}
                       disabled={!fnpEnabled} placeholder="e.g. 5"
-                      className={`flex-1 rounded border p-2 font-bold text-xl disabled:opacity-40 ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300 text-gray-900"}`} />
+                      className={`flex-1 min-w-0 rounded border p-2 font-bold text-xl disabled:opacity-40 ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300 text-gray-900"}`} />
                   </div>
                 </InlineStatField>
               </div>
@@ -2311,7 +2311,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                             <input type="checkbox" checked={t.fnpEnabled} onChange={e => setSplitTargetField(i, "fnpEnabled", e.target.checked)} className="h-4 w-4 accent-amber-400" />
                             <input type="text" inputMode="numeric" inputMode="numeric" value={t.fnp} onChange={e => setSplitTargetField(i, "fnp", e.target.value)}
                               disabled={!t.fnpEnabled} placeholder="FNP+ e.g. 5"
-                              className={`flex-1 rounded border p-2 font-bold disabled:opacity-40 ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300 text-gray-900"}`} />
+                              className={`flex-1 min-w-0 rounded border p-2 font-bold disabled:opacity-40 ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300 text-gray-900"}`} />
                           </div>
                         </div>
                       </div>
@@ -2422,7 +2422,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                               >
                                 <div className="flex gap-2">
                                   <input
-                                    className={`flex-1 rounded border p-2 text-lg font-semibold ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100 placeholder:text-gray-500" : "bg-white border-gray-300 text-gray-900"} ${
+                                    className={`flex-1 min-w-0 rounded border p-2 text-lg font-semibold ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100 placeholder:text-gray-500" : "bg-white border-gray-300 text-gray-900"} ${
                                       parseDiceList(attacksRolls).length !== parseDiceSpec(attacksValue).n
                                         ? "border-red-500 ring-2 ring-red-200"
                                         : ""
@@ -2445,7 +2445,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                             >
                               <div className="flex gap-2">
                                 <input
-                                  className={`flex-1 rounded border p-2 text-lg font-semibold ${hasHitCountError ? "border-red-500 ring-2 ring-red-200" : ""}`}
+                                  className={`flex-1 min-w-0 rounded border p-2 text-lg font-semibold ${hasHitCountError ? "border-red-500 ring-2 ring-red-200" : ""}`}
                                   value={hitRollsText}
                                   onChange={(e) => setHitRollsText(e.target.value)}
                                   placeholder="e.g. 6 5 2 1 4 ..."
@@ -2476,7 +2476,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                               >
                                 <div className="flex gap-2">
                                   <input
-                                    className={`flex-1 rounded border p-2 text-lg font-semibold ${hasWoundCountError ? "border-red-500 ring-2 ring-red-200" : ""}`}
+                                    className={`flex-1 min-w-0 rounded border p-2 text-lg font-semibold ${hasWoundCountError ? "border-red-500 ring-2 ring-red-200" : ""}`}
                                     value={woundRollsText}
                                     onChange={(e) => setWoundRollsText(e.target.value)}
                                     placeholder="e.g. 6 4 3 1 ..."
@@ -2494,7 +2494,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                               >
                                 <div className="flex gap-2">
                                   <input
-                                    className={`flex-1 rounded border p-2 text-lg font-semibold ${hasWoundRerollCountError ? "border-red-500 ring-2 ring-red-200" : ""}`}
+                                    className={`flex-1 min-w-0 rounded border p-2 text-lg font-semibold ${hasWoundRerollCountError ? "border-red-500 ring-2 ring-red-200" : ""}`}
                                     value={woundRerollRollsText}
                                     onChange={(e) => setWoundRerollRollsText(e.target.value)}
                                     placeholder="e.g. 5 4 ..."
@@ -2514,7 +2514,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                                 >
                                   <div className="flex gap-2">
                                     <input
-                                      className={`flex-1 rounded border p-2 text-lg font-semibold ${hasSaveCountError ? "border-red-500 ring-2 ring-red-200" : ""}`}
+                                      className={`flex-1 min-w-0 rounded border p-2 text-lg font-semibold ${hasSaveCountError ? "border-red-500 ring-2 ring-red-200" : ""}`}
                                       value={saveRollsText}
                                       onChange={(e) => setSaveRollsText(e.target.value)}
                                       placeholder="e.g. 5 2 6 ..."
@@ -2533,7 +2533,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                                           >
                                             <div className="flex gap-2">
                                               <input
-                                                className={`flex-1 rounded border p-2 text-lg font-semibold ${hasFnpCountError ? "border-red-500 ring-2 ring-red-200" : ""}`}
+                                                className={`flex-1 min-w-0 rounded border p-2 text-lg font-semibold ${hasFnpCountError ? "border-red-500 ring-2 ring-red-200" : ""}`}
                                                 value={fnpRollsText}
                                                 onChange={(e) => setFnpRollsText(e.target.value)}
                                                 placeholder="e.g. 1 5 6 2 ..."
@@ -2561,7 +2561,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                               >
                                 <div className="flex gap-2">
                                   <input
-                                    className={`flex-1 rounded border p-2 text-lg font-semibold ${
+                                    className={`flex-1 min-w-0 rounded border p-2 text-lg font-semibold ${
                                       parseDiceSpec(damageValue).n * activeComputed.failedSavesEffective > 0 && parseDiceList(damageRolls).length < parseDiceSpec(damageValue).n * activeComputed.failedSavesEffective
                                         ? "border-red-500 ring-2 ring-red-200" : ""
                                     }`}
@@ -2599,7 +2599,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                                 >
                                   <div className="flex gap-2">
                                     <input
-                                      className={`flex-1 rounded border p-2 text-lg font-semibold ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100 placeholder:text-gray-500" : "bg-white border-gray-300 text-gray-900"} ${saveCountMismatch ? "border-red-500 ring-2 ring-red-200" : ""}`}
+                                      className={`flex-1 min-w-0 rounded border p-2 text-lg font-semibold ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100 placeholder:text-gray-500" : "bg-white border-gray-300 text-gray-900"} ${saveCountMismatch ? "border-red-500 ring-2 ring-red-200" : ""}`}
                                       value={t.saveRollsText}
                                       onChange={e => setSplitTargetField(i, "saveRollsText", e.target.value)}
                                       placeholder="e.g. 5 2 6 ..."
@@ -2616,7 +2616,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                                   >
                                     <div className="flex gap-2">
                                       <input
-                                        className={`flex-1 rounded border p-2 text-lg font-semibold ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100 placeholder:text-gray-500" : "bg-white border-gray-300 text-gray-900"}`}
+                                        className={`flex-1 min-w-0 rounded border p-2 text-lg font-semibold ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100 placeholder:text-gray-500" : "bg-white border-gray-300 text-gray-900"}`}
                                         value={t.damageRolls}
                                         onChange={e => setSplitTargetField(i, "damageRolls", e.target.value)}
                                         placeholder="e.g. 3 5 2 ..."
@@ -2635,7 +2635,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                                   >
                                     <div className="flex gap-2">
                                       <input
-                                        className={`flex-1 rounded border p-2 text-lg font-semibold ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100 placeholder:text-gray-500" : "bg-white border-gray-300 text-gray-900"}`}
+                                        className={`flex-1 min-w-0 rounded border p-2 text-lg font-semibold ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100 placeholder:text-gray-500" : "bg-white border-gray-300 text-gray-900"}`}
                                         value={t.fnpRollsText}
                                         onChange={e => setSplitTargetField(i, "fnpRollsText", e.target.value)}
                                         placeholder="e.g. 1 5 6 ..."
@@ -2894,23 +2894,38 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
 
         </div>
 
-          <div className="rounded-2xl bg-gray-900/40 border border-gray-700 text-gray-100 p-4">
-            <div className="flex flex-wrap gap-2">
-              {[
-                { label: showTableUse ? "Hide table guide" : "📋 Table guide", on: showTableUse, action: () => setShowTableUse(!showTableUse), title: "Show/hide table use guide" },
-                { label: showDiceRef ? "Hide dice ref" : "🎲 Dice ref", on: showDiceRef, action: () => setShowDiceRef(!showDiceRef), title: "Dice sequencing reference" },
-                { label: showLimitations ? "Hide limitations" : "Limitations", on: showLimitations, action: () => setShowLimitations(!showLimitations) },
-                { label: showCheatSheet ? "Hide cheat sheet" : "Cheat sheet", on: showCheatSheet, action: () => setShowCheatSheet(!showCheatSheet) },
-                { label: `Preserve hooks: ${preserveHooks ? "ON" : "OFF"}`, on: preserveHooks, action: () => setPreserveHooks(!preserveHooks), title: "Keep toggle states on Clear" },
-                { label: `Strict: ${strictMode ? "ON" : "OFF"}`, on: strictMode, action: () => setStrictMode(!strictMode), title: "Lock totals until dice complete" },
-                { label: showLog ? "Hide log" : "Show log", on: showLog, action: () => setShowLog(!showLog) },
-              ].map(({ label, on, action, title }) => (
-                <button key={label} type="button"
-                  className={`rounded px-2 py-1 text-xs font-semibold border transition ${on ? "bg-amber-600/70 text-white border-amber-500/40" : "bg-gray-900 text-gray-300 border-gray-700 hover:bg-gray-800"}`}
-                  onClick={action} title={title}>
-                  {label}
+          <div className="rounded-2xl bg-gray-900/40 border border-gray-700 text-gray-100 p-3 sm:p-4">
+            <div className="flex flex-wrap justify-between gap-y-2">
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { label: showTableUse ? "Hide table guide" : "📋 Table guide", on: showTableUse, action: () => setShowTableUse(!showTableUse), title: "Show/hide table use guide" },
+                  { label: showDiceRef ? "Hide dice ref" : "🎲 Dice ref", on: showDiceRef, action: () => setShowDiceRef(!showDiceRef), title: "Dice sequencing reference" },
+                  { label: showLimitations ? "Hide limitations" : "Limitations", on: showLimitations, action: () => setShowLimitations(!showLimitations) },
+                  { label: showCheatSheet ? "Hide cheat sheet" : "Cheat sheet", on: showCheatSheet, action: () => setShowCheatSheet(!showCheatSheet) },
+                  { label: `Preserve hooks: ${preserveHooks ? "ON" : "OFF"}`, on: preserveHooks, action: () => setPreserveHooks(!preserveHooks), title: "Keep toggle states on Clear" },
+                  { label: `Strict: ${strictMode ? "ON" : "OFF"}`, on: strictMode, action: () => setStrictMode(!strictMode), title: "Lock totals until dice complete" },
+                  { label: showLog ? "Hide log" : "Show log", on: showLog, action: () => setShowLog(!showLog) },
+                ].map(({ label, on, action, title }) => (
+                  <button key={label} type="button"
+                    className={`rounded px-2 py-1 text-xs font-semibold border transition ${on ? "bg-amber-600/70 text-white border-amber-500/40" : "bg-gray-900 text-gray-300 border-gray-700 hover:bg-gray-800"}`}
+                    onClick={action} title={title}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <div className="flex flex-wrap gap-2 items-start">
+                <button type="button"
+                  className={`rounded px-2 py-1 text-xs font-bold border transition shrink-0 ${simpleMode ? "bg-emerald-600/80 text-white border-emerald-500/40" : "bg-gray-900/80 text-gray-300 border-gray-700 hover:bg-gray-800"}`}
+                  onClick={toggleSimpleMode} title="Toggle Simple/Complex mode">
+                  {simpleMode ? "Simple" : "Complex"}
                 </button>
-              ))}
+                <button type="button"
+                  className={`rounded px-2 py-1 text-xs font-bold border transition shrink-0 ${theme === "dark" ? "bg-slate-800 border-gray-600 text-gray-300 hover:bg-slate-700" : "bg-gray-100 border-gray-300 text-gray-700 hover:bg-gray-200"}`}
+                  onClick={toggleTheme} title="Toggle dark/light theme">
+                  {theme === "dark" ? "🌙 Dark" : "☀️ Light"}
+                </button>
+                <SettingsPanel theme={theme} />
+              </div>
             </div>
 
 
