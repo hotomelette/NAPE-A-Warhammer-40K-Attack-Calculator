@@ -286,7 +286,7 @@ function HistoryDropdown({ history, onFillWeapon, onFillTarget, theme, mode }) {
 
   if (visibleEntries.length === 0) return null;
 
-  const panelCls = `absolute z-50 mt-1 w-72 max-w-[calc(100vw-1rem)] left-0 rounded-lg border shadow-lg p-2 flex flex-col gap-1 max-h-60 overflow-y-auto
+  const panelCls = `absolute z-50 mt-1 w-72 max-w-[calc(100vw-1rem)] right-0 rounded-lg border shadow-lg p-2 flex flex-col gap-1 max-h-60 overflow-y-auto
     ${isDark ? "bg-gray-900 border-gray-700 text-gray-100" : "bg-white border-gray-200 text-gray-900"}`;
   const rowCls = `flex items-center rounded px-2 py-1 ${isDark ? "hover:bg-gray-800" : "hover:bg-gray-100"}`;
   const chipCls = `rounded px-2 py-0.5 text-xs font-medium cursor-pointer
