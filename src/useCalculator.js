@@ -355,15 +355,23 @@ export function useCalculator({
 
     // If variable damage and Dev Wounds is enabled, we interpret dice as:
     //   first N = Dev Wounds conversions, then next M = normal failed saves (after ignore-first-failed-save).
+    // "2D6" damage means 2 dice per wound — multiply wound count by n.
+    const dmgSpec = parseDiceSpec(damageValue);
+    const dmgDicePerWound = dmgSpec.hasDie ? dmgSpec.n : 1;
+    const dmgSides = dmgSpec.hasDie ? dmgSpec.sides : 6;
+    const dmgMod = dmgSpec.mod || 0;
+
     const expectedVarDice = damageFixed
       ? 0
       : devastatingWounds
-        ? mortalWoundAttacks + failedSavesEffective
-        : failedSavesEffective;
+        ? (mortalWoundAttacks + failedSavesEffective) * dmgDicePerWound
+        : failedSavesEffective * dmgDicePerWound;
 
     if (!damageFixed && expectedVarDice > 0 && damageDice.length < expectedVarDice) {
       errors.push(
-        `Damage rolls provided (${damageDice.length}) must equal ${expectedVarDice} (${devastatingWounds ? "Dev Wounds dice + failed saves" : "failed saves"}).`
+        `Damage rolls provided (${damageDice.length}) must equal ${expectedVarDice} (${
+          devastatingWounds ? "Dev Wounds dice + failed saves" : "failed saves"
+        }${dmgDicePerWound > 1 ? ` × ${dmgDicePerWound} dice per wound` : ""}).`
       );
     }
 
@@ -382,33 +390,39 @@ export function useCalculator({
         log.push(`Dev Wounds damage: fixed. ${mortalWoundAttacks} × ${perM} = ${mortalDamage}`);
       }
     } else {
-      // Variable damage dice
+      // Variable damage: consume dmgDicePerWound dice per wound, mod added once per wound.
       let idx = 0;
       if (devastatingWounds && mortalWoundAttacks > 0) {
         for (let i = 0; i < mortalWoundAttacks; i++) {
-          const d = damageDice[idx++];
-          const dmgSpec = parseDiceSpec(damageValue);
-          const dmgSides = dmgSpec.hasDie ? dmgSpec.sides : 6;
-          if (d === undefined) continue;
-          if (!(d >= 1 && d <= dmgSides)) {
-            errors.push(`Damage roll #${idx} is not a valid D${dmgSides} result (1-${dmgSides}).`);
-            continue;
+          let woundTotal = dmgMod;
+          let valid = true;
+          for (let j = 0; j < dmgDicePerWound; j++) {
+            const d = damageDice[idx++];
+            if (d === undefined) { valid = false; continue; }
+            if (!(d >= 1 && d <= dmgSides)) {
+              errors.push(`Damage roll #${idx} is not a valid D${dmgSides} result (1-${dmgSides}).`);
+              valid = false; continue;
+            }
+            woundTotal += d;
           }
-          mortalDamage += applyDamageMods(d + (dmgSpec.mod || 0));
+          if (valid) mortalDamage += applyDamageMods(woundTotal);
         }
         log.push(`Dev Wounds damage: variable. Sum after mods = ${mortalDamage}`);
       }
 
       for (let i = 0; i < failedSavesEffective; i++) {
-        const d = damageDice[idx++];
-        const dmgSpec2 = parseDiceSpec(damageValue);
-        const dmgSides2 = dmgSpec2.hasDie ? dmgSpec2.sides : 6;
-        if (d === undefined) continue;
-        if (!(d >= 1 && d <= dmgSides2)) {
-          errors.push(`Damage roll #${idx} is not a valid D${dmgSides2} result (1-${dmgSides2}).`);
-          continue;
+        let woundTotal = dmgMod;
+        let valid = true;
+        for (let j = 0; j < dmgDicePerWound; j++) {
+          const d = damageDice[idx++];
+          if (d === undefined) { valid = false; continue; }
+          if (!(d >= 1 && d <= dmgSides)) {
+            errors.push(`Damage roll #${idx} is not a valid D${dmgSides} result (1-${dmgSides}).`);
+            valid = false; continue;
+          }
+          woundTotal += d;
         }
-        normalDamage += applyDamageMods(d + (dmgSpec2.mod || 0));
+        if (valid) normalDamage += applyDamageMods(woundTotal);
       }
       if (failedSavesEffective > 0) log.push(`Damage: variable. Normal damage sum after mods = ${normalDamage}`);
     }

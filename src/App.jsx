@@ -1398,11 +1398,12 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
       const failedEffective = Math.max(0, failedSaves - (ignoreFirstFailedSave ? 1 : 0));
       let totalDmg = 0;
       if (!damageFixed && dmgSpec.hasDie) {
-        const totalDmgDice = failedEffective + mortalWoundAttacks;
+        const woundCount = failedEffective + mortalWoundAttacks;
+        const totalDmgDice = woundCount * dmgSpec.n;
         if (totalDmgDice > 0) {
           const rolls = Array.from({ length: totalDmgDice }, () => Math.ceil(Math.random() * dmgSpec.sides));
           await animateField(setDamageRolls, rolls, dmgSpec.sides);
-          totalDmg = rolls.reduce((s, d) => s + d + dmgSpec.mod, 0);
+          totalDmg = rolls.reduce((s, d) => s + d, 0) + woundCount * dmgSpec.mod;
           await pause(120);
         }
       } else if (damageFixed) {
@@ -1460,11 +1461,12 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
       const t1FailedEff = Math.max(0, t1Failed - (ignoreFirstFailedSave ? 1 : 0));
       let t1Dmg = 0;
       if (!damageFixed && dmgSpec.hasDie) {
-        const t1DmgDice = t1FailedEff + mortalWoundAttacks;
+        const t1WoundCount = t1FailedEff + mortalWoundAttacks;
+        const t1DmgDice = t1WoundCount * dmgSpec.n;
         if (t1DmgDice > 0) {
           const t1DmgRolls = Array.from({ length: t1DmgDice }, () => Math.ceil(Math.random() * dmgSpec.sides));
           await animateField(setDamageRolls, t1DmgRolls, dmgSpec.sides);
-          t1Dmg = t1DmgRolls.reduce((s, d) => s + d + dmgSpec.mod, 0);
+          t1Dmg = t1DmgRolls.reduce((s, d) => s + d, 0) + t1WoundCount * dmgSpec.mod;
           await pause(80);
         } else { setDamageRolls(""); }
       } else if (damageFixed) {
@@ -1483,9 +1485,9 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
         const failedEff = Math.max(0, (extFailed[i] || 0) - (t.ignoreFirstFailedSave ? 1 : 0));
         let tDmg = 0;
         if (!damageFixed && dmgSpec.hasDie && failedEff > 0) {
-          const extDmgRolls = Array.from({ length: failedEff }, () => Math.ceil(Math.random() * dmgSpec.sides));
+          const extDmgRolls = Array.from({ length: failedEff * dmgSpec.n }, () => Math.ceil(Math.random() * dmgSpec.sides));
           await animateField(v => setSplitTargetField(i, "damageRolls", v), extDmgRolls, dmgSpec.sides);
-          tDmg = extDmgRolls.reduce((s, d) => s + d + dmgSpec.mod, 0);
+          tDmg = extDmgRolls.reduce((s, d) => s + d, 0) + failedEff * dmgSpec.mod;
           await pause(80);
         } else if (damageFixed) {
           tDmg = failedEff * (Number(damageValue) || 0);
@@ -1592,18 +1594,8 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
       }
     }
 
-    // Phase 4: Pre-roll damage dice (attacker rolls; count = total wounds before saves)
-    const dmgSpecW = parseDiceSpec(damageValue);
-    const totalDmgDiceW = totalWoundsW + mortalWoundAttacksW;
-    if (!damageFixed && dmgSpecW.hasDie && totalDmgDiceW > 0) {
-      const rolls = Array.from({ length: totalDmgDiceW }, () => Math.ceil(Math.random() * dmgSpecW.sides));
-      await animateField(setDamageRolls, rolls, dmgSpecW.sides);
-      await pause(80);
-    } else {
-      setDamageRolls("");
-    }
-
-    // Clear stale target-side fields so the defender knows to roll their half
+    // Clear stale target-side fields
+    setDamageRolls("");
     setSaveRollsText("");
     setFnpRollsText("");
 
@@ -1650,11 +1642,12 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
 
       // Phase 5: T1 Damage
       if (!damageFixed && dmgSpec.hasDie) {
-        const totalDmgDice = t1FailedEff + mortalWoundAttacks;
+        const t1WoundCount = t1FailedEff + mortalWoundAttacks;
+        const totalDmgDice = t1WoundCount * dmgSpec.n;
         if (totalDmgDice > 0) {
           const rolls = Array.from({ length: totalDmgDice }, () => Math.ceil(Math.random() * dmgSpec.sides));
           await animateField(setDamageRolls, rolls, dmgSpec.sides);
-          t1Dmg = rolls.reduce((s, d) => s + d + dmgSpec.mod, 0);
+          t1Dmg = rolls.reduce((s, d) => s + d, 0) + t1WoundCount * dmgSpec.mod;
           await pause(120);
         }
       } else if (damageFixed) {
@@ -1689,9 +1682,9 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
 
         let tDmg = 0;
         if (!damageFixed && dmgSpec.hasDie && tFailedEff > 0) {
-          const extDmgRolls = Array.from({ length: tFailedEff }, () => Math.ceil(Math.random() * dmgSpec.sides));
+          const extDmgRolls = Array.from({ length: tFailedEff * dmgSpec.n }, () => Math.ceil(Math.random() * dmgSpec.sides));
           await animateField(v => setSplitTargetField(i, "damageRolls", v), extDmgRolls, dmgSpec.sides);
-          tDmg = extDmgRolls.reduce((s, d) => s + d + dmgSpec.mod, 0);
+          tDmg = extDmgRolls.reduce((s, d) => s + d, 0) + tFailedEff * dmgSpec.mod;
           await pause(80);
         } else if (damageFixed) {
           tDmg = tFailedEff * (Number(damageValue) || 0);
@@ -2513,41 +2506,6 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                               </Field>
                             ) : null}
 
-                            {!damageFixed && (
-                              <Field
-                                label={
-                                  <CounterLabel
-                                    prefix={`Damage rolls${parseDiceSpec(damageValue).mod > 0 ? ` (+${parseDiceSpec(damageValue).mod} added after)` : ""}`}
-                                    need={activeComputed.failedSavesEffective}
-                                    entered={parseDiceList(damageRolls).length}
-                                    remaining={Math.max(0, activeComputed.failedSavesEffective - parseDiceList(damageRolls).length)}
-                                    theme={theme}
-                                  />
-                                }
-                                hint={`One die per failed save${parseDiceSpec(damageValue).mod > 0 ? `. +${parseDiceSpec(damageValue).mod} modifier is added per die automatically` : ""}. Count updates after save rolls are entered.`}
-                                theme={theme}
-                              >
-                                <div className="flex gap-2">
-                                  <input
-                                    className={`flex-1 rounded border p-2 text-lg font-semibold ${
-                                      activeComputed.failedSavesEffective > 0 && parseDiceList(damageRolls).length < activeComputed.failedSavesEffective
-                                        ? "border-red-500 ring-2 ring-red-200" : ""
-                                    }`}
-                                    value={damageRolls}
-                                    onChange={(e) => setDamageRolls(e.target.value)}
-                                    placeholder="e.g. 3 5 2 ..."
-                                  />
-                                  <button type="button" title="Roll for me"
-                                    disabled={activeComputed.failedSavesEffective === 0}
-                                    onClick={() => {
-                                      const sp = parseDiceSpec(damageValue);
-                                      setDamageRolls(rollDice(activeComputed.failedSavesEffective, sp.sides));
-                                    }}
-                                    className="rounded-lg bg-amber-500 hover:bg-amber-400 disabled:opacity-30 text-gray-950 px-3 font-bold text-lg transition">🎲</button>
-                                </div>
-                              </Field>
-                            )}
-
                             <>
                                 {splitEnabled && <div className={`text-sm font-extrabold tracking-wide mt-2 mb-0 uppercase ${theme === "dark" ? "text-amber-300/80" : "text-amber-700/80"}`}>🎯 Target 1 — Dice</div>}
                                 <Field
@@ -2587,6 +2545,41 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                                           </Field>
                             ) : null}
 
+                            {!damageFixed && (
+                              <Field
+                                label={
+                                  <CounterLabel
+                                    prefix={`Damage rolls${parseDiceSpec(damageValue).mod > 0 ? ` (+${parseDiceSpec(damageValue).mod} added after)` : ""}`}
+                                    need={parseDiceSpec(damageValue).n * activeComputed.failedSavesEffective}
+                                    entered={parseDiceList(damageRolls).length}
+                                    remaining={Math.max(0, parseDiceSpec(damageValue).n * activeComputed.failedSavesEffective - parseDiceList(damageRolls).length)}
+                                    theme={theme}
+                                  />
+                                }
+                                hint={`${parseDiceSpec(damageValue).n > 1 ? `${parseDiceSpec(damageValue).n} dice` : "One die"} per failed save${parseDiceSpec(damageValue).mod > 0 ? `. +${parseDiceSpec(damageValue).mod} modifier is added per wound automatically` : ""}. Count updates after save rolls are entered.`}
+                                theme={theme}
+                              >
+                                <div className="flex gap-2">
+                                  <input
+                                    className={`flex-1 rounded border p-2 text-lg font-semibold ${
+                                      parseDiceSpec(damageValue).n * activeComputed.failedSavesEffective > 0 && parseDiceList(damageRolls).length < parseDiceSpec(damageValue).n * activeComputed.failedSavesEffective
+                                        ? "border-red-500 ring-2 ring-red-200" : ""
+                                    }`}
+                                    value={damageRolls}
+                                    onChange={(e) => setDamageRolls(e.target.value)}
+                                    placeholder="e.g. 3 5 2 ..."
+                                  />
+                                  <button type="button" title="Roll for me"
+                                    disabled={activeComputed.failedSavesEffective === 0}
+                                    onClick={() => {
+                                      const sp = parseDiceSpec(damageValue);
+                                      setDamageRolls(rollDice(sp.n * activeComputed.failedSavesEffective, sp.sides));
+                                    }}
+                                    className="rounded-lg bg-amber-500 hover:bg-amber-400 disabled:opacity-30 text-gray-950 px-3 font-bold text-lg transition">🎲</button>
+                                </div>
+                              </Field>
+                            )}
+
                           {splitEnabled && extraTargets.map((t, i) => {
                             const sr = splitResults[i + 1];
                             const woundsN = Math.max(0, parseInt(t.wounds) || 0);
@@ -2618,8 +2611,8 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                                 </Field>
                                 {!damageFixed && (
                                   <Field
-                                    label={<CounterLabel prefix={`Damage rolls (T${i + 2})`} need={sr ? sr.failedSavesEffective : 0} entered={parseDiceList(t.damageRolls).length} remaining={(sr ? sr.failedSavesEffective : 0) - parseDiceList(t.damageRolls).length} theme={theme} />}
-                                    hint="One die per failed save." theme={theme}
+                                    label={<CounterLabel prefix={`Damage rolls (T${i + 2})`} need={parseDiceSpec(damageValue).n * (sr ? sr.failedSavesEffective : 0)} entered={parseDiceList(t.damageRolls).length} remaining={parseDiceSpec(damageValue).n * (sr ? sr.failedSavesEffective : 0) - parseDiceList(t.damageRolls).length} theme={theme} />}
+                                    hint={`${parseDiceSpec(damageValue).n > 1 ? `${parseDiceSpec(damageValue).n} dice` : "One die"} per failed save.`} theme={theme}
                                   >
                                     <div className="flex gap-2">
                                       <input
