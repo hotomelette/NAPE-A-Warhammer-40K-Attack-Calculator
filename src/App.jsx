@@ -426,6 +426,160 @@ function DiceColorBar({ rollsText, target, mod = 0, theme }) {
   );
 }
 
+function WeaponStatTable({
+  attacksFixed, setAttacksFixed, attacksValue, setAttacksValue,
+  modelQty, setModelQty,
+  toHit, setToHit,
+  strength, setStrength,
+  ap, setAp,
+  damageFixed, setDamageFixed, damageValue, setDamageValue,
+  isNum, theme
+}) {
+  const dark = theme === "dark";
+  const border = dark ? "border-gray-600" : "border-gray-300";
+  const divider = dark ? "border-gray-700" : "border-gray-200";
+  const hdrBg = dark ? "bg-gray-800/80 text-gray-400" : "bg-gray-100 text-gray-600";
+  const inputCls = `w-full text-center font-bold p-1.5 bg-transparent focus:outline-none text-xl`;
+  const attacksErr = attacksFixed ? !isNum(attacksValue) : !parseDiceSpec(attacksValue).ok;
+  const damageErr = damageFixed ? !isNum(damageValue) : (damageValue.trim() !== "" && !parseDiceSpec(damageValue).ok);
+  return (
+    <div className={`rounded-lg border overflow-hidden ${border}`}>
+      <div className={`grid grid-cols-6 text-center text-xs font-bold uppercase tracking-wide border-b ${hdrBg} ${dark ? "border-gray-600" : "border-gray-300"}`}>
+        <div className={`py-1.5 px-0.5 border-r ${divider} flex items-center justify-center`} title="Models attacking">Qty</div>
+        <div className={`py-1 px-0.5 border-r ${divider} flex flex-col items-center gap-0.5`}>
+          <span>A</span>
+          <button type="button"
+            onClick={() => setAttacksFixed(!attacksFixed)}
+            title={attacksFixed ? "Fixed — click for random" : "Random — click for fixed"}
+            className={`px-1.5 py-0.5 rounded text-[10px] font-bold leading-none transition-colors ${
+              attacksFixed
+                ? (dark ? "bg-gray-700 text-gray-300 hover:bg-gray-600" : "bg-gray-200 text-gray-600 hover:bg-gray-300")
+                : "bg-amber-500 text-gray-950 hover:bg-amber-400"
+            }`}>
+            {attacksFixed ? "Fixed" : "Rng 🎲"}
+          </button>
+        </div>
+        <div className={`py-1.5 px-0.5 border-r ${divider} flex items-center justify-center`} title="Ballistic/Weapon Skill (e.g. 4 = roll 4+)">BS</div>
+        <div className={`py-1.5 px-0.5 border-r ${divider} flex items-center justify-center`} title="Strength">S</div>
+        <div className={`py-1.5 px-0.5 border-r ${divider} flex items-center justify-center`} title="Armour Penetration">AP</div>
+        <div className={`py-1 px-0.5 flex flex-col items-center gap-0.5`}>
+          <span>D</span>
+          <button type="button"
+            onClick={() => setDamageFixed(!damageFixed)}
+            title={damageFixed ? "Fixed — click for random" : "Random — click for fixed"}
+            className={`px-1.5 py-0.5 rounded text-[10px] font-bold leading-none transition-colors ${
+              damageFixed
+                ? (dark ? "bg-gray-700 text-gray-300 hover:bg-gray-600" : "bg-gray-200 text-gray-600 hover:bg-gray-300")
+                : "bg-amber-500 text-gray-950 hover:bg-amber-400"
+            }`}>
+            {damageFixed ? "Fixed" : "Rng 🎲"}
+          </button>
+        </div>
+      </div>
+      <div className={`grid grid-cols-6 divide-x ${dark ? "divide-gray-700 bg-gray-900/10" : "divide-gray-200 bg-white"}`}>
+        <input type="number" min="1" inputMode="numeric" value={modelQty ?? 1}
+          onChange={e => setModelQty(Math.max(1, parseInt(e.target.value) || 1))}
+          className={`${inputCls} ${dark ? "text-gray-100" : "text-gray-900"}`}
+          title="Number of models attacking" />
+        <input value={attacksValue}
+          onChange={e => setAttacksValue(attacksFixed ? e.target.value.replace(/[^0-9]/g, "") : e.target.value.replace(/[^0-9dD+]/g, "").toUpperCase())}
+          inputMode={attacksFixed ? "numeric" : "text"}
+          placeholder={attacksFixed ? "#" : "D6"}
+          className={`${inputCls} ${attacksErr ? "text-red-400" : dark ? "text-gray-100" : "text-gray-900"}`} />
+        <input type="number" value={toHit} onChange={e => setToHit(e.target.value)} placeholder="4"
+          className={`${inputCls} ${!isNum(toHit) ? "text-red-400" : dark ? "text-gray-100" : "text-gray-900"}`} />
+        <input type="number" value={strength} onChange={e => setStrength(e.target.value)} placeholder="4"
+          className={`${inputCls} ${!isNum(strength) ? "text-red-400" : dark ? "text-gray-100" : "text-gray-900"}`} />
+        <input type="number" value={ap}
+          onChange={e => { const raw = e.target.value; if (raw === "" || raw === "-") { setAp(raw); return; } const n = parseFloat(raw); if (!isNaN(n)) setAp(String(Math.min(0, -Math.abs(n)))); }}
+          placeholder="0"
+          className={`${inputCls} ${!isNum(ap) ? "text-red-400" : dark ? "text-gray-100" : "text-gray-900"}`} />
+        <input value={damageValue}
+          onChange={e => setDamageValue(damageFixed ? e.target.value : e.target.value.replace(/[^0-9dD+]/g, "").toUpperCase())}
+          inputMode={damageFixed ? "numeric" : "text"}
+          type={damageFixed ? "number" : "text"}
+          placeholder={damageFixed ? "#" : "D6"}
+          className={`${inputCls} ${damageErr ? "text-red-400" : dark ? "text-gray-100" : "text-gray-900"}`} />
+      </div>
+    </div>
+  );
+}
+
+function TargetStatTable({
+  toughness, setToughness,
+  armorSave, setArmorSave,
+  invulnSave, setInvulnSave,
+  fnpEnabled, setFnpEnabled,
+  fnp, setFnp,
+  setFnpRollsText,
+  isNum, theme
+}) {
+  const dark = theme === "dark";
+  const border = dark ? "border-gray-600" : "border-gray-300";
+  const divider = dark ? "border-gray-700" : "border-gray-200";
+  const hdrBg = dark ? "bg-gray-800/80 text-gray-400" : "bg-gray-100 text-gray-600";
+  const inputCls = `w-full text-center font-bold p-1.5 bg-transparent focus:outline-none text-xl`;
+  return (
+    <div className={`rounded-lg border overflow-hidden ${border}`}>
+      <div className={`grid grid-cols-4 text-center text-xs font-bold uppercase tracking-wide border-b ${hdrBg} ${dark ? "border-gray-600" : "border-gray-300"}`}>
+        <div className={`py-1 border-r ${divider}`} title="Toughness">T</div>
+        <div className={`py-1 border-r ${divider}`} title="Armour Save (e.g. 3 means 3+)">Sv+</div>
+        <div className={`py-1 border-r ${divider}`} title="Invulnerable Save (optional)">Inv+</div>
+        <div className={`py-1 flex items-center justify-center gap-1`} title="Feel No Pain">
+          FNP+
+          <input type="checkbox" checked={fnpEnabled} className="h-3 w-3 accent-amber-400"
+            onChange={e => { const on = e.target.checked; setFnpEnabled(on); if (!on) { setFnp(""); setFnpRollsText(""); } }} />
+        </div>
+      </div>
+      <div className={`grid grid-cols-4 divide-x ${dark ? "divide-gray-700 bg-gray-900/10" : "divide-gray-200 bg-white"}`}>
+        <input type="text" inputMode="numeric" value={toughness} onChange={e => setToughness(e.target.value)} placeholder="4"
+          className={`${inputCls} ${!isNum(toughness) ? "text-red-400" : dark ? "text-gray-100" : "text-gray-900"}`} />
+        <input type="text" inputMode="numeric" value={armorSave} onChange={e => setArmorSave(e.target.value)} placeholder="3"
+          className={`${inputCls} ${!isNum(armorSave) ? "text-red-400" : dark ? "text-gray-100" : "text-gray-900"}`} />
+        <input type="text" inputMode="numeric" value={invulnSave} onChange={e => setInvulnSave(e.target.value)} placeholder="—"
+          className={`${inputCls} ${dark ? "text-gray-100" : "text-gray-900"}`} />
+        <input type="text" inputMode="numeric" value={fnp} onChange={e => setFnp(e.target.value)}
+          disabled={!fnpEnabled} placeholder={fnpEnabled ? "5" : "—"}
+          className={`${inputCls} disabled:opacity-30 ${dark ? "text-gray-100" : "text-gray-900"}`} />
+      </div>
+    </div>
+  );
+}
+
+function ColoredDiceInput({ value, onChange, className, target, mod = 0, theme, placeholder, disabled, ...props }) {
+  const [editing, setEditing] = React.useState(false);
+  const inputRef = React.useRef(null);
+  const rolls = parseDiceList(value);
+  const dark = theme === "dark";
+  const showChips = !editing && rolls.length > 0 && target > 0;
+
+  React.useEffect(() => {
+    if (editing && inputRef.current) inputRef.current.focus();
+  }, [editing]);
+
+  if (!showChips) {
+    return (
+      <input ref={inputRef} {...props} value={value} onChange={onChange}
+        onBlur={() => setEditing(false)} placeholder={placeholder} disabled={disabled}
+        className={className} />
+    );
+  }
+  return (
+    <div className={`${className} flex items-center flex-wrap gap-0.5 cursor-text`}
+      style={{ alignContent: "center" }}
+      onClick={() => setEditing(true)} tabIndex={0} onFocus={() => setEditing(true)}>
+      {rolls.map((d, i) => {
+        const success = d !== 1 && (d + mod) >= target;
+        return (
+          <span key={i} className={`inline-flex items-center justify-center px-0.5 rounded text-lg font-bold ${
+            success ? (dark ? "text-green-400" : "text-green-600") : (dark ? "text-orange-400" : "text-orange-500")
+          }`}>{d}</span>
+        );
+      })}
+    </div>
+  );
+}
+
 function Chip({ children }) {
   return (
     <span className="inline-flex items-center rounded-full border border-gray-600 px-2 py-0.5 text-xs bg-gray-800 text-gray-100">
@@ -1100,7 +1254,9 @@ function AttackCalculator() {
   const hitNeeded = torrent ? 0 : activeComputed.A;
   const woundNeeded = activeComputed.woundRollPool;
   const saveNeeded = splitEnabled ? target1Wounds : (activeComputed.savableWounds || 0);
-  const fnpNeeded = fnpEnabled && fnp !== "" ? activeComputed.totalPreFnp : 0;
+  const fnpNeeded = fnpEnabled && fnp !== ""
+    ? (splitEnabled ? (splitResults[0]?.fnpNeeded ?? 0) : activeComputed.totalPreFnp)
+    : 0;
 
   const hitRemaining = Math.max(0, hitNeeded - hitEntered);
   const woundRemaining = Math.max(0, woundNeeded - woundEntered);
@@ -1340,8 +1496,10 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
     const critHitT = Number(critHitThreshold) || 6;
     const critWoundT = Number(critWoundThreshold) || 6;
     const woundTarget = strengthNum >= toughnessNum * 2 ? 2 : strengthNum > toughnessNum ? 3 : strengthNum === toughnessNum ? 4 : strengthNum * 2 <= toughnessNum ? 6 : 5;
-    const rawSave = armorSaveNum - apNum - (inCover ? 1 : 0);
-    const saveTarget = Math.min(7, Math.max(2, ignoreAp ? armorSaveNum : rawSave));
+    const invNum = invulnSave === "" ? null : Number(invulnSave);
+    const armorWithCover = inCover ? clampMin2Plus(armorSaveNum - 1) : armorSaveNum;
+    const apForSave = ignoreAp ? 0 : apNum - (lance ? 1 : 0);
+    const saveTarget = clampMin2Plus(chooseSaveTarget(armorWithCover, invNum, apForSave));
 
     // Use flushSync to force React to render each animation tick synchronously.
     // Without this, React 18 batches all dispatch calls in async functions and
@@ -1390,6 +1548,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
         }
       }
       for (const d of hitRollsFinal) {
+        if (d === 1) continue;
         if (d >= critHitT) {
           if (sustainedHits) sustainedExtra += Number(sustainedHitsN) || 1;
           if (lethalHits) lethalAutoWounds++; else normalHits++;
@@ -1416,9 +1575,13 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
           woundRollsFinal = woundRollsFinal.map(d => (rerollWoundOnes && !twinLinked && d === 1) || ((rerollWoundFails || twinLinked) && d + effectiveWoundMod < woundTarget) ? (rr[ri++] ?? d) : d);
         }
       }
+      const effectiveCritWoundT = antiXEnabled ? Math.max(2, Math.min(6, Number(antiXThreshold) || 6)) : critWoundT;
       for (const d of woundRollsFinal) {
-        if (d >= critWoundT) { if (devastatingWounds) mortalWoundAttacks++; else totalWounds++; }
-        else if (d + effectiveWoundMod >= woundTarget) totalWounds++;
+        if (d === 1) continue;
+        const normalWound = d + effectiveWoundMod >= woundTarget;
+        const isCrit = d >= effectiveCritWoundT && (antiXEnabled || normalWound);
+        if (isCrit) { if (devastatingWounds) mortalWoundAttacks++; else totalWounds++; }
+        else if (normalWound) totalWounds++;
       }
     }
     await pause(120);
@@ -1446,14 +1609,15 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
           await animateField(setDamageRolls, rolls, dmgSpec.sides);
           totalDmg = rolls.reduce((s, d) => s + d, 0) + woundCount * dmgSpec.mod;
           await pause(120);
-        }
+        } else { setDamageRolls(""); }
       } else if (damageFixed) {
         totalDmg = (failedEffective + mortalWoundAttacks) * (Number(damageValue) || 0);
+        setDamageRolls("");
       }
       if (fnpEnabled && fnp !== "" && totalDmg > 0) {
         const fnpRolls = Array.from({ length: totalDmg }, () => Math.ceil(Math.random() * 6));
         await animateField(setFnpRollsText, fnpRolls, 6);
-      }
+      } else { setFnpRollsText(""); }
     } else {
       // ── Split path ──
       // Compute allocation directly from totalWounds using the same even-split formula
@@ -1599,6 +1763,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
         }
       }
       for (const d of hitRollsFinal) {
+        if (d === 1) continue;
         if (d >= critHitT) {
           if (sustainedHits) sustainedExtra += Number(sustainedHitsN) || 1;
           if (!lethalHits) normalHits++;
@@ -1630,9 +1795,13 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
           );
         }
       }
+      const effectiveCritWoundTW = antiXEnabled ? Math.max(2, Math.min(6, Number(antiXThreshold) || 6)) : critWoundTW;
       for (const d of woundRollsFinal) {
-        if (d >= critWoundTW) { if (devastatingWounds) mortalWoundAttacksW++; else totalWoundsW++; }
-        else if (d + effectiveWoundMod >= woundTarget) totalWoundsW++;
+        if (d === 1) continue;
+        const normalWoundW = d + effectiveWoundMod >= woundTarget;
+        const isCritW = d >= effectiveCritWoundTW && (antiXEnabled || normalWoundW);
+        if (isCritW) { if (devastatingWounds) mortalWoundAttacksW++; else totalWoundsW++; }
+        else if (normalWoundW) totalWoundsW++;
       }
     }
 
@@ -1655,7 +1824,9 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
 
     const armorSaveNum = Number(armorSave);
     const apNum = Number(ap) || 0;
-    const saveTarget = Math.min(7, Math.max(2, ignoreAp ? armorSaveNum : armorSaveNum - apNum - (inCover ? 1 : 0)));
+    const invNum = invulnSave === "" ? null : Number(invulnSave);
+    const armorWithCover = inCover ? clampMin2Plus(armorSaveNum - 1) : armorSaveNum;
+    const saveTarget = clampMin2Plus(chooseSaveTarget(armorWithCover, invNum, ignoreAp ? 0 : apNum - (lance ? 1 : 0)));
     const dmgSpec = parseDiceSpec(damageValue);
     const mortalWoundAttacks = activeComputed.mortalWoundAttacks || 0;
 
@@ -1691,19 +1862,22 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
           await animateField(setDamageRolls, rolls, dmgSpec.sides);
           t1Dmg = rolls.reduce((s, d) => s + d, 0) + t1WoundCount * dmgSpec.mod;
           await pause(120);
-        }
+        } else { setDamageRolls(""); }
       } else if (damageFixed) {
         t1Dmg = (t1FailedEff + mortalWoundAttacks) * (Number(damageValue) || 0);
+        setDamageRolls("");
       }
 
       // Phase 6: T1 FNP
       if (fnpEnabled && fnp !== "" && t1Dmg > 0) {
         const fnpRolls = Array.from({ length: t1Dmg }, () => Math.ceil(Math.random() * 6));
         await animateField(setFnpRollsText, fnpRolls, 6);
-      }
+      } else { setFnpRollsText(""); }
       if (hasSplitExtra) await pause(80);
     } else {
       setSaveRollsText("");
+      setDamageRolls("");
+      setFnpRollsText("");
     }
 
     // Extra targets (split mode)
@@ -1905,104 +2079,24 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                   }
                 </div>
               )}
-              <Field
-                label={<StatLabel label="A" full="Attacks" example="e.g. 6 (fixed) or D6+1 (random)" theme={theme} />}
-                hint="Fixed: enter a number. Random: uncheck Fixed, enter a dice expression (D6+1, 2D6, D3+2). The +N modifier is auto-added to the dice result. Enter rolled attack dice in the Dice entry section."
-                theme={theme}
-              >
-                <div className="flex flex-col md:flex-row md:items-center gap-2">
-                  <label className="inline-flex items-center gap-2 text-sm text-gray-200 md:min-w-[160px]">
-                    <input
-                      type="checkbox"
-                      className="h-4 w-4 accent-amber-400"
-                      checked={attacksFixed}
-                      onChange={(e) => setAttacksFixed(e.target.checked)}
-                    />
-                    <span className="font-semibold">Fixed attacks</span>
-                  </label>
-
-                  <input
-                    value={attacksValue}
-                    onChange={(e) => {
-                      const raw = e.target.value;
-                      if (attacksFixed) {
-                        // Fixed: integers only
-                        setAttacksValue(raw.replace(/[^0-9]/g, ""));
-                      } else {
-                        // Random: allow dice expressions like D6+1, 2D6, 2D3+2
-                        setAttacksValue(raw.replace(/[^0-9dD+]/g, "").toUpperCase());
-                      }
-                    }}
-                    inputMode="text"
-                    placeholder={attacksFixed ? "e.g. 6" : "e.g. D6+1, 2D6, D3+2"}
-                    className={`flex-1 min-w-0 rounded border p-2 text-lg font-semibold ${!isNum(attacksValue) ? "border-red-500 ring-2 ring-red-200" : ""}`}
-                  />
-
-                  <label className="inline-flex items-center gap-1.5 shrink-0">
-                    <span className={`text-sm font-semibold ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>× models</span>
-                    <input
-                      type="number"
-                      min="1"
-                      inputMode="numeric"
-                      value={modelQty ?? 1}
-                      onChange={(e) => setModelQty(Math.max(1, parseInt(e.target.value) || 1))}
-                      className={`w-16 rounded border p-2 text-lg font-semibold text-center ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300 text-gray-900"}`}
-                    />
-                  </label>
-                </div>
-
-                <div className="mt-1 text-xs text-gray-300">
-                  Computed attacks this volley: <span className="font-semibold">{activeComputed.A}</span>
-                  {(modelQty ?? 1) > 1 && attacksFixed && isNum(attacksValue) ? (
-                    <span className="ml-2 text-gray-400">({attacksValue} × {modelQty} models)</span>
-                  ) : !attacksFixed && parseDiceSpec(attacksValue).mod > 0 ? (
-                    <span className="ml-2 text-gray-400">(dice sum + {parseDiceSpec(attacksValue).mod} modifier)</span>
-                  ) : null}
-                </div>
-              </Field>
-
-              <div className="space-y-2">
-                <InlineStatField label={<StatLabel label="BS/WS" full="Ballistic / Weapon Skill" example="e.g. 4 = roll 4+ to hit" required={!isNum(toHit)} theme={theme} />}>
-                  <input className={`w-full rounded border p-2 text-xl font-bold ${!isNum(toHit) ? "border-red-500 ring-2 ring-red-200" : ""} ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300 text-gray-900"}`} type="number" value={toHit} onChange={(e) => setToHit(e.target.value)} placeholder="e.g. 4" />
-                </InlineStatField>
-                <InlineStatField label={<StatLabel label="S" full="Strength" example="e.g. 5 — compared to target T" required={!isNum(strength)} theme={theme} />}>
-                  <input className={`w-full rounded border p-2 text-xl font-bold ${!isNum(strength) ? "border-red-500 ring-2 ring-red-200" : ""} ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300 text-gray-900"}`} type="number" value={strength} onChange={(e) => setStrength(e.target.value)} placeholder="e.g. 5" />
-                </InlineStatField>
-                <InlineStatField label={<StatLabel label="AP" full="Armour Penetration" example="e.g. -1 or -2 (auto-negated)" theme={theme} />}>
-                  <input
-                    className={`w-full rounded border p-2 text-xl font-bold ${!isNum(ap) ? "border-red-500 ring-2 ring-red-200" : ""} ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300 text-gray-900"}`}
-                    type="number"
-                    value={ap}
-                    onChange={(e) => {
-                      const raw = e.target.value;
-                      if (raw === "" || raw === "-") { setAp(raw); return; }
-                      const n = parseFloat(raw);
-                      if (!isNaN(n)) setAp(String(Math.min(0, -Math.abs(n))));
-                    }}
-                    placeholder="e.g. -1"
-                  />
-                </InlineStatField>
-
-                <InlineStatField label={<StatLabel label="D" full="Damage" example="e.g. 2 (fixed) or D3, D6 (variable)" theme={theme} />}>
-                  <div className="flex flex-col gap-2 flex-1">
-                    <div className="flex items-center gap-2">
-                      <label className="flex items-center gap-2 text-sm whitespace-nowrap">
-                        <input type="checkbox" checked={damageFixed} onChange={(e) => setDamageFixed(e.target.checked)} />
-                        Fixed
-                      </label>
-                      {damageFixed ? (
-                        <input className={`flex-1 min-w-0 rounded border p-2 text-xl font-bold ${damageFixed && !isNum(damageValue) ? "border-red-500 ring-2 ring-red-200" : ""} ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300 text-gray-900"}`} type="number" value={damageValue} onChange={(e) => setDamageValue(e.target.value)} placeholder="e.g. 2" />
-                      ) : (
-                        <input
-                          className={`flex-1 min-w-0 rounded border p-2 text-lg font-semibold ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300 text-gray-900"}`}
-                          placeholder="e.g. D3, D6, D6+1"
-                          value={damageValue}
-                          onChange={(e) => setDamageValue(e.target.value.replace(/[^0-9dD+]/g, "").toUpperCase())}
-                        />
-                      )}
-                    </div>
-                  </div>
-                </InlineStatField>
+              <WeaponStatTable
+                attacksFixed={attacksFixed} setAttacksFixed={setAttacksFixed}
+                attacksValue={attacksValue} setAttacksValue={setAttacksValue}
+                modelQty={modelQty} setModelQty={setModelQty}
+                toHit={toHit} setToHit={setToHit}
+                strength={strength} setStrength={setStrength}
+                ap={ap} setAp={setAp}
+                damageFixed={damageFixed} setDamageFixed={setDamageFixed}
+                damageValue={damageValue} setDamageValue={setDamageValue}
+                isNum={isNum} theme={theme}
+              />
+              <div className="mt-1 text-xs text-gray-400">
+                Computed attacks: <span className="font-semibold">{activeComputed.A}</span>
+                {(modelQty ?? 1) > 1 && attacksFixed && isNum(attacksValue) ? (
+                  <span className="ml-2 opacity-70">({attacksValue} × {modelQty} models)</span>
+                ) : !attacksFixed && parseDiceSpec(attacksValue).mod > 0 ? (
+                  <span className="ml-2 opacity-70">(dice sum + {parseDiceSpec(attacksValue).mod} modifier)</span>
+                ) : null}
               </div>
 
 
@@ -2223,32 +2317,15 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                   }
                 </div>
               )}
-              <div className="space-y-2">
-                <InlineStatField label={<StatLabel label="T" full="Toughness" example="e.g. 4" required={!isNum(toughness)} theme={theme} />}>
-                  <input type="text" inputMode="numeric" value={toughness} onChange={e => setToughness(e.target.value)}
-                    placeholder="e.g. 4"
-                    className={`w-full rounded border p-2 font-bold text-xl ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300 text-gray-900"} ${!isNum(toughness) ? "border-red-500 ring-2 ring-red-200" : ""}`} />
-                </InlineStatField>
-                <InlineStatField label={<StatLabel label="Sv+" full="Armour Save" example="e.g. 3 (means 3+)" required={!isNum(armorSave)} theme={theme} />}>
-                  <input type="text" inputMode="numeric" value={armorSave} onChange={e => setArmorSave(e.target.value)}
-                    placeholder="e.g. 3"
-                    className={`w-full rounded border p-2 font-bold text-xl ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300 text-gray-900"} ${!isNum(armorSave) ? "border-red-500 ring-2 ring-red-200" : ""}`} />
-                </InlineStatField>
-                <InlineStatField label={<StatLabel label="Inv+" full="Invuln Save" example="e.g. 5 (means 5+)" theme={theme} />}>
-                  <input type="text" inputMode="numeric" value={invulnSave} onChange={e => setInvulnSave(e.target.value)}
-                    placeholder="e.g. 5"
-                    className={`w-full rounded border p-2 font-bold text-xl ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300 text-gray-900"}`} />
-                </InlineStatField>
-                <InlineStatField label={<StatLabel label="FNP+" full="Feel No Pain" example="e.g. 5 (means 5+)" theme={theme} />}>
-                  <div className="flex items-center gap-2 flex-1">
-                    <input type="checkbox" checked={fnpEnabled} className="h-4 w-4 accent-amber-400 shrink-0"
-                      onChange={e => { const on = e.target.checked; setFnpEnabled(on); if (!on) { setFnp(""); setFnpRollsText(""); } }} />
-                    <input type="text" inputMode="numeric" value={fnp} onChange={e => setFnp(e.target.value)}
-                      disabled={!fnpEnabled} placeholder="e.g. 5"
-                      className={`flex-1 min-w-0 rounded border p-2 font-bold text-xl disabled:opacity-40 ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300 text-gray-900"}`} />
-                  </div>
-                </InlineStatField>
-              </div>
+              <TargetStatTable
+                toughness={toughness} setToughness={setToughness}
+                armorSave={armorSave} setArmorSave={setArmorSave}
+                invulnSave={invulnSave} setInvulnSave={setInvulnSave}
+                fnpEnabled={fnpEnabled} setFnpEnabled={setFnpEnabled}
+                fnp={fnp} setFnp={setFnp}
+                setFnpRollsText={setFnpRollsText}
+                isNum={isNum} theme={theme}
+              />
               <div className="mt-3 flex flex-wrap gap-3 text-sm">
                 <label className="flex items-center gap-2"><input type="checkbox" checked={inCover} onChange={e => setInCover(e.target.checked)} className="accent-amber-400" /> Cover (+1 Sv)</label>
                 <label className="flex items-center gap-2"><input type="checkbox" checked={ignoreAp} onChange={e => setIgnoreAp(e.target.checked)} className="accent-amber-400" /> Ignore AP</label>
@@ -2329,34 +2406,17 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                   {/* Extra target stats panels */}
                   {extraTargets.map((t, i) => (
                     <div key={i} className={`rounded-xl p-3 border ${theme === "dark" ? "bg-gray-900/40 border-gray-700" : "bg-gray-50 border-gray-200 text-gray-900"}`}>
-                      <div className={`text-sm font-extrabold mb-3 ${theme === "dark" ? "text-amber-400" : "text-amber-700"}`}>🎯 Target {i + 2} — Stats</div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <StatLabel label="T" full="Toughness" example="e.g. 4" required={!t.toughness} theme={theme} />
-                          <input type="text" inputMode="numeric" inputMode="numeric" value={t.toughness} onChange={e => setSplitTargetField(i, "toughness", e.target.value)}
-                            placeholder="T e.g. 4" className={`w-full rounded border p-2 font-bold ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300 text-gray-900"} ${!t.toughness ? "border-red-500/60" : ""}`} />
-                        </div>
-                        <div>
-                          <StatLabel label="Sv+" full="Armour Save" example="e.g. 3 (means 3+)" required={!t.armorSave} theme={theme} />
-                          <input type="text" inputMode="numeric" inputMode="numeric" value={t.armorSave} onChange={e => setSplitTargetField(i, "armorSave", e.target.value)}
-                            placeholder="Sv+ e.g. 3" className={`w-full rounded border p-2 font-bold ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300 text-gray-900"} ${!t.armorSave ? "border-red-500/60" : ""}`} />
-                        </div>
-                        <div>
-                          <StatLabel label="Inv+" full="Invuln Save" example="e.g. 5 (means 5+)" theme={theme} />
-                          <input type="text" inputMode="numeric" inputMode="numeric" value={t.invulnSave} onChange={e => setSplitTargetField(i, "invulnSave", e.target.value)}
-                            placeholder="Inv+ e.g. 5" className={`w-full rounded border p-2 font-bold ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300 text-gray-900"}`} />
-                        </div>
-                        <div>
-                          <StatLabel label="FNP+" full="Feel No Pain" example="e.g. 5 (means 5+)" theme={theme} />
-                          <div className="flex items-center gap-2">
-                            <input type="checkbox" checked={t.fnpEnabled} onChange={e => setSplitTargetField(i, "fnpEnabled", e.target.checked)} className="h-4 w-4 accent-amber-400" />
-                            <input type="text" inputMode="numeric" inputMode="numeric" value={t.fnp} onChange={e => setSplitTargetField(i, "fnp", e.target.value)}
-                              disabled={!t.fnpEnabled} placeholder="FNP+ e.g. 5"
-                              className={`flex-1 min-w-0 rounded border p-2 font-bold disabled:opacity-40 ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300 text-gray-900"}`} />
-                          </div>
-                        </div>
-                      </div>
-                      <div className="mt-3 flex flex-wrap gap-3 text-sm">
+                      <div className={`text-sm font-extrabold mb-2 ${theme === "dark" ? "text-amber-400" : "text-amber-700"}`}>🎯 Target {i + 2} — Stats</div>
+                      <TargetStatTable
+                        toughness={t.toughness} setToughness={v => setSplitTargetField(i, "toughness", v)}
+                        armorSave={t.armorSave} setArmorSave={v => setSplitTargetField(i, "armorSave", v)}
+                        invulnSave={t.invulnSave} setInvulnSave={v => setSplitTargetField(i, "invulnSave", v)}
+                        fnpEnabled={t.fnpEnabled} setFnpEnabled={v => setSplitTargetField(i, "fnpEnabled", v)}
+                        fnp={t.fnp} setFnp={v => setSplitTargetField(i, "fnp", v)}
+                        setFnpRollsText={v => setSplitTargetField(i, "fnpRollsText", v)}
+                        isNum={isNum} theme={theme}
+                      />
+                      <div className="mt-2 flex flex-wrap gap-3 text-sm">
                         <label className="flex items-center gap-2"><input type="checkbox" checked={t.inCover} onChange={e => setSplitTargetField(i, "inCover", e.target.checked)} className="accent-amber-400" /> Cover (+1 Sv)</label>
                         <label className="flex items-center gap-2"><input type="checkbox" checked={t.ignoreAp} onChange={e => setSplitTargetField(i, "ignoreAp", e.target.checked)} className="accent-amber-400" /> Ignore AP</label>
                         <label className="flex items-center gap-2"><input type="checkbox" checked={t.ignoreFirstFailedSave} onChange={e => setSplitTargetField(i, "ignoreFirstFailedSave", e.target.checked)} className="accent-amber-400" /> Ignore 1st failed save</label>
@@ -2490,17 +2550,17 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                               hint="One die per attack. Skip if Torrent (auto-hits). Crits trigger Lethal Hits / Sustained Hits. Count must match A exactly."
                             >
                               <div className="flex gap-2">
-                                <input
+                                <ColoredDiceInput
                                   className={`flex-1 min-w-0 rounded border p-2 text-lg font-semibold ${hasHitCountError ? "border-red-500 ring-2 ring-red-200" : ""}`}
                                   value={hitRollsText}
                                   onChange={(e) => setHitRollsText(e.target.value)}
                                   placeholder="e.g. 6 5 2 1 4 ..."
+                                  target={Number(toHit)} mod={effectiveHitMod} theme={theme}
                                 />
                                 <button type="button" title="Roll for me" disabled={hitNeeded === 0}
                                   onClick={() => setHitRollsText(rollDice(hitNeeded, 6))}
                                   className="rounded-lg bg-amber-500 hover:bg-amber-400 disabled:opacity-30 text-gray-950 px-3 font-bold text-lg transition">🎲</button>
                               </div>
-                              <DiceColorBar rollsText={hitRollsText} target={Number(toHit)} mod={effectiveHitMod} theme={theme} />
                             </Field>
 
                             {(rerollHitOnes || rerollHitFails) ? (
@@ -2522,17 +2582,17 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                                 hint={`One die per hit (incl. Sustained bonus hits). Lethal Hits skip directly to saves — auto-wounds this volley: ${activeComputed.autoWoundsFromLethal}. Count must match the wound roll pool.`}
                               >
                                 <div className="flex gap-2">
-                                  <input
+                                  <ColoredDiceInput
                                     className={`flex-1 min-w-0 rounded border p-2 text-lg font-semibold ${hasWoundCountError ? "border-red-500 ring-2 ring-red-200" : ""}`}
                                     value={woundRollsText}
                                     onChange={(e) => setWoundRollsText(e.target.value)}
                                     placeholder="e.g. 6 4 3 1 ..."
+                                    target={activeComputed.woundTarget} mod={effectiveWoundMod} theme={theme}
                                   />
                                   <button type="button" title="Roll for me" disabled={woundNeeded === 0}
                                     onClick={() => setWoundRollsText(rollDice(woundNeeded, 6))}
                                     className="rounded-lg bg-amber-500 hover:bg-amber-400 disabled:opacity-30 text-gray-950 px-3 font-bold text-lg transition">🎲</button>
                                 </div>
-                                <DiceColorBar rollsText={woundRollsText} target={activeComputed.woundTarget} mod={effectiveWoundMod} theme={theme} />
                               </Field>
 
                             {(rerollWoundOnes || rerollWoundFails || twinLinked) ? (
@@ -2541,11 +2601,12 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                                 hint="Enter rerolled wound dice in order for each eligible reroll. Eligibility is determined from the initial wound rolls."
                               >
                                 <div className="flex gap-2">
-                                  <input
+                                  <ColoredDiceInput
                                     className={`flex-1 min-w-0 rounded border p-2 text-lg font-semibold ${hasWoundRerollCountError ? "border-red-500 ring-2 ring-red-200" : ""}`}
                                     value={woundRerollRollsText}
                                     onChange={(e) => setWoundRerollRollsText(e.target.value)}
                                     placeholder="e.g. 5 4 ..."
+                                    target={activeComputed.woundTarget} mod={effectiveWoundMod} theme={theme}
                                   />
                                   <button type="button" title="Roll for me" disabled={woundRerollNeeded === 0}
                                     onClick={() => setWoundRerollRollsText(rollDice(woundRerollNeeded, 6))}
@@ -2561,17 +2622,17 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                                   hint="One die per savable wound. Mortal wounds (Devastating) bypass saves and go straight to damage. Count must equal wounds allocated to this target."
                                 >
                                   <div className="flex gap-2">
-                                    <input
+                                    <ColoredDiceInput
                                       className={`flex-1 min-w-0 rounded border p-2 text-lg font-semibold ${hasSaveCountError ? "border-red-500 ring-2 ring-red-200" : ""}`}
                                       value={saveRollsText}
                                       onChange={(e) => setSaveRollsText(e.target.value)}
                                       placeholder="e.g. 5 2 6 ..."
+                                      target={activeComputed.saveTarget} mod={clampModPlusMinusOne(Number(saveMod) || 0)} theme={theme}
                                     />
                                     <button type="button" title="Roll for me" disabled={saveNeeded === 0}
                                       onClick={() => setSaveRollsText(rollDice(saveNeeded, 6))}
                                       className="rounded-lg bg-amber-500 hover:bg-amber-400 disabled:opacity-30 text-gray-950 px-3 font-bold text-lg transition">🎲</button>
                                   </div>
-                                  <DiceColorBar rollsText={saveRollsText} target={activeComputed.saveTarget} mod={clampModPlusMinusOne(Number(saveMod) || 0)} theme={theme} />
                                 </Field>
                               </>
 
@@ -2581,17 +2642,17 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                                             hint="Only if FNP is enabled. One die per point of damage."
                                           >
                                             <div className="flex gap-2">
-                                              <input
+                                              <ColoredDiceInput
                                                 className={`flex-1 min-w-0 rounded border p-2 text-lg font-semibold ${hasFnpCountError ? "border-red-500 ring-2 ring-red-200" : ""}`}
                                                 value={fnpRollsText}
                                                 onChange={(e) => setFnpRollsText(e.target.value)}
                                                 placeholder="e.g. 1 5 6 2 ..."
+                                                target={Number(fnp)} theme={theme}
                                               />
                                               <button type="button" title="Roll for me" disabled={fnpNeeded === 0}
                                                 onClick={() => setFnpRollsText(rollDice(fnpNeeded, 6))}
                                                 className="rounded-lg bg-amber-500 hover:bg-amber-400 disabled:opacity-30 text-gray-950 px-3 font-bold text-lg transition">🎲</button>
                                             </div>
-                                            <DiceColorBar rollsText={fnpRollsText} target={Number(fnp)} theme={theme} />
                                           </Field>
                             ) : null}
 
@@ -2634,25 +2695,31 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                             const sr = splitResults[i + 1];
                             const woundsN = Math.max(0, parseInt(t.wounds) || 0);
                             const saveCountMismatch = parseDiceList(t.saveRollsText).length > 0 && parseDiceList(t.saveRollsText).length !== woundsN && woundsN > 0;
+                            const tFnpNeeded = sr ? sr.fnpNeeded : 0;
+                            const tFnpEntered = parseDiceList(t.fnpRollsText).length;
+                            const tFnpCountError = tFnpNeeded > 0 && tFnpEntered !== tFnpNeeded;
+                            const tSaveTarget = sr ? sr.saveTarget : 0;
+                            const tFnpTarget = t.fnpEnabled && t.fnp !== "" ? Number(t.fnp) : 0;
                             return (
                               <div key={i} className={`border-t mt-2 pt-3 ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}>
-                                <div className={`text-sm font-extrabold tracking-wide mt-2 mb-2 uppercase ${theme === "dark" ? "text-amber-300/80" : "text-amber-700/80"}`}>
+                                <div className={`text-sm font-extrabold tracking-wide mb-1 uppercase ${theme === "dark" ? "text-amber-300/80" : "text-amber-700/80"}`}>
                                   🎯 Target {i + 2} — Dice
                                 </div>
                                 <div className={`text-xs mb-2 ${theme === "dark" ? "text-amber-400" : "text-amber-600"}`}>
-                                  {woundsN} wounds allocated
+                                  {woundsN} wounds allocated{tSaveTarget > 0 ? ` · save ${tSaveTarget}+` : ""}
                                 </div>
                                 <Field
-                                  label={<CounterLabel prefix={`Save rolls (T${i + 2})`} need={woundsN} entered={parseDiceList(t.saveRollsText).length} remaining={woundsN - parseDiceList(t.saveRollsText).length} theme={theme} />}
-                                  hint={sr ? `Save target: ${sr.saveTarget}+` : "Enter Target stats first."}
+                                  label={<CounterLabel prefix={`Save rolls (T${i + 2})${tSaveTarget > 0 ? ` · ${tSaveTarget}+` : ""}`} need={woundsN} entered={parseDiceList(t.saveRollsText).length} remaining={woundsN - parseDiceList(t.saveRollsText).length} theme={theme} />}
+                                  hint={sr ? `Save target: ${tSaveTarget}+` : "Enter Target stats first."}
                                   theme={theme}
                                 >
                                   <div className="flex gap-2">
-                                    <input
-                                      className={`flex-1 min-w-0 rounded border p-2 text-lg font-semibold ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100 placeholder:text-gray-500" : "bg-white border-gray-300 text-gray-900"} ${saveCountMismatch ? "border-red-500 ring-2 ring-red-200" : ""}`}
+                                    <ColoredDiceInput
+                                      className={`flex-1 min-w-0 rounded border p-2 text-lg font-semibold ${saveCountMismatch ? "border-red-500 ring-2 ring-red-200" : ""}`}
                                       value={t.saveRollsText}
                                       onChange={e => setSplitTargetField(i, "saveRollsText", e.target.value)}
                                       placeholder="e.g. 5 2 6 ..."
+                                      target={tSaveTarget} mod={clampModPlusMinusOne(Number(t.saveMod) || 0)} theme={theme}
                                     />
                                     <button type="button" title="Roll for me" disabled={woundsN === 0}
                                       onClick={() => setSplitTargetField(i, "saveRollsText", rollDice(woundsN, 6))}
@@ -2666,7 +2733,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                                   >
                                     <div className="flex gap-2">
                                       <input
-                                        className={`flex-1 min-w-0 rounded border p-2 text-lg font-semibold ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100 placeholder:text-gray-500" : "bg-white border-gray-300 text-gray-900"}`}
+                                        className={`flex-1 min-w-0 rounded border p-2 text-lg font-semibold`}
                                         value={t.damageRolls}
                                         onChange={e => setSplitTargetField(i, "damageRolls", e.target.value)}
                                         placeholder="e.g. 3 5 2 ..."
@@ -2680,19 +2747,20 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                                 )}
                                 {(t.fnpEnabled && t.fnp !== "") && (
                                   <Field
-                                    label={<CounterLabel prefix={`FNP rolls (T${i + 2})`} need={sr ? sr.fnpNeeded : 0} entered={parseDiceList(t.fnpRollsText).length} remaining={(sr ? sr.fnpNeeded : 0) - parseDiceList(t.fnpRollsText).length} theme={theme} />}
+                                    label={<CounterLabel prefix={`FNP rolls (T${i + 2})${tFnpTarget > 0 ? ` · ${tFnpTarget}+` : ""}`} need={tFnpNeeded} entered={tFnpEntered} remaining={tFnpNeeded - tFnpEntered} theme={theme} />}
                                     hint="One die per point of damage." theme={theme}
                                   >
                                     <div className="flex gap-2">
-                                      <input
-                                        className={`flex-1 min-w-0 rounded border p-2 text-lg font-semibold ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100 placeholder:text-gray-500" : "bg-white border-gray-300 text-gray-900"}`}
+                                      <ColoredDiceInput
+                                        className={`flex-1 min-w-0 rounded border p-2 text-lg font-semibold ${tFnpCountError ? "border-red-500 ring-2 ring-red-200" : ""}`}
                                         value={t.fnpRollsText}
                                         onChange={e => setSplitTargetField(i, "fnpRollsText", e.target.value)}
                                         placeholder="e.g. 1 5 6 ..."
+                                        target={tFnpTarget} theme={theme}
                                       />
                                       <button type="button" title="Roll for me"
-                                        disabled={!sr || sr.fnpNeeded === 0}
-                                        onClick={() => setSplitTargetField(i, "fnpRollsText", rollDice(sr.fnpNeeded, 6))}
+                                        disabled={tFnpNeeded === 0}
+                                        onClick={() => setSplitTargetField(i, "fnpRollsText", rollDice(tFnpNeeded, 6))}
                                         className="rounded-lg bg-amber-500 hover:bg-amber-400 disabled:opacity-30 text-gray-950 px-3 font-bold text-lg transition">🎲</button>
                                     </div>
                                   </Field>

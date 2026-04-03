@@ -131,7 +131,7 @@ export function useCalculator({
           errors.push(`Hit roll #${i + 1} is not a valid D6 result (1-6).`);
           continue;
         }
-        const success = meets(Number(toHit) || 7, unmod, hitModCapped);
+        const success = unmod !== 1 && meets(Number(toHit) || 7, unmod, hitModCapped);
         const crit = unmod >= (Number(critHitThreshold) || 6);
         hits.push({ unmod, success, crit });
 
@@ -236,7 +236,8 @@ export function useCalculator({
         errors.push(`Wound roll #${i + 1} is not a valid D6 result (1-6).`);
         continue;
       }
-      const success = meets(needed, unmod, woundModNum);
+      const autoWound = antiXEnabled && unmod !== 1 && unmod >= effectiveCritWoundThreshold;
+      const success = autoWound || (unmod !== 1 && meets(needed, unmod, woundModNum));
       if (success) {
         woundSuccesses++;
         if (unmod >= effectiveCritWoundThreshold) critWounds++;
