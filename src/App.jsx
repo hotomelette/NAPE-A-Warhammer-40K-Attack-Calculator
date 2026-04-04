@@ -477,14 +477,23 @@ function WeaponStatTable({
         </div>
       </div>
       <div className={`grid grid-cols-6 divide-x ${dark ? "divide-gray-700 bg-gray-900/10" : "divide-gray-200 bg-white"}`}>
-        <input type="number" min="1" inputMode="numeric" value={modelQty ?? 1}
-          onChange={e => setModelQty(Math.max(1, parseInt(e.target.value) || 1))}
+        <input type="number" min="1" max="20" inputMode="numeric" value={modelQty ?? 1}
+          onChange={e => setModelQty(Math.min(20, Math.max(1, parseInt(e.target.value) || 1)))}
           className={`${inputCls} ${dark ? "text-gray-100" : "text-gray-900"}`}
-          title="Number of models attacking" />
+          title="Number of models attacking (max 20)" />
         <input value={attacksValue}
-          onChange={e => setAttacksValue(attacksFixed ? e.target.value.replace(/[^0-9]/g, "") : e.target.value.replace(/[^0-9dD+]/g, "").toUpperCase())}
+          onChange={e => {
+            if (attacksFixed) {
+              const digits = e.target.value.replace(/[^0-9]/g, "");
+              const n = parseInt(digits, 10);
+              setAttacksValue(digits === "" ? "" : String(Math.min(20, isNaN(n) ? 0 : n)));
+            } else {
+              setAttacksValue(e.target.value.replace(/[^0-9dD+]/g, "").toUpperCase());
+            }
+          }}
           inputMode={attacksFixed ? "numeric" : "text"}
           placeholder={attacksFixed ? "#" : "D6"}
+          title={attacksFixed ? "Fixed attacks per model (max 20)" : "Dice expression e.g. D6, 2D3+1"}
           className={`${inputCls} ${attacksErr ? "text-red-400" : dark ? "text-gray-100" : "text-gray-900"}`} />
         <input type="number" value={toHit} onChange={e => setToHit(e.target.value)} placeholder="4"
           className={`${inputCls} ${!isNum(toHit) ? "text-red-400" : dark ? "text-gray-100" : "text-gray-900"}`} />
@@ -1353,6 +1362,8 @@ function AttackCalculator() {
     return Math.max(0, parseInt(t.wounds) || 0) === 0 || !!t.armorSave;
   });
   const allSplitStatsReady = splitTargetStatsReady.every(Boolean);
+  // effectiveStatsReady gates status display: also requires split target stats when split is on
+  const effectiveStatsReady = statsReady && (!splitEnabled || allSplitStatsReady);
   const diceReady =
     statsReady &&
     activeComputed.errors.length === 0 &&
@@ -1360,7 +1371,7 @@ function AttackCalculator() {
     (woundNeeded === 0 || !hasWoundCountError) &&
     (saveNeeded === 0 || !hasSaveCountError) &&
     (fnpNeeded === 0 || !hasFnpCountError);
-  const status = !statsReady ? "Waiting for stats" : diceReady ? "Ready" : "Waiting for dice";
+  const status = !effectiveStatsReady ? "Waiting for stats" : diceReady ? "Ready" : "Waiting for dice";
 
   const statusEmoji = status === "Ready" ? "✅⚔️" : status === "Waiting for dice" ? "⏳🎲" : "⛔🧩";
 
@@ -2037,14 +2048,14 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
 
           {/* Emoji marquee background — only when hard total is ready */}
           {diceReady && (
-            <div className="absolute inset-0 pointer-events-none overflow-hidden" style={{ opacity: 0.12 }}>
+            <div className="absolute inset-0 pointer-events-none overflow-hidden" style={{ opacity: 0.055 }}>
               <div className="nape-marquee-row" style={{ animationDuration: "30s", fontSize: "0.9rem", lineHeight: 1.5 }}>
-                {Array.from({ length: 40 }).map((_, i) => <span key={i} className="mr-3">{viz.emoji}</span>)}
-                {Array.from({ length: 40 }).map((_, i) => <span key={`d${i}`} className="mr-3">{viz.emoji}</span>)}
+                {Array.from({ length: 12 }).map((_, i) => <span key={i} className="mr-24">{viz.emoji}</span>)}
+                {Array.from({ length: 12 }).map((_, i) => <span key={`d${i}`} className="mr-24">{viz.emoji}</span>)}
               </div>
               <div className="nape-marquee-row nape-marquee-reverse" style={{ animationDuration: "36s", fontSize: "0.9rem", lineHeight: 1.5 }}>
-                {Array.from({ length: 40 }).map((_, i) => <span key={i} className="mr-3">{viz.emoji}</span>)}
-                {Array.from({ length: 40 }).map((_, i) => <span key={`d${i}`} className="mr-3">{viz.emoji}</span>)}
+                {Array.from({ length: 12 }).map((_, i) => <span key={i} className="mr-24">{viz.emoji}</span>)}
+                {Array.from({ length: 12 }).map((_, i) => <span key={`d${i}`} className="mr-24">{viz.emoji}</span>)}
               </div>
             </div>
           )}
@@ -2062,8 +2073,8 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
             </div>
 
             {/* Status detail OR live damage — same row */}
-            {!statsReady ? (
-              <span className="text-xs text-gray-400 truncate max-w-[200px]">Missing: {[...missingWeapon, ...missingTarget].join(", ")}</span>
+            {!effectiveStatsReady ? (
+              <span className="text-xs text-gray-400 truncate max-w-[200px]">{!statsReady ? `Missing: ${[...missingWeapon, ...missingTarget].join(", ")}` : "Split target stats missing"}</span>
             ) : status === "Waiting for dice" ? (
               <span className="text-xs text-gray-400 shrink-0">Hit {hitRemaining} · Wound {woundRemaining} · Save {saveRemaining}{fnpNeeded > 0 ? ` · FNP ${fnpRemaining}` : ""}</span>
             ) : (
@@ -2168,7 +2179,6 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
               />
 
 
-              {!simpleMode && (
               <KeywordGroup label="Keywords / Effects" hint="Enable only keywords that apply to this weapon and this firing sequence." theme={theme} items={[
                   { key: "rapidFire", checked: rapidFire, node: (
                     <div className="flex flex-wrap items-center gap-2 min-h-[36px]">
@@ -2265,18 +2275,23 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                     </label>
                   )},
                 ]} />
-              )}
 
             </Section>
 
             <Section theme={theme} title="Target 1" action={
-  <button
-    type="button"
-    className={`rounded px-2 py-1 text-xs font-semibold border transition ${theme === "dark" ? "bg-gray-800 border-gray-600 text-gray-300 hover:bg-gray-700" : "bg-gray-50 border-gray-300 text-gray-600 hover:bg-gray-100"}`}
-    onClick={clearTarget}
-  >
-    Clear target
-  </button>
+  <div className="flex items-center gap-2">
+    <button type="button" onClick={toggleSplit}
+      className={`rounded px-2 py-1 text-xs font-extrabold border transition ${splitEnabled ? "bg-gradient-to-r from-amber-500 to-orange-500 border-amber-400/40 text-gray-950" : theme === "dark" ? "bg-gray-800 border-gray-600 text-gray-300 hover:bg-gray-700" : "bg-gray-100 border-gray-300 text-gray-700 hover:bg-gray-200"}`}>
+      {splitEnabled ? "⚔️ Split ON" : "Split Volley"}
+    </button>
+    <button
+      type="button"
+      className={`rounded px-2 py-1 text-xs font-semibold border transition ${theme === "dark" ? "bg-gray-800 border-gray-600 text-gray-300 hover:bg-gray-700" : "bg-gray-50 border-gray-300 text-gray-600 hover:bg-gray-100"}`}
+      onClick={clearTarget}
+    >
+      Clear target
+    </button>
+  </div>
 }>
               {hasApiKey && (
                 <div className="flex flex-col gap-1 mb-2">
@@ -2335,27 +2350,8 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                   { key: "minusOneToWound", checked: minusOneToWound, node: (<label className="flex items-center gap-2 min-h-[32px]"><input type="checkbox" checked={minusOneToWound} onChange={e => setMinusOneToWound(e.target.checked)} className="accent-amber-400" /><span className="font-semibold">-1 To Wound</span><span className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>(Transhuman Physiology)</span></label>) },
                 ]} />
               </div>
-            </Section>
-
-            {/* ── Split Volley Toggle ── */}
-            {!simpleMode && (
-            <div className={`rounded-2xl p-4 border ${theme === "dark" ? "bg-slate-900 border-gray-700 text-gray-100" : "bg-white border-gray-200 text-gray-900"}`}>
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="font-extrabold text-lg">Split Volley</div>
-                  <div className={`text-xs mt-0.5 ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>
-                    Split wounds across two targets after the wound phase. Rules-accurate: one weapon, two targets.
-                  </div>
-                </div>
-                <button type="button" onClick={toggleSplit}
-                  className={`rounded-lg px-4 py-2 text-sm font-extrabold border transition ${splitEnabled ? "bg-gradient-to-r from-amber-500 to-orange-500 border-amber-400/40 text-gray-950" : theme === "dark" ? "bg-gray-800 border-gray-600 text-gray-300 hover:bg-gray-700" : "bg-gray-100 border-gray-300 text-gray-700 hover:bg-gray-200"}`}>
-                  {splitEnabled ? "⚔️ Split ON" : "Split OFF"}
-                </button>
-              </div>
-
               {splitEnabled && (
                 <div className="mt-4 space-y-4">
-
                   {/* Wound allocation summary */}
                   <div className={`rounded-xl p-3 border ${theme === "dark" ? "bg-gray-900/60 border-gray-700" : "bg-gray-50 border-gray-200 text-gray-900"}`}>
                     <div className="flex items-center justify-between mb-2">
@@ -2364,13 +2360,11 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                         {Math.min(extraWoundsSum, totalSavableWounds) + target1Wounds}/{totalSavableWounds} allocated
                       </div>
                     </div>
-                    {/* Target 1 — auto-calculated remainder */}
                     <div className="flex items-center gap-2 mb-2">
                       <span className="text-sm w-20">🎯 Target 1:</span>
                       <span className={`w-14 rounded border p-1.5 text-center font-bold text-base ${theme === "dark" ? "bg-gray-900/20 border-gray-700 text-amber-400" : "bg-gray-50 border-gray-200 text-amber-600"}`}>{target1Wounds}</span>
                       <span className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>wounds (remainder)</span>
                     </div>
-                    {/* Extra targets — each editable */}
                     {extraTargets.map((t, i) => (
                       <div key={i} className="flex items-center gap-2 mb-2">
                         <span className="text-sm w-20">🎯 Target {i + 2}:</span>
@@ -2384,7 +2378,6 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                         <button type="button" onClick={() => removeSplitTarget(i)} className="ml-auto text-xs text-red-400 hover:text-red-300 px-2 py-1 rounded border border-red-800/40 hover:bg-red-900/20">✕ Remove</button>
                       </div>
                     ))}
-                    {/* Add target button — max 4 total; require wound rolls for 2+ splits */}
                     {extraTargets.length < 3 && totalSavableWounds > 0 && (extraTargets.length === 0 || parseDiceList(woundRollsText).length > 0) && (
                       <button type="button" onClick={() => dispatch({ type: "ADD_SPLIT_TARGET", totalWounds: totalSavableWounds })}
                         className={`mt-1 text-xs px-3 py-1.5 rounded border font-semibold transition ${theme === "dark" ? "border-amber-700/60 text-amber-300 hover:bg-amber-900/20" : "border-amber-400 text-amber-700 hover:bg-amber-50"}`}>
@@ -2392,7 +2385,6 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                       </button>
                     )}
                   </div>
-
                   {/* Extra target stats panels */}
                   {extraTargets.map((t, i) => (
                     <div key={i} className={`rounded-xl p-3 border ${theme === "dark" ? "bg-gray-900/40 border-gray-700" : "bg-gray-50 border-gray-200 text-gray-900"}`}>
@@ -2413,16 +2405,17 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                           { key: "ignoreFirstFailedSave", checked: t.ignoreFirstFailedSave, node: (<label className="flex items-center gap-2 min-h-[32px]"><input type="checkbox" checked={t.ignoreFirstFailedSave} onChange={e => setSplitTargetField(i, "ignoreFirstFailedSave", e.target.checked)} className="accent-amber-400" /><span>Ignore 1st failed save</span></label>) },
                           { key: "minusOneDamage", checked: t.minusOneDamage, node: (<label className="flex items-center gap-2 min-h-[32px]"><input type="checkbox" checked={t.minusOneDamage} onChange={e => setSplitTargetField(i, "minusOneDamage", e.target.checked)} className="accent-amber-400" /><span>-1 Damage</span></label>) },
                           { key: "halfDamage", checked: t.halfDamage, node: (<label className="flex items-center gap-2 min-h-[32px]"><input type="checkbox" checked={t.halfDamage} onChange={e => setSplitTargetField(i, "halfDamage", e.target.checked)} className="accent-amber-400" /><span>Half Damage</span></label>) },
+                          { key: "stealthSmoke", checked: t.stealthSmoke ?? false, node: (<label className="flex items-center gap-2 min-h-[32px]"><input type="checkbox" checked={t.stealthSmoke ?? false} onChange={e => setSplitTargetField(i, "stealthSmoke", e.target.checked)} className="accent-amber-400" /><span className="font-semibold">Stealth / Smoke</span><span className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>(-1 to hit)</span></label>) },
+                          { key: "minusOneToWound", checked: t.minusOneToWound ?? false, node: (<label className="flex items-center gap-2 min-h-[32px]"><input type="checkbox" checked={t.minusOneToWound ?? false} onChange={e => setSplitTargetField(i, "minusOneToWound", e.target.checked)} className="accent-amber-400" /><span className="font-semibold">-1 To Wound</span><span className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>(Transhuman Physiology)</span></label>) },
                         ]} />
                       </div>
                     </div>
                   ))}
                 </div>
               )}
-            </div>
-            )}
+            </Section>
 
-            {!simpleMode && showExperimental && (
+            {showExperimental && (
               <Section theme={theme} title="Experimental">
                 <div className="grid grid-cols-2 gap-2 text-sm mb-3">
                   <label className="flex items-center gap-2">
@@ -2765,15 +2758,10 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
 
 <Section theme={theme} title="Results" action={
   <div className="flex items-center gap-2">
-    {!statsReady ? (
-      <span className={`text-xs px-2 py-0.5 rounded-full border ${theme === "dark" ? "bg-red-900/50 border-red-600 text-red-300" : "bg-red-50 border-red-300 text-red-700"}`}>Missing stats</span>
-    ) : activeComputed.errors.length > 0 ? (
-      <span className={`text-xs px-2 py-0.5 rounded-full border ${theme === "dark" ? "bg-red-900/50 border-red-600 text-red-300" : "bg-red-50 border-red-300 text-red-700"}`}>Input issues</span>
-    ) : status === "Waiting for dice" ? (
-      <span className={`text-xs px-2 py-0.5 rounded-full border ${theme === "dark" ? "bg-amber-900/50 border-amber-600 text-amber-300" : "bg-amber-50 border-amber-300 text-amber-800"}`}>Waiting for dice</span>
-    ) : (
-      <span className={`text-xs px-2 py-0.5 rounded-full border ${theme === "dark" ? "bg-green-900/50 border-green-600 text-green-300" : "bg-green-50 border-green-300 text-green-700"}`}>✓ Ready</span>
-    )}
+    <div className={`inline-flex items-center gap-1.5 rounded-xl border px-2 py-0.5 text-xs font-bold ${statusClass}`}>
+      <span className="leading-none">{statusEmoji}</span>
+      <span>{status}</span>
+    </div>
     <button
       type="button"
       className="rounded px-2 py-1 text-xs font-extrabold border transition bg-gradient-to-r from-yellow-400/80 to-amber-400/80 text-gray-950 border-yellow-200/40 hover:from-yellow-300/90 hover:to-amber-300/90"
@@ -2927,7 +2915,13 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                       <div className="mt-1">{activeComputed.A} attacks</div>
                       <div>Wound-roll pool: {activeComputed.woundRollPool}</div>
                       <div>Wound target: {activeComputed.needed}+</div>
-                      <div>Save target: {activeComputed.saveTarget}+</div>
+                      {splitEnabled && activeSplitResults.length > 1 ? (
+                        activeSplitResults.map((r, i) => (
+                          <div key={i}>T{i+1} save target: {r?.saveTarget ?? "—"}+{i === 0 ? ` (${target1Wounds} wounds)` : ` (${extraTargets[i-1]?.wounds ?? 0} wounds)`}</div>
+                        ))
+                      ) : (
+                        <div>Save target: {activeComputed.saveTarget}+</div>
+                      )}
                     </div>
 
                     <div className={`rounded-lg border p-2 ${theme === "dark" ? "bg-gray-900 border-gray-700 text-gray-100" : "bg-white border-gray-200 text-gray-900"}`}>
@@ -2988,7 +2982,6 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                 {[
                   { label: showTableUse ? "Hide table guide" : "📋 Table guide", on: showTableUse, action: () => setShowTableUse(!showTableUse), title: "Show/hide table use guide" },
                   { label: showDiceRef ? "Hide dice ref" : "🎲 Dice ref", on: showDiceRef, action: () => setShowDiceRef(!showDiceRef), title: "Dice sequencing reference" },
-                  { label: showLimitations ? "Hide limitations" : "Limitations", on: showLimitations, action: () => setShowLimitations(!showLimitations) },
                   { label: showCheatSheet ? "Hide cheat sheet" : "Cheat sheet", on: showCheatSheet, action: () => setShowCheatSheet(!showCheatSheet) },
                   { label: `Preserve hooks: ${preserveHooks ? "ON" : "OFF"}`, on: preserveHooks, action: () => setPreserveHooks(!preserveHooks), title: "Keep toggle states on Clear" },
                   { label: `Strict: ${strictMode ? "ON" : "OFF"}`, on: strictMode, action: () => setStrictMode(!strictMode), title: "Lock totals until dice complete" },
@@ -3003,11 +2996,6 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                 ))}
               </div>
               <div className="flex flex-wrap gap-2 items-start">
-                <button type="button"
-                  className={`rounded px-2 py-1 text-xs font-bold border transition shrink-0 ${simpleMode ? "bg-emerald-600/80 text-white border-emerald-500/40" : "bg-gray-900/80 text-gray-300 border-gray-700 hover:bg-gray-800"}`}
-                  onClick={toggleSimpleMode} title="Toggle Simple/Complex mode">
-                  {simpleMode ? "Simple" : "Complex"}
-                </button>
                 <button type="button"
                   className={`rounded px-2 py-1 text-xs font-bold border transition shrink-0 ${theme === "dark" ? "bg-slate-800 border-gray-600 text-gray-300 hover:bg-slate-700" : "bg-gray-100 border-gray-300 text-gray-700 hover:bg-gray-200"}`}
                   onClick={toggleTheme} title="Toggle dark/light theme">
@@ -3038,45 +3026,6 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
               <div className="text-sm font-extrabold mb-2">🎲 Dice Reference</div>
               <div className={`rounded-xl border p-3 text-xs ${theme === "dark" ? "bg-gray-900 border-gray-700" : "bg-gray-50 border-gray-200"}`}>
                 <DiceEntryTooltipContent theme={theme} />
-              </div>
-            </div>
-          )}
-
-          {showLimitations && (
-            <div className="mt-4 rounded-xl border border-gray-700 bg-gray-950/30 p-3">
-              <div className="text-sm font-semibold">Accuracy and limitations</div>
-              <div className="text-xs text-gray-300 mt-1">
-                Goal: accurate, table-friendly attack resolution for 40k 10th edition. Weapon stats sourced live from Wahapedia where available.
-              </div>
-              <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                <div className="rounded-lg border border-gray-700 bg-gray-900/30 p-2">
-                  <div className="text-xs uppercase tracking-widest text-gray-300">Implemented</div>
-                  <ul className="mt-2 list-disc pl-5 text-gray-200 space-y-1">
-                    <li>Manual dice entry with step-by-step log</li>
-                    <li>Hit, wound, save, FNP sequencing</li>
-                    <li>Crit thresholds, Sustained Hits, Lethal Hits, Devastating Wounds</li>
-                    <li>Rerolls: reroll 1s and reroll fails for both hit and wound rolls; Twin-linked</li>
-                    <li>Rapid Fire X (half-range bonus attacks)</li>
-                    <li>Variable attacks: fixed integer or dice expression (e.g. D6+1, 2D6, D3+2)</li>
-                    <li>Cover (+1 save), Ignore AP</li>
-                    <li>Ignore first failed save, Half damage (round up), -1 Damage (min 1)</li>
-                    <li>Step-by-step Wizard with auto-roll for quick table use</li>
-                    <li>Split Volley — divide wounds across up to 4 targets, each with their own stats and save dice</li>
-                    <li>Unit lookup via Wahapedia (live data) or training data — fill weapon/target stats by description</li>
-                  </ul>
-                </div>
-                <div className="rounded-lg border border-gray-700 bg-gray-900/30 p-2">
-                  <div className="text-xs uppercase tracking-widest text-gray-300">Not implemented</div>
-                  <ul className="mt-2 list-disc pl-5 text-gray-200 space-y-1">
-                    <li>Unit wound tracking and model removal (no health-pool management)</li>
-                    <li>Look Out Sir and leader targeting rules</li>
-                    <li>Stratagems and command point spending</li>
-                    <li>All full-40k edge-case keyword interactions (Indirect Fire, Blast, etc.)</li>
-                  </ul>
-                </div>
-              </div>
-              <div className="mt-3 text-xs text-gray-300">
-                Notes: Cover is a simple +1 save toggle (not range/terrain conditional). AP is enforced as 0 or negative. Damage-mod ordering: half (round up) then -1 (min 1).
               </div>
             </div>
           )}
