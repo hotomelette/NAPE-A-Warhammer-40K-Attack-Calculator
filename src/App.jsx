@@ -2011,7 +2011,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
   return (
     <div className={`min-h-screen ${viz.pageBg || "bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950"} p-4 relative overflow-x-hidden`}>
       {/* Animated page-wide emoji backdrop — fixed so it covers full viewport regardless of scroll */}
-      <div className="pointer-events-none fixed inset-0 overflow-hidden mix-blend-screen" style={{ zIndex: 0, opacity: 0.08 }}>
+      <div className="pointer-events-none fixed inset-0 overflow-hidden mix-blend-screen" style={{ zIndex: 0, opacity: 0.04 }}>
         {diceReady && (
           <div style={{ display: "flex", flexDirection: "column", gap: "18px", paddingTop: "40px" }}>
             {Array.from({ length: 22 }).map((_, i) => (
