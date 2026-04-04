@@ -2011,19 +2011,20 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
   return (
     <div className={`min-h-screen ${viz.pageBg || "bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950"} p-4 relative overflow-x-hidden`}>
       {/* Animated page-wide emoji backdrop — fixed so it covers full viewport regardless of scroll */}
-      <div className="pointer-events-none fixed inset-0 overflow-hidden opacity-20 mix-blend-screen" style={{ zIndex: 0 }}>
+      <div className="pointer-events-none fixed inset-0 overflow-hidden mix-blend-screen" style={{ zIndex: 0, opacity: 0.08 }}>
         {diceReady && (
           <div style={{ display: "flex", flexDirection: "column", gap: "18px", paddingTop: "40px" }}>
             {Array.from({ length: 22 }).map((_, i) => (
               <div
                 key={i}
                 className={i % 2 ? "nape-marquee-row nape-marquee-reverse" : "nape-marquee-row"}
+                style={{ gap: "7rem", animationDelay: `${-(i * 1.9 % 9).toFixed(1)}s` }}
               >
-                {Array.from({ length: 24 }).map((__, j) => (
-                  <span key={j} className="mr-3">{viz.emoji}</span>
+                {Array.from({ length: 8 }).map((__, j) => (
+                  <span key={j}>{viz.emoji}</span>
                 ))}
-                {Array.from({ length: 24 }).map((__, j) => (
-                  <span key={`d${j}`} className="mr-3">{viz.emoji}</span>
+                {Array.from({ length: 8 }).map((__, j) => (
+                  <span key={`d${j}`}>{viz.emoji}</span>
                 ))}
               </div>
             ))}
@@ -2048,14 +2049,14 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
 
           {/* Emoji marquee background — only when hard total is ready */}
           {diceReady && (
-            <div className="absolute inset-0 pointer-events-none overflow-hidden" style={{ opacity: 0.055 }}>
+            <div className="absolute inset-0 pointer-events-none overflow-hidden" style={{ opacity: 0.12 }}>
               <div className="nape-marquee-row" style={{ animationDuration: "30s", fontSize: "0.9rem", lineHeight: 1.5 }}>
-                {Array.from({ length: 12 }).map((_, i) => <span key={i} className="mr-24">{viz.emoji}</span>)}
-                {Array.from({ length: 12 }).map((_, i) => <span key={`d${i}`} className="mr-24">{viz.emoji}</span>)}
+                {Array.from({ length: 40 }).map((_, i) => <span key={i} className="mr-3">{viz.emoji}</span>)}
+                {Array.from({ length: 40 }).map((_, i) => <span key={`d${i}`} className="mr-3">{viz.emoji}</span>)}
               </div>
               <div className="nape-marquee-row nape-marquee-reverse" style={{ animationDuration: "36s", fontSize: "0.9rem", lineHeight: 1.5 }}>
-                {Array.from({ length: 12 }).map((_, i) => <span key={i} className="mr-24">{viz.emoji}</span>)}
-                {Array.from({ length: 12 }).map((_, i) => <span key={`d${i}`} className="mr-24">{viz.emoji}</span>)}
+                {Array.from({ length: 40 }).map((_, i) => <span key={i} className="mr-3">{viz.emoji}</span>)}
+                {Array.from({ length: 40 }).map((_, i) => <span key={`d${i}`} className="mr-3">{viz.emoji}</span>)}
               </div>
             </div>
           )}
