@@ -157,29 +157,39 @@ async function resolveWahapediaPath(description, client) {
   }
 }
 
+const WORKER_TIMEOUT_MS = 8000;
+
 export async function fetchWahapediaPage(path, workerUrl) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), WORKER_TIMEOUT_MS);
   try {
     const url = `${workerUrl}/wahapedia?path=${encodeURIComponent(path)}`;
-    const res = await fetch(url);
+    const res = await fetch(url, { signal: controller.signal });
     const data = await res.json();
     if (data.error) return null;
     return data;
   } catch (err) {
     console.warn("[fetchWahapediaPage] failed for path", path, err);
     return null;
+  } finally {
+    clearTimeout(timer);
   }
 }
 
 export async function fetchWahapediaSearch(unitName, factionHint, workerUrl) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), WORKER_TIMEOUT_MS);
   try {
     const url = `${workerUrl}/search?unit=${encodeURIComponent(unitName)}&faction=${encodeURIComponent(factionHint)}`;
-    const res = await fetch(url);
+    const res = await fetch(url, { signal: controller.signal });
     const data = await res.json();
     if (data.error) return null;
     return data; // { text, url }
   } catch (err) {
     console.warn("[fetchWahapediaSearch] failed", unitName, err);
     return null;
+  } finally {
+    clearTimeout(timer);
   }
 }
 
