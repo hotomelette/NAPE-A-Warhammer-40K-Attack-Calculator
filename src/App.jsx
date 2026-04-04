@@ -589,30 +589,37 @@ function Chip({ children }) {
 }
 
 // KeywordGroup: selected keywords are pinned/always-visible; unselected ones collapse behind a toggle.
-function KeywordGroup({ items, theme }) {
+// When `label` is provided the toggle button sits inline with the label row (never shifts layout).
+// When no `label`, the toggle sits at the top of the list.
+function KeywordGroup({ items, theme, label, hint }) {
   const [expanded, setExpanded] = React.useState(false);
   const dark = theme === "dark";
   const active = items.filter(i => i.checked);
   const inactive = items.filter(i => !i.checked);
+  const toggleBtn = inactive.length > 0 ? (
+    <button
+      type="button"
+      onClick={() => setExpanded(e => !e)}
+      className={`text-xs px-2 py-0.5 rounded border transition ${dark ? "border-gray-700 text-gray-500 hover:text-gray-300 hover:border-gray-500" : "border-gray-300 text-gray-400 hover:text-gray-600 hover:border-gray-400"}`}
+    >
+      {expanded ? "▾ fewer keywords" : `▸ ${inactive.length} more keyword${inactive.length !== 1 ? "s" : ""}`}
+    </button>
+  ) : null;
   return (
     <div className="flex flex-col gap-1 text-sm">
-      {active.map(i => <div key={i.key}>{i.node}</div>)}
-      {inactive.length > 0 && (
-        <div>
-          <button
-            type="button"
-            onClick={() => setExpanded(e => !e)}
-            className={`mt-1 text-xs px-2 py-0.5 rounded border transition ${dark ? "border-gray-700 text-gray-500 hover:text-gray-300 hover:border-gray-500" : "border-gray-300 text-gray-400 hover:text-gray-600 hover:border-gray-400"}`}
-          >
-            {expanded ? "▾ fewer keywords" : `▸ ${inactive.length} more keyword${inactive.length !== 1 ? "s" : ""}`}
-          </button>
-          {expanded && (
-            <div className="flex flex-col gap-1 mt-1">
-              {inactive.map(i => <div key={i.key}>{i.node}</div>)}
-            </div>
-          )}
+      {label ? (
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <span className="font-semibold tracking-wide">{label}</span>
+            {toggleBtn}
+          </div>
+          <FieldHint hint={hint} theme={theme} />
         </div>
-      )}
+      ) : toggleBtn ? (
+        <div>{toggleBtn}</div>
+      ) : null}
+      {active.map(i => <div key={i.key}>{i.node}</div>)}
+      {expanded && inactive.map(i => <div key={i.key}>{i.node}</div>)}
     </div>
   );
 }
@@ -1423,70 +1430,110 @@ function AttackCalculator() {
   const softNote = isStrictLocked ? "STRICT MODE: totals locked until Ready" : isSoftTotal ? (!statsReady ? "SOFT TOTAL: missing stats" : "SOFT TOTAL: missing dice") : null;
 
   const cheatSheet = [
+    // ── Weapon keywords (same order as dropdown) ──────────────────────────────
     {
       name: "Rapid Fire X",
-      what: "At half range, the weapon makes additional attacks (X).",
-      how: "When Rapid Fire is enabled, and the target is within half range, +X attacks are added to A before hit dice are entered.",
-      notes: "This is a direct implementation of Rapid Fire increasing the weapon’s Attacks characteristic at half range.",
+      what: "At half range this weapon makes X additional attacks.",
+      how: "When Rapid Fire and Half Range are both enabled, +X attacks are added to A before hit rolls.",
     },
     {
-      name: "Heavy",
-      what: "If the unit Remained Stationary, the weapon gets +1 to Hit.",
-      how: "Not implemented in this build unless you have a separate toggle. This entry is informational only.",
+      name: "Torrent",
+      what: "This weapon automatically hits — no hit roll required.",
+      how: "Hit rolls are skipped entirely. All attacks go straight to the wound roll pool.",
     },
     {
-      name: "Indirect Fire",
-      what: "Attacks can target units not visible, usually with penalties and granting Cover.",
-      how: "Not implemented in this build unless you have a separate toggle. This entry is informational only.",
+      name: "Lethal Hits",
+      what: "Critical hits automatically wound without a wound roll.",
+      how: "Each critical hit bypasses the wound roll and adds 1 auto-wound to the pool.",
+    },
+    {
+      name: "Sustained Hits X",
+      what: "Each critical hit scores X additional hits.",
+      how: "Each critical hit generates X bonus hits added to the wound-roll pool. Bonus hits are not themselves critical.",
+    },
+    {
+      name: "Devastating Wounds",
+      what: "Critical wounds become mortal wounds that bypass saves.",
+      how: "Each critical wound is converted to a mortal-wound attack. Remaining normal wounds are saved as usual.",
     },
     {
       name: "Twin-linked",
       what: "Reroll failed wound rolls for this weapon.",
-      how: "When enabled, the tool locks 'Reroll failed wounds' ON in the Rerolls panel.",
+      how: "Enabling this locks ‘Reroll failed wounds’ ON in the Rerolls panel.",
     },
     {
-      name: "Lethal Hits",
-      what: "Critical hits automatically wound.",
-      how: "Each critical hit adds 1 auto-wound and reduces the wound-roll pool by 1.",
+      name: "Lance",
+      what: "In the Fight phase, if the bearer charged this turn, AP improves by 1.",
+      how: "AP is strengthened by 1 (e.g., AP -1 becomes AP -2) when computing the save target.",
     },
     {
-      name: "Sustained Hits X",
-      what: "Critical hits score X additional hits.",
-      how: "Each critical hit adds X extra hits into the wound-roll pool. Extra hits are not critical hits.",
+      name: "Blast",
+      what: "Minimum number of attacks scales with the target unit size.",
+      how: "Adds ⌊unit size ÷ 5⌋ extra attacks. Enter the enemy unit size in the field to let the tool calculate it.",
     },
     {
-      name: "Devastating Wounds",
-      what: "Critical wounds become mortal wounds that skip saves.",
-      how: "Critical wounds (from wound rolls) convert into mortal-wound attacks. The remaining wounds are saved normally.",
+      name: "Melta X",
+      what: "At half range, roll X extra dice and add the result to this weapon’s Damage.",
+      how: "Enter the Melta bonus value; the tool adds it to each damage roll when at half range.",
     },
+    {
+      name: "Anti-X N+",
+      what: "Wound rolls of N+ are always critical wounds against the specified keyword.",
+      how: "The critical wound threshold is set to N, overriding the default 6+. Rolls of N+ auto-wound regardless of S vs T.",
+    },
+    {
+      name: "+1 To Hit (Heavy / Guided / Markerlights)",
+      what: "Certain abilities grant +1 to hit rolls (e.g. Heavy when Remained Stationary, Guided, Markerlights).",
+      how: "Applies +1 to the effective hit modifier, lowering the hit target by 1 (capped at 2+).",
+    },
+    {
+      name: "Indirect Fire",
+      what: "Can target units not in line of sight, but suffers -1 to hit and grants the target Cover.",
+      how: "Applies -1 to the hit modifier. Enable Cover on the target separately if applicable.",
+    },
+    // ── Target keywords (same order as dropdown) ──────────────────────────────
     {
       name: "Cover",
-      what: "Improves the target's armor save.",
-      how: "Treated as +1 to the armor save (i.e., armor save improves by 1).",
-      notes: "This is a simplified toggle and does not model terrain conditions.",
+      what: "Improves the target’s armor save by 1.",
+      how: "The armor save is improved by 1 (e.g., 3+ becomes 2+) before comparing to the AP-modified save target.",
+      notes: "Does not model terrain-type restrictions — toggle it when the target benefits from Cover per the rules.",
     },
     {
       name: "Ignore AP",
-      what: "Treats AP as 0 for the save calculation.",
-      how: "When enabled, AP is ignored when computing the save target.",
+      what: "The target treats AP as 0 for this attack sequence.",
+      how: "AP is set to 0 when computing the effective save target.",
     },
-    {
-      name: "Rerolls (Hit/Wound)",
-      what: "Allows rerolling certain hit or wound dice.",
-      how: "Enable in the Rerolls panel: reroll 1s or reroll all fails for hits and wounds. Twin-linked locks reroll failed wounds ON. The tool determines eligible dice from initial rolls and prompts for the exact reroll count.",
-      notes: "Reroll dice are entered separately in Manual dice entry after the initial rolls.",
-    },
-
     {
       name: "Ignore first failed save",
-      what: "Negates one failed save.",
-      how: "After rolling saves, one failed save is removed before damage is applied.",
+      what: "One failed save is negated.",
+      how: "After rolling saves, the first failure is removed before applying damage.",
     },
     {
-      name: "-1 Damage / Half Damage",
-      what: "Reduces damage from each failed save instance.",
-      how: "Ordering used: half (round up), then -1 (min 1).",
-      notes: "Some datasheets specify different ordering; treat as a limitation if so.",
+      name: "-1 Damage",
+      what: "Each wound inflicts 1 less damage (minimum 1).",
+      how: "Applied after Half Damage (if both are active). Order: half (round up) → subtract 1, min 1.",
+    },
+    {
+      name: "Half Damage",
+      what: "Each wound inflicts half damage (round up).",
+      how: "Applied before -1 Damage (if both are active). Order: half (round up) → subtract 1, min 1.",
+    },
+    {
+      name: "Stealth / Smoke",
+      what: "Attacks against this unit suffer -1 to hit.",
+      how: "Applies -1 to the hit modifier (stacks with other modifiers, capped at ±1 per 10th ed rules).",
+    },
+    {
+      name: "-1 To Wound (Transhuman Physiology)",
+      what: "Attacks against this unit suffer -1 to wound rolls.",
+      how: "Applies -1 to the effective wound modifier, raising the wound target by 1.",
+    },
+    // ── General mechanics ─────────────────────────────────────────────────────
+    {
+      name: "Rerolls (Hit / Wound)",
+      what: "Reroll certain hit or wound dice — 1s only, or all failures.",
+      how: "Enable in the Rerolls panel. Twin-linked locks reroll-failed-wounds ON. After initial rolls the tool shows exactly how many reroll dice to enter.",
+      notes: "Reroll dice are entered in a separate field after the initial rolls.",
     },
   ];
 
@@ -2119,19 +2166,10 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                 damageValue={damageValue} setDamageValue={setDamageValue}
                 isNum={isNum} theme={theme}
               />
-              <div className="mt-1 text-xs text-gray-400">
-                Computed attacks: <span className="font-semibold">{activeComputed.A}</span>
-                {(modelQty ?? 1) > 1 && attacksFixed && isNum(attacksValue) ? (
-                  <span className="ml-2 opacity-70">({attacksValue} × {modelQty} models)</span>
-                ) : !attacksFixed && parseDiceSpec(attacksValue).mod > 0 ? (
-                  <span className="ml-2 opacity-70">(dice sum + {parseDiceSpec(attacksValue).mod} modifier)</span>
-                ) : null}
-              </div>
 
 
               {!simpleMode && (
-              <Field label="Keywords / Effects" hint="Enable only keywords that apply to this weapon and this firing sequence." theme={theme}>
-                <KeywordGroup theme={theme} items={[
+              <KeywordGroup label="Keywords / Effects" hint="Enable only keywords that apply to this weapon and this firing sequence." theme={theme} items={[
                   { key: "rapidFire", checked: rapidFire, node: (
                     <div className="flex flex-wrap items-center gap-2 min-h-[36px]">
                       <label className="flex items-center gap-2">
@@ -2227,7 +2265,6 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                     </label>
                   )},
                 ]} />
-              </Field>
               )}
 
             </Section>
@@ -2501,7 +2538,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                             ) : null}
 
               <Field
-                              label={<CounterLabel prefix={`Hit rolls${isNum(toHit) && !torrent ? ` · ${toHit}+` : torrent ? " · Auto" : ""}`} need={hitNeeded} entered={hitEntered} remaining={hitNeeded - hitEntered} theme={theme} />}
+                              label={<CounterLabel prefix={`Hit rolls${isNum(toHit) && !torrent ? ` · ${Math.max(2, Number(toHit) - effectiveHitMod)}+${effectiveHitMod > 0 ? ` (+${effectiveHitMod})` : effectiveHitMod < 0 ? ` (${effectiveHitMod})` : ""}` : torrent ? " · Auto" : ""}`} need={hitNeeded} entered={hitEntered} remaining={hitNeeded - hitEntered} theme={theme} />}
                               hint="One die per attack. Skip if Torrent (auto-hits). Crits trigger Lethal Hits / Sustained Hits. Count must match A exactly."
                             >
                               <div className="flex gap-2">
@@ -2727,7 +2764,16 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                           </Section>
 
 <Section theme={theme} title="Results" action={
-  <div className="flex gap-2">
+  <div className="flex items-center gap-2">
+    {!statsReady ? (
+      <span className={`text-xs px-2 py-0.5 rounded-full border ${theme === "dark" ? "bg-red-900/50 border-red-600 text-red-300" : "bg-red-50 border-red-300 text-red-700"}`}>Missing stats</span>
+    ) : activeComputed.errors.length > 0 ? (
+      <span className={`text-xs px-2 py-0.5 rounded-full border ${theme === "dark" ? "bg-red-900/50 border-red-600 text-red-300" : "bg-red-50 border-red-300 text-red-700"}`}>Input issues</span>
+    ) : status === "Waiting for dice" ? (
+      <span className={`text-xs px-2 py-0.5 rounded-full border ${theme === "dark" ? "bg-amber-900/50 border-amber-600 text-amber-300" : "bg-amber-50 border-amber-300 text-amber-800"}`}>Waiting for dice</span>
+    ) : (
+      <span className={`text-xs px-2 py-0.5 rounded-full border ${theme === "dark" ? "bg-green-900/50 border-green-600 text-green-300" : "bg-green-50 border-green-300 text-green-700"}`}>✓ Ready</span>
+    )}
     <button
       type="button"
       className="rounded px-2 py-1 text-xs font-extrabold border transition bg-gradient-to-r from-yellow-400/80 to-amber-400/80 text-gray-950 border-yellow-200/40 hover:from-yellow-300/90 hover:to-amber-300/90"
@@ -2745,33 +2791,6 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
     </button>
   </div>
 }>
-
-                {!statsReady ? (
-                  <div className={`mt-3 rounded-xl border p-4 text-base ${theme === "dark" ? "border-red-600 bg-red-900/30 text-red-200" : "border-red-300 bg-red-50 text-red-800"}`}>
-                    <div className="font-semibold mb-1">Missing required stats</div>
-                    <div className="text-xs">Fill the highlighted fields in Weapon and Target to get a valid preview.</div>
-                    <div className="mt-2 text-xs">Missing: {[...missingWeapon, ...missingTarget].join(', ')}</div>
-                  </div>
-                ) : activeComputed.errors.length > 0 ? (
-                  <div className={`mt-3 rounded-xl border p-4 text-base ${theme === "dark" ? "border-red-600 bg-red-900/30 text-red-200" : "border-red-300 bg-red-50 text-red-800"}`}>
-                    <div className="font-semibold mb-1">Input issues</div>
-                    <ul className="list-disc pl-5 space-y-1">
-                      {activeComputed.errors.map((e, idx) => (
-                        <li key={idx}>{e}</li>
-                      ))}
-                    </ul>
-                  </div>
-                ) : status === "Waiting for dice" ? (
-                  <div className={`mt-3 rounded-xl border p-4 text-base ${theme === "dark" ? "border-amber-600 bg-amber-900/30 text-amber-200" : "border-amber-300 bg-amber-50 text-amber-900"}`}>
-                    <div className="font-semibold">Waiting for dice</div>
-                    <div className="text-xs">Enter the remaining dice to finalize a hard result.</div>
-                  </div>
-                ) : (
-                  <div className={`mt-3 rounded-xl border p-4 text-base ${theme === "dark" ? "border-green-600 bg-green-900/30 text-green-200" : "border-green-300 bg-green-50 text-green-900"}`}>
-                    <div className="font-semibold">Ready</div>
-                    <div className="text-xs">Results are now fully determined by your entered dice.</div>
-                  </div>
-                )}
 
                 
                 {/* Prominent total damage panel (full width) */}
@@ -2892,65 +2911,6 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                   </div>
                 )}
 
-                <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
-                  <div className={`rounded-lg border p-2 ${theme === "dark" ? "bg-gray-900 border-gray-700 text-gray-100" : "bg-white border-gray-200 text-gray-900"}`}>
-                    <div className="text-base font-extrabold">Attack math</div>
-                    <div className="mt-1">{activeComputed.A} attacks</div>
-                    <div>Wound-roll pool: {activeComputed.woundRollPool}</div>
-                    <div>Wound target: {activeComputed.needed}+</div>
-                    <div>Save target: {activeComputed.saveTarget}+ </div>
-                  </div>
-
-                  <div className={`rounded-lg border p-2 ${theme === "dark" ? "bg-gray-900 border-gray-700 text-gray-100" : "bg-white border-gray-200 text-gray-900"}`}>
-                    <div className="text-base font-extrabold">Crit branches</div>
-                    <div className="mt-1">Crit hits: {activeComputed.critHits}</div>
-                    <div>Sustained extra hits: {activeComputed.sustainedExtraHits}</div>
-                    <div>Lethal auto-wounds: {activeComputed.autoWoundsFromLethal}</div>
-                    <div>Crit wounds: {activeComputed.critWounds}</div>
-                  </div>
-
-                  <div className={`rounded-lg border p-2 ${theme === "dark" ? "bg-gray-900 border-gray-700 text-gray-100" : "bg-white border-gray-200 text-gray-900"}`}>
-                    <div className="text-base font-extrabold">Wounds and saves</div>
-                    <div className="mt-1">Total wounds: {activeComputed.totalWounds}</div>
-                    <div>Dev Wounds conversions: {activeComputed.mortalWoundAttacks}</div>
-                    <div>Savable wounds: {activeComputed.savableWounds}</div>
-                    <div>Failed saves: {activeComputed.failedSaves}</div>
-                  </div>
-
-                    <div className={`rounded-xl border p-3 ${dmgSubWrapClass}`}>
-                      <div className="text-base font-extrabold flex items-center justify-between">
-                        <span>Damage subtotals</span>
-                      <span className="text-3xl leading-none">{viz.emoji}</span>
-                    </div>
-
-                          <div className="mt-2 grid grid-cols-2 gap-2">
-                            <div className={`rounded-lg border p-2 ${dmgSubTileClass}`}>
-                              <div className={`text-xs uppercase tracking-widest ${dmgSubLabelClass}`}>Normal</div>
-                              <div className={`text-3xl font-extrabold ${theme === "dark" ? "text-white" : Number(shownNormalDamage || 0) >= 10 ? "text-gray-900" : "text-gray-900"}`}>{shownNormalDamage}</div>
-                            </div>
-                            <div className={`rounded-lg border p-2 ${dmgSubTileClass}`}>
-                              <div className={`text-xs uppercase tracking-widest ${dmgSubLabelClass}`}>Mortal</div>
-                              <div className={`text-3xl font-extrabold ${theme === "dark" ? "text-white" : "text-gray-900"}`}>{shownMortalDamage}</div>
-                            </div>
-                          </div>
-
-                          <div className="mt-3 grid grid-cols-2 gap-2">
-                            <div className={`rounded-lg border p-2 ${dmgSubTileClass}`}>
-                              <div className={`text-xs uppercase tracking-widest ${dmgSubLabelClass}`}>Pre-FNP</div>
-                              <div className={`text-3xl font-extrabold ${theme === "dark" ? "text-white" : "text-gray-900"}`}>{shownTotalPreFnp}</div>
-                            </div>
-                            <div className={`rounded-lg border p-2 ${dmgSubTileClass}`}>
-                              <div className={`text-xs uppercase tracking-widest ${dmgSubLabelClass}`}>Ignored</div>
-                              <div className={`text-3xl font-extrabold ${theme === "dark" ? "text-white" : "text-gray-900"}`}>{ignoredTotal}</div>
-                            {activeComputed.ignoredByRule ? (
-                                <div className={`text-xs mt-0.5 ${theme === "dark" ? "text-gray-300" : "text-gray-700"}`}>incl. ignore-first-failed-save</div>
-                            ) : null}
-                          </div>
-                        </div>
-
-                </div>
-
-                </div>
               </Section>
 
 
@@ -2961,6 +2921,61 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                       <li key={idx}>{line}</li>
                     ))}
                   </ol>
+                  <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
+                    <div className={`rounded-lg border p-2 ${theme === "dark" ? "bg-gray-900 border-gray-700 text-gray-100" : "bg-white border-gray-200 text-gray-900"}`}>
+                      <div className="text-base font-extrabold">Attack math</div>
+                      <div className="mt-1">{activeComputed.A} attacks</div>
+                      <div>Wound-roll pool: {activeComputed.woundRollPool}</div>
+                      <div>Wound target: {activeComputed.needed}+</div>
+                      <div>Save target: {activeComputed.saveTarget}+</div>
+                    </div>
+
+                    <div className={`rounded-lg border p-2 ${theme === "dark" ? "bg-gray-900 border-gray-700 text-gray-100" : "bg-white border-gray-200 text-gray-900"}`}>
+                      <div className="text-base font-extrabold">Crit branches</div>
+                      <div className="mt-1">Crit hits: {activeComputed.critHits}</div>
+                      <div>Sustained extra hits: {activeComputed.sustainedExtraHits}</div>
+                      <div>Lethal auto-wounds: {activeComputed.autoWoundsFromLethal}</div>
+                      <div>Crit wounds: {activeComputed.critWounds}</div>
+                    </div>
+
+                    <div className={`rounded-lg border p-2 ${theme === "dark" ? "bg-gray-900 border-gray-700 text-gray-100" : "bg-white border-gray-200 text-gray-900"}`}>
+                      <div className="text-base font-extrabold">Wounds and saves</div>
+                      <div className="mt-1">Total wounds: {activeComputed.totalWounds}</div>
+                      <div>Dev Wounds conversions: {activeComputed.mortalWoundAttacks}</div>
+                      <div>Savable wounds: {activeComputed.savableWounds}</div>
+                      <div>Failed saves: {activeComputed.failedSaves}</div>
+                    </div>
+
+                    <div className={`rounded-xl border p-3 ${dmgSubWrapClass}`}>
+                      <div className="text-base font-extrabold flex items-center justify-between">
+                        <span>Damage subtotals</span>
+                        <span className="text-3xl leading-none">{viz.emoji}</span>
+                      </div>
+                      <div className="mt-2 grid grid-cols-2 gap-2">
+                        <div className={`rounded-lg border p-2 ${dmgSubTileClass}`}>
+                          <div className={`text-xs uppercase tracking-widest ${dmgSubLabelClass}`}>Normal</div>
+                          <div className={`text-3xl font-extrabold ${theme === "dark" ? "text-white" : "text-gray-900"}`}>{shownNormalDamage}</div>
+                        </div>
+                        <div className={`rounded-lg border p-2 ${dmgSubTileClass}`}>
+                          <div className={`text-xs uppercase tracking-widest ${dmgSubLabelClass}`}>Mortal</div>
+                          <div className={`text-3xl font-extrabold ${theme === "dark" ? "text-white" : "text-gray-900"}`}>{shownMortalDamage}</div>
+                        </div>
+                      </div>
+                      <div className="mt-3 grid grid-cols-2 gap-2">
+                        <div className={`rounded-lg border p-2 ${dmgSubTileClass}`}>
+                          <div className={`text-xs uppercase tracking-widest ${dmgSubLabelClass}`}>Pre-FNP</div>
+                          <div className={`text-3xl font-extrabold ${theme === "dark" ? "text-white" : "text-gray-900"}`}>{shownTotalPreFnp}</div>
+                        </div>
+                        <div className={`rounded-lg border p-2 ${dmgSubTileClass}`}>
+                          <div className={`text-xs uppercase tracking-widest ${dmgSubLabelClass}`}>Ignored</div>
+                          <div className={`text-3xl font-extrabold ${theme === "dark" ? "text-white" : "text-gray-900"}`}>{ignoredTotal}</div>
+                          {activeComputed.ignoredByRule ? (
+                            <div className={`text-xs mt-0.5 ${theme === "dark" ? "text-gray-300" : "text-gray-700"}`}>incl. ignore-first-failed-save</div>
+                          ) : null}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </Section>
               )}
           </div>
@@ -3070,7 +3085,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
             <div className="mt-4 rounded-xl border border-gray-700 bg-gray-950/30 p-3">
               <div className="text-sm font-semibold">Keyword cheat sheet</div>
               <div className="mt-1 text-xs text-gray-300">
-                Quick definitions plus what this tool actually applies. Keep this aligned with your toggles.
+                Weapon keywords first, then target keywords — same order as the dropdowns.
               </div>
 
               <div className="mt-3 space-y-2">
