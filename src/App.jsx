@@ -2018,7 +2018,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
               <div
                 key={i}
                 className={i % 2 ? "nape-marquee-row nape-marquee-reverse" : "nape-marquee-row"}
-                style={{ gap: "7rem", animationDelay: `${-(i * 1.9 % 9).toFixed(1)}s` }}
+                style={{ gap: "7rem", animationDuration: `${22 + (i % 5) * 4}s`, animationDelay: `${-(i * 1.9 % 9).toFixed(1)}s` }}
               >
                 {Array.from({ length: 8 }).map((__, j) => (
                   <span key={j}>{viz.emoji}</span>
