@@ -588,6 +588,35 @@ function Chip({ children }) {
   );
 }
 
+// KeywordGroup: selected keywords are pinned/always-visible; unselected ones collapse behind a toggle.
+function KeywordGroup({ items, theme }) {
+  const [expanded, setExpanded] = React.useState(false);
+  const dark = theme === "dark";
+  const active = items.filter(i => i.checked);
+  const inactive = items.filter(i => !i.checked);
+  return (
+    <div className="flex flex-col gap-1 text-sm">
+      {active.map(i => <div key={i.key}>{i.node}</div>)}
+      {inactive.length > 0 && (
+        <div>
+          <button
+            type="button"
+            onClick={() => setExpanded(e => !e)}
+            className={`mt-1 text-xs px-2 py-0.5 rounded border transition ${dark ? "border-gray-700 text-gray-500 hover:text-gray-300 hover:border-gray-500" : "border-gray-300 text-gray-400 hover:text-gray-600 hover:border-gray-400"}`}
+          >
+            {expanded ? "▾ fewer keywords" : `▸ ${inactive.length} more keyword${inactive.length !== 1 ? "s" : ""}`}
+          </button>
+          {expanded && (
+            <div className="flex flex-col gap-1 mt-1">
+              {inactive.map(i => <div key={i.key}>{i.node}</div>)}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function damageViz(total) {
   // Provides both the damage emojis and a cohesive page theme.
   // Tailwind classes are kept literal for JIT safety.
@@ -2102,170 +2131,102 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
 
               {!simpleMode && (
               <Field label="Keywords / Effects" hint="Enable only keywords that apply to this weapon and this firing sequence." theme={theme}>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-2 gap-y-2 text-sm items-start">
-
-                  <div className="flex flex-wrap items-center gap-2 self-start min-h-[40px]">
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={rapidFire}
-                        onChange={(e) => {
-                          const on = e.target.checked;
-                          setRapidFire(on);
-                          if (!on) setHalfRange(false);
-                        }}
-                      />
-                      <span className="font-semibold">Rapid Fire</span>
+                <KeywordGroup theme={theme} items={[
+                  { key: "rapidFire", checked: rapidFire, node: (
+                    <div className="flex flex-wrap items-center gap-2 min-h-[36px]">
+                      <label className="flex items-center gap-2">
+                        <input type="checkbox" checked={rapidFire} onChange={(e) => { const on = e.target.checked; setRapidFire(on); if (!on) setHalfRange(false); }} />
+                        <span className="font-semibold">Rapid Fire</span>
+                      </label>
+                      {rapidFire && <input className={`w-14 rounded border p-1 text-sm font-bold ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300 text-gray-900"}`} type="number" min={0} value={rapidFireX} onChange={(e) => setRapidFireX(e.target.value)} title="Rapid Fire X: add X attacks at half range." />}
+                      <label className={`flex items-center gap-2 ${!rapidFire || Number(rapidFireX || 0) <= 0 ? "opacity-50" : ""}`}>
+                        <input type="checkbox" checked={halfRange} disabled={!rapidFire || Number(rapidFireX || 0) <= 0} onChange={(e) => setHalfRange(e.target.checked)} />
+                        <span className="font-semibold">Half range</span>
+                      </label>
+                    </div>
+                  )},
+                  { key: "torrent", checked: torrent, node: (
+                    <label className="flex items-center gap-2 min-h-[36px]">
+                      <input type="checkbox" checked={torrent} onChange={(e) => setTorrent(e.target.checked)} />
+                      <span className="font-semibold">TORRENT</span>
+                      <span className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>(auto-hit)</span>
                     </label>
-                    {rapidFire && (
-                      <input
-                        className={`w-14 rounded border p-1 text-sm font-bold ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300 text-gray-900"}`}
-                        type="number"
-                        min={0}
-                        value={rapidFireX}
-                        onChange={(e) => setRapidFireX(e.target.value)}
-                        title="Rapid Fire X: if the target is within half range, add X attacks to A before rolling hits."
-                      />
-                    )}
-                    <label className={`flex items-center gap-2 ${!rapidFire || Number(rapidFireX || 0) <= 0 ? "opacity-50" : ""}`}>
-                      <input
-                        type="checkbox"
-                        checked={halfRange}
-                        disabled={!rapidFire || Number(rapidFireX || 0) <= 0}
-                        onChange={(e) => setHalfRange(e.target.checked)}
-                      />
-                      <span className="font-semibold">Half range</span>
+                  )},
+                  { key: "lethalHits", checked: lethalHits, node: (
+                    <label className="flex items-center gap-2 min-h-[36px]">
+                      <input type="checkbox" checked={lethalHits} onChange={(e) => setLethalHits(e.target.checked)} />
+                      <span className="font-semibold">Lethal Hits</span>
+                      <span className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>(crit hit auto-wounds)</span>
                     </label>
-                  </div>
-
-
-                  <label className="flex items-center gap-2 min-h-[40px]">
-                    <input type="checkbox" checked={torrent} onChange={(e) => setTorrent(e.target.checked)} />
-                    <span className="font-semibold">TORRENT</span>
-                    <span className="text-xs text-gray-300">(auto-hit)</span>
-                  </label>
-
-                  <label className="flex items-center gap-2 min-h-[40px]">
-                    <input type="checkbox" checked={lethalHits} onChange={(e) => setLethalHits(e.target.checked)} />
-                    <span className="font-semibold">Lethal Hits</span>
-                    <span className="text-xs text-gray-300">(crit hit auto-wounds)</span>
-                  </label>
-
-                  <label className="flex items-center gap-2 min-h-[40px]">
-                    <input type="checkbox" checked={sustainedHits} onChange={(e) => setSustainedHits(e.target.checked)} />
-                    <span className="font-semibold">Sustained Hits</span>
-                    {sustainedHits && (
-                      <input
-                        className={`w-14 rounded border p-1 text-sm font-bold ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300 text-gray-900"}`}
-                        type="number"
-                        min={1}
-                        value={sustainedHitsN}
-                        onChange={(e) => setSustainedHitsN(e.target.value)}
-                        title="Sustained Hits X: each critical hit adds X extra hits. Extra hits are not critical hits."
-                      />
-                    )}
-                    <span className="text-xs text-gray-300">(crit hit = extra hits)</span>
-                  </label>
-
-                  <label className="flex items-center gap-2 min-h-[40px]">
-                    <input type="checkbox" checked={devastatingWounds} onChange={(e) => setDevastatingWounds(e.target.checked)} />
-                    <span className="font-semibold">Devastating Wounds</span>
-                    <span className="text-xs text-gray-300">(crit wound becomes mortals)</span>
-                  </label>
-
-                  <label className="flex items-center gap-2 min-h-[40px]">
-                    <input
-                      type="checkbox"
-                      checked={twinLinked}
-                      onChange={(e) => {
-                        const next = e.target.checked;
-                        setTwinLinked(next);
-                        if (next) setRerollWoundFails(true);
-                        if (!next) setRerollWoundFails(false);
-                      }}
-                      title="Twin-linked: reroll failed wound rolls for this weapon."
-                    />
-                    <span className="font-semibold">Twin-linked</span>
-                    <span className="text-xs text-gray-300">(reroll failed wounds)</span>
-                  </label>
-
-                  {/* Lance */}
-                  <label className="flex items-center gap-2 min-h-[40px]">
-                    <input type="checkbox" checked={lance} onChange={e => setLance(e.target.checked)} />
-                    <span className="font-semibold">Lance</span>
-                    <span className="text-xs text-gray-300">(AP improves by 1)</span>
-                  </label>
-
-                  {/* Blast */}
-                  <label className="flex items-center gap-2 min-h-[40px]">
-                    <input type="checkbox" checked={blastEnabled} onChange={e => setBlastEnabled(e.target.checked)} />
-                    <span className="font-semibold">Blast</span>
-                    {blastEnabled && (
-                      <input
-                        type="number"
-                        min={1}
-                        className={`w-16 rounded border p-1 text-sm font-bold ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300 text-gray-900"}`}
-                        value={blastUnitSize}
-                        onChange={e => setBlastUnitSize(Number(e.target.value))}
-                        title="Enemy unit size"
-                      />
-                    )}
-                    <span className="text-xs text-gray-300">{blastEnabled ? `(+${Math.floor((blastUnitSize||0)/5)} attacks)` : "(+1 per 5 models)"}</span>
-                  </label>
-
-                  {/* Melta */}
-                  <label className="flex items-center gap-2 min-h-[40px]">
-                    <input type="checkbox" checked={meltaEnabled} onChange={e => setMeltaEnabled(e.target.checked)} />
-                    <span className="font-semibold">Melta</span>
-                    {meltaEnabled && (
-                      <input
-                        type="number"
-                        min={0}
-                        className={`w-14 rounded border p-1 text-sm font-bold ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300 text-gray-900"}`}
-                        value={meltaX}
-                        onChange={e => setMeltaX(Number(e.target.value))}
-                        title="Melta bonus damage"
-                      />
-                    )}
-                    <span className="text-xs text-gray-300">(+X damage, half range)</span>
-                  </label>
-
-                  {/* Anti-X */}
-                  <label className="flex items-center gap-2 min-h-[40px]">
-                    <input type="checkbox" checked={antiXEnabled} onChange={e => {
-                      setAntiXEnabled(e.target.checked);
-                      if (!e.target.checked) dispatch({ type: "SET_WEAPON_FIELD", field: "critWoundThreshold", value: 6 });
-                    }} />
-                    <span className="font-semibold">Anti-X</span>
-                    {antiXEnabled && (
-                      <input
-                        type="number"
-                        min={2}
-                        max={6}
-                        className={`w-14 rounded border p-1 text-sm font-bold ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300 text-gray-900"}`}
-                        value={antiXThreshold}
-                        onChange={e => setAntiXThreshold(Number(e.target.value))}
-                        title="Critical wound on N+"
-                      />
-                    )}
-                    <span className="text-xs text-gray-300">(crit wound on N+, e.g. Anti-Infantry 4+)</span>
-                  </label>
-
-                  {/* +1 To Hit */}
-                  <label className="flex items-center gap-2 min-h-[40px]">
-                    <input type="checkbox" checked={plusOneToHit} onChange={e => setPlusOneToHit(e.target.checked)} />
-                    <span className="font-semibold">+1 To Hit</span>
-                    <span className="text-xs text-gray-300">(Heavy, Guided, Markerlights)</span>
-                  </label>
-
-                  {/* Indirect Fire */}
-                  <label className="flex items-center gap-2 min-h-[40px]">
-                    <input type="checkbox" checked={indirectFire} onChange={e => setIndirectFire(e.target.checked)} />
-                    <span className="font-semibold">Indirect Fire</span>
-                    <span className="text-xs text-gray-300">(-1 to hit, no line of sight)</span>
-                  </label>
-
-                </div>
+                  )},
+                  { key: "sustainedHits", checked: sustainedHits, node: (
+                    <label className="flex items-center gap-2 min-h-[36px]">
+                      <input type="checkbox" checked={sustainedHits} onChange={(e) => setSustainedHits(e.target.checked)} />
+                      <span className="font-semibold">Sustained Hits</span>
+                      {sustainedHits && <input className={`w-14 rounded border p-1 text-sm font-bold ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300 text-gray-900"}`} type="number" min={1} value={sustainedHitsN} onChange={(e) => setSustainedHitsN(e.target.value)} title="Sustained Hits X: each crit hit adds X extra hits." />}
+                      <span className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>(crit hit = extra hits)</span>
+                    </label>
+                  )},
+                  { key: "devastatingWounds", checked: devastatingWounds, node: (
+                    <label className="flex items-center gap-2 min-h-[36px]">
+                      <input type="checkbox" checked={devastatingWounds} onChange={(e) => setDevastatingWounds(e.target.checked)} />
+                      <span className="font-semibold">Devastating Wounds</span>
+                      <span className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>(crit wound → mortals)</span>
+                    </label>
+                  )},
+                  { key: "twinLinked", checked: twinLinked, node: (
+                    <label className="flex items-center gap-2 min-h-[36px]">
+                      <input type="checkbox" checked={twinLinked} onChange={(e) => { const next = e.target.checked; setTwinLinked(next); if (next) setRerollWoundFails(true); if (!next) setRerollWoundFails(false); }} title="Twin-linked: reroll failed wound rolls." />
+                      <span className="font-semibold">Twin-linked</span>
+                      <span className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>(reroll failed wounds)</span>
+                    </label>
+                  )},
+                  { key: "lance", checked: lance, node: (
+                    <label className="flex items-center gap-2 min-h-[36px]">
+                      <input type="checkbox" checked={lance} onChange={e => setLance(e.target.checked)} />
+                      <span className="font-semibold">Lance</span>
+                      <span className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>(AP improves by 1)</span>
+                    </label>
+                  )},
+                  { key: "blast", checked: blastEnabled, node: (
+                    <label className="flex items-center gap-2 min-h-[36px]">
+                      <input type="checkbox" checked={blastEnabled} onChange={e => setBlastEnabled(e.target.checked)} />
+                      <span className="font-semibold">Blast</span>
+                      {blastEnabled && <input type="number" min={1} className={`w-16 rounded border p-1 text-sm font-bold ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300 text-gray-900"}`} value={blastUnitSize} onChange={e => setBlastUnitSize(Number(e.target.value))} title="Enemy unit size" />}
+                      <span className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>{blastEnabled ? `(+${Math.floor((blastUnitSize||0)/5)} attacks)` : "(+1 per 5 models)"}</span>
+                    </label>
+                  )},
+                  { key: "melta", checked: meltaEnabled, node: (
+                    <label className="flex items-center gap-2 min-h-[36px]">
+                      <input type="checkbox" checked={meltaEnabled} onChange={e => setMeltaEnabled(e.target.checked)} />
+                      <span className="font-semibold">Melta</span>
+                      {meltaEnabled && <input type="number" min={0} className={`w-14 rounded border p-1 text-sm font-bold ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300 text-gray-900"}`} value={meltaX} onChange={e => setMeltaX(Number(e.target.value))} title="Melta bonus damage" />}
+                      <span className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>(+X damage, half range)</span>
+                    </label>
+                  )},
+                  { key: "antiX", checked: antiXEnabled, node: (
+                    <label className="flex items-center gap-2 min-h-[36px]">
+                      <input type="checkbox" checked={antiXEnabled} onChange={e => { setAntiXEnabled(e.target.checked); if (!e.target.checked) dispatch({ type: "SET_WEAPON_FIELD", field: "critWoundThreshold", value: 6 }); }} />
+                      <span className="font-semibold">Anti-X</span>
+                      {antiXEnabled && <input type="number" min={2} max={6} className={`w-14 rounded border p-1 text-sm font-bold ${theme === "dark" ? "bg-gray-900/40 border-gray-700 text-gray-100" : "bg-white border-gray-300 text-gray-900"}`} value={antiXThreshold} onChange={e => setAntiXThreshold(Number(e.target.value))} title="Critical wound on N+" />}
+                      <span className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>(crit wound on N+, e.g. Anti-Infantry 4+)</span>
+                    </label>
+                  )},
+                  { key: "plusOneToHit", checked: plusOneToHit, node: (
+                    <label className="flex items-center gap-2 min-h-[36px]">
+                      <input type="checkbox" checked={plusOneToHit} onChange={e => setPlusOneToHit(e.target.checked)} />
+                      <span className="font-semibold">+1 To Hit</span>
+                      <span className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>(Heavy, Guided, Markerlights)</span>
+                    </label>
+                  )},
+                  { key: "indirectFire", checked: indirectFire, node: (
+                    <label className="flex items-center gap-2 min-h-[36px]">
+                      <input type="checkbox" checked={indirectFire} onChange={e => setIndirectFire(e.target.checked)} />
+                      <span className="font-semibold">Indirect Fire</span>
+                      <span className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>(-1 to hit)</span>
+                    </label>
+                  )},
+                ]} />
               </Field>
               )}
 
@@ -2326,24 +2287,16 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                 setFnpRollsText={setFnpRollsText}
                 isNum={isNum} theme={theme}
               />
-              <div className="mt-3 flex flex-wrap gap-3 text-sm">
-                <label className="flex items-center gap-2"><input type="checkbox" checked={inCover} onChange={e => setInCover(e.target.checked)} className="accent-amber-400" /> Cover (+1 Sv)</label>
-                <label className="flex items-center gap-2"><input type="checkbox" checked={ignoreAp} onChange={e => setIgnoreAp(e.target.checked)} className="accent-amber-400" /> Ignore AP</label>
-                <label className="flex items-center gap-2"><input type="checkbox" checked={ignoreFirstFailedSave} onChange={e => setIgnoreFirstFailedSave(e.target.checked)} className="accent-amber-400" /> Ignore 1st failed save</label>
-                <label className="flex items-center gap-2"><input type="checkbox" checked={minusOneDamage} onChange={e => setMinusOneDamage(e.target.checked)} className="accent-amber-400" /> -1 Damage</label>
-                <label className="flex items-center gap-2"><input type="checkbox" checked={halfDamage} onChange={e => setHalfDamage(e.target.checked)} className="accent-amber-400" /> Half Damage</label>
-                {/* Stealth / Smoke */}
-                <label className="flex items-center gap-2 min-h-[40px]">
-                  <input type="checkbox" checked={stealthSmoke} onChange={e => setStealthSmoke(e.target.checked)} className="accent-amber-400" />
-                  <span className="font-semibold">Stealth / Smoke</span>
-                  <span className="text-xs text-gray-300">(-1 to hit: Stealth ability or Smokescreen)</span>
-                </label>
-                {/* -1 To Wound */}
-                <label className="flex items-center gap-2 min-h-[40px]">
-                  <input type="checkbox" checked={minusOneToWound} onChange={e => setMinusOneToWound(e.target.checked)} className="accent-amber-400" />
-                  <span className="font-semibold">-1 To Wound</span>
-                  <span className="text-xs text-gray-300">(Transhuman Physiology, similar)</span>
-                </label>
+              <div className="mt-3">
+                <KeywordGroup theme={theme} items={[
+                  { key: "inCover", checked: inCover, node: (<label className="flex items-center gap-2 min-h-[32px]"><input type="checkbox" checked={inCover} onChange={e => setInCover(e.target.checked)} className="accent-amber-400" /><span>Cover (+1 Sv)</span></label>) },
+                  { key: "ignoreAp", checked: ignoreAp, node: (<label className="flex items-center gap-2 min-h-[32px]"><input type="checkbox" checked={ignoreAp} onChange={e => setIgnoreAp(e.target.checked)} className="accent-amber-400" /><span>Ignore AP</span></label>) },
+                  { key: "ignoreFirstFailedSave", checked: ignoreFirstFailedSave, node: (<label className="flex items-center gap-2 min-h-[32px]"><input type="checkbox" checked={ignoreFirstFailedSave} onChange={e => setIgnoreFirstFailedSave(e.target.checked)} className="accent-amber-400" /><span>Ignore 1st failed save</span></label>) },
+                  { key: "minusOneDamage", checked: minusOneDamage, node: (<label className="flex items-center gap-2 min-h-[32px]"><input type="checkbox" checked={minusOneDamage} onChange={e => setMinusOneDamage(e.target.checked)} className="accent-amber-400" /><span>-1 Damage</span></label>) },
+                  { key: "halfDamage", checked: halfDamage, node: (<label className="flex items-center gap-2 min-h-[32px]"><input type="checkbox" checked={halfDamage} onChange={e => setHalfDamage(e.target.checked)} className="accent-amber-400" /><span>Half Damage</span></label>) },
+                  { key: "stealthSmoke", checked: stealthSmoke, node: (<label className="flex items-center gap-2 min-h-[32px]"><input type="checkbox" checked={stealthSmoke} onChange={e => setStealthSmoke(e.target.checked)} className="accent-amber-400" /><span className="font-semibold">Stealth / Smoke</span><span className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>(-1 to hit)</span></label>) },
+                  { key: "minusOneToWound", checked: minusOneToWound, node: (<label className="flex items-center gap-2 min-h-[32px]"><input type="checkbox" checked={minusOneToWound} onChange={e => setMinusOneToWound(e.target.checked)} className="accent-amber-400" /><span className="font-semibold">-1 To Wound</span><span className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>(Transhuman Physiology)</span></label>) },
+                ]} />
               </div>
             </Section>
 
@@ -2416,12 +2369,14 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                         setFnpRollsText={v => setSplitTargetField(i, "fnpRollsText", v)}
                         isNum={isNum} theme={theme}
                       />
-                      <div className="mt-2 flex flex-wrap gap-3 text-sm">
-                        <label className="flex items-center gap-2"><input type="checkbox" checked={t.inCover} onChange={e => setSplitTargetField(i, "inCover", e.target.checked)} className="accent-amber-400" /> Cover (+1 Sv)</label>
-                        <label className="flex items-center gap-2"><input type="checkbox" checked={t.ignoreAp} onChange={e => setSplitTargetField(i, "ignoreAp", e.target.checked)} className="accent-amber-400" /> Ignore AP</label>
-                        <label className="flex items-center gap-2"><input type="checkbox" checked={t.ignoreFirstFailedSave} onChange={e => setSplitTargetField(i, "ignoreFirstFailedSave", e.target.checked)} className="accent-amber-400" /> Ignore 1st failed save</label>
-                        <label className="flex items-center gap-2"><input type="checkbox" checked={t.minusOneDamage} onChange={e => setSplitTargetField(i, "minusOneDamage", e.target.checked)} className="accent-amber-400" /> -1 Damage</label>
-                        <label className="flex items-center gap-2"><input type="checkbox" checked={t.halfDamage} onChange={e => setSplitTargetField(i, "halfDamage", e.target.checked)} className="accent-amber-400" /> Half Damage</label>
+                      <div className="mt-2">
+                        <KeywordGroup theme={theme} items={[
+                          { key: "inCover", checked: t.inCover, node: (<label className="flex items-center gap-2 min-h-[32px]"><input type="checkbox" checked={t.inCover} onChange={e => setSplitTargetField(i, "inCover", e.target.checked)} className="accent-amber-400" /><span>Cover (+1 Sv)</span></label>) },
+                          { key: "ignoreAp", checked: t.ignoreAp, node: (<label className="flex items-center gap-2 min-h-[32px]"><input type="checkbox" checked={t.ignoreAp} onChange={e => setSplitTargetField(i, "ignoreAp", e.target.checked)} className="accent-amber-400" /><span>Ignore AP</span></label>) },
+                          { key: "ignoreFirstFailedSave", checked: t.ignoreFirstFailedSave, node: (<label className="flex items-center gap-2 min-h-[32px]"><input type="checkbox" checked={t.ignoreFirstFailedSave} onChange={e => setSplitTargetField(i, "ignoreFirstFailedSave", e.target.checked)} className="accent-amber-400" /><span>Ignore 1st failed save</span></label>) },
+                          { key: "minusOneDamage", checked: t.minusOneDamage, node: (<label className="flex items-center gap-2 min-h-[32px]"><input type="checkbox" checked={t.minusOneDamage} onChange={e => setSplitTargetField(i, "minusOneDamage", e.target.checked)} className="accent-amber-400" /><span>-1 Damage</span></label>) },
+                          { key: "halfDamage", checked: t.halfDamage, node: (<label className="flex items-center gap-2 min-h-[32px]"><input type="checkbox" checked={t.halfDamage} onChange={e => setSplitTargetField(i, "halfDamage", e.target.checked)} className="accent-amber-400" /><span>Half Damage</span></label>) },
+                        ]} />
                       </div>
                     </div>
                   ))}

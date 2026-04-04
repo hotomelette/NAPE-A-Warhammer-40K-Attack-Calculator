@@ -157,7 +157,7 @@ async function resolveWahapediaPath(description, client) {
   }
 }
 
-const WORKER_TIMEOUT_MS = 8000;
+const WORKER_TIMEOUT_MS = 10000;
 
 export async function fetchWahapediaPage(path, workerUrl) {
   const controller = new AbortController();
