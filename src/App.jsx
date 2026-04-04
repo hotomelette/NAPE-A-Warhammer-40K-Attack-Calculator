@@ -1385,6 +1385,8 @@ function AttackCalculator() {
     allowDamageTotals ? ((activeComputed.ignored || 0) + (activeComputed.ignoredByRule || 0)) : 0;
 
   const viz = damageViz(shownTotalPostFnp);
+  // Split viz.emoji into individual grapheme clusters so background shows 1 · 1 · 1 evenly spaced
+  const bgEmojiList = [...new Intl.Segmenter().segment(viz.emoji)].map(s => s.segment);
   const ignoredTotal = shownIgnoredTotal;
 
   const dmgTotalNum = Number(shownTotalPostFnp || 0);
@@ -2021,10 +2023,10 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                 style={{ gap: "7rem", animationDuration: `${22 + (i % 5) * 4}s`, animationDelay: `${-(i * 1.9 % 9).toFixed(1)}s`, animationDirection: i % 2 ? "alternate-reverse" : "alternate" }}
               >
                 {Array.from({ length: 8 }).map((__, j) => (
-                  <span key={j}>{viz.emoji}</span>
+                  <span key={j}>{bgEmojiList[j % bgEmojiList.length]}</span>
                 ))}
                 {Array.from({ length: 8 }).map((__, j) => (
-                  <span key={`d${j}`}>{viz.emoji}</span>
+                  <span key={`d${j}`}>{bgEmojiList[j % bgEmojiList.length]}</span>
                 ))}
               </div>
             ))}
