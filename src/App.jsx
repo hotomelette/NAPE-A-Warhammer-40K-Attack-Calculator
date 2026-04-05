@@ -2018,8 +2018,8 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
   return (
     <div className={`min-h-screen ${viz.pageBg || "bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950"} p-4 relative overflow-x-hidden`}>
       {/* Animated page-wide emoji backdrop — fixed so it covers full viewport regardless of scroll */}
-      <div className="pointer-events-none fixed inset-0 overflow-hidden mix-blend-screen" style={{ zIndex: 0, opacity: 0.04 }}>
-        {diceReady && !isAnyRolling && (
+      <div className="pointer-events-none fixed inset-0 overflow-hidden mix-blend-screen" style={{ zIndex: 0, opacity: isAnyRolling ? 0 : 0.04, transition: "opacity 0.5s ease" }}>
+        {diceReady && (
           <div style={{ display: "flex", flexDirection: "column", gap: "18px", paddingTop: "40px" }}>
             {Array.from({ length: 22 }).map((_, i) => (
               <div
@@ -2055,8 +2055,8 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
         <div className={`sticky top-0 z-40 border-b border-gray-700/80 shadow-lg rounded-2xl ${viz.headerBg}`}>
 
           {/* Emoji marquee background — only when hard total is ready */}
-          {diceReady && !isAnyRolling && (
-            <div className="absolute inset-0 pointer-events-none overflow-hidden" style={{ opacity: 0.12 }}>
+          {diceReady && (
+            <div className="absolute inset-0 pointer-events-none overflow-hidden" style={{ opacity: isAnyRolling ? 0 : 0.12, transition: "opacity 0.5s ease" }}>
               <div className="nape-marquee-row" style={{ animationDuration: "30s", fontSize: "0.9rem", lineHeight: 1.5 }}>
                 {Array.from({ length: 40 }).map((_, i) => <span key={i} className="mr-3">{viz.emoji}</span>)}
                 {Array.from({ length: 40 }).map((_, i) => <span key={`d${i}`} className="mr-3">{viz.emoji}</span>)}
@@ -2793,8 +2793,8 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                 {splitEnabled && activeSplitResults.length > 1 ? (
                   // ── Split view: per-target grid inside the same viz panel ──
                   <div className={`mt-4 rounded-2xl border p-4 ${viz.totalPanel} relative overflow-visible`}>
-                    {diceReady && allSplitStatsReady && !isAnyRolling ? (
-                      <div className="absolute inset-0 pointer-events-none opacity-15 overflow-hidden rounded-2xl">
+                    {diceReady && allSplitStatsReady ? (
+                      <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-2xl" style={{ opacity: isAnyRolling ? 0 : 0.15, transition: "opacity 0.5s ease" }}>
                         <div className="nape-marquee-row" style={{ animationDuration: "24s" }}>
                           {Array.from({ length: 28 }).map((_, i) => <span key={`m-${i}`}>{viz.emoji}</span>)}
                           {Array.from({ length: 28 }).map((_, i) => <span key={`m-dup-${i}`}>{viz.emoji}</span>)}
@@ -2863,8 +2863,8 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                 ) : (
                   // ── Normal single-target view ──
                   <div className={`mt-4 rounded-2xl border p-4 ${viz.totalPanel} relative overflow-visible w-full`}>
-                    {diceReady && !isAnyRolling ? (
-                      <div className="absolute inset-0 pointer-events-none opacity-15 overflow-hidden rounded-2xl">
+                    {diceReady ? (
+                      <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-2xl" style={{ opacity: isAnyRolling ? 0 : 0.15, transition: "opacity 0.5s ease" }}>
                         <div className="nape-marquee-row" style={{ animationDuration: "24s" }}>
                           {Array.from({ length: 28 }).map((_, i) => <span key={`m-${i}`}>{viz.emoji}</span>)}
                           {Array.from({ length: 28 }).map((_, i) => <span key={`m-dup-${i}`}>{viz.emoji}</span>)}
