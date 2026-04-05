@@ -331,6 +331,7 @@ export function appReducer(state, action) {
           ? { ...initialTarget, saveMod: savedHooks.saveMod, hasLeaderAttached: savedHooks.hasLeaderAttached, allocatePrecisionToLeader: savedHooks.allocatePrecisionToLeader }
           : { ...initialTarget },
         dice: { ...initialDice },
+        rerolls: { ...initialRerolls },
         split: { ...initialSplit },
       };
     }
@@ -346,6 +347,8 @@ export function appReducer(state, action) {
           ? { ...EXAMPLE_TARGET, saveMod: state.target.saveMod }
           : { ...EXAMPLE_TARGET },
         dice: { ...EXAMPLE_DICE },
+        rerolls: { ...initialRerolls },
+        split: { ...initialSplit },
       };
     }
 

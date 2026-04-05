@@ -1651,7 +1651,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
 
   // ── Roll All ──
   const rollAll = async () => {
-    if (isRollingAll || isRollingWeapon || isRollingTarget || !statsReady) return;
+    if (isRollingAll || isRollingWeapon || isRollingTarget || !effectiveStatsReady) return;
     setIsRollingAll(true);
 
     const attackSpecNow = parseDiceSpec(attacksValue);
@@ -2560,9 +2560,9 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                                 />
                                 <RollButton
                                   onClick={rollAll}
-                                  disabled={!statsReady || isRollingAll || isRollingWeapon || isRollingTarget}
+                                  disabled={!effectiveStatsReady || isRollingAll || isRollingWeapon || isRollingTarget}
                                   isRolling={isRollingAll}
-                                  isReady={statsReady}
+                                  isReady={effectiveStatsReady}
                                   emoji="🎲"
                                   label="Roll all"
                                   readyClass="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 border-amber-400/40 text-gray-950"
