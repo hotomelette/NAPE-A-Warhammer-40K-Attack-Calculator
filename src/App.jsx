@@ -628,7 +628,11 @@ function KeywordGroup({ items, theme, label, hint }) {
         <div>{toggleBtn}</div>
       ) : null}
       {active.map(i => <div key={i.key}>{i.node}</div>)}
-      {expanded && inactive.map(i => <div key={i.key}>{i.node}</div>)}
+      {expanded && (
+        <div onChange={() => setExpanded(false)}>
+          {inactive.map(i => <div key={i.key}>{i.node}</div>)}
+        </div>
+      )}
     </div>
   );
 }
@@ -1211,6 +1215,7 @@ function AttackCalculator() {
   });
 
   // Freeze display during Roll All animation to prevent UI thrash
+  const isAnyRolling = isRollingAll || isRollingWeapon || isRollingTarget;
   const lastStableComputed = useRef(null);
   const displayComputed = (isRollingAll || isRollingWeapon || isRollingTarget)
     ? (lastStableComputed.current || computed)
@@ -1602,8 +1607,8 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
         flushSync(() => {
           setter(Array.from({ length: finalRolls.length }, () => Math.ceil(Math.random() * sides)).join(" "));
         });
-        if (++step >= 10) { clearInterval(ticker); flushSync(() => setter(finalRolls.join(" "))); resolve(); }
-      }, 60);
+        if (++step >= 4) { clearInterval(ticker); flushSync(() => setter(finalRolls.join(" "))); resolve(); }
+      }, 25);
     });
     const pause = (ms) => new Promise(r => setTimeout(r, ms));
     const modelQtyNum = Math.max(1, parseInt(String(modelQty || "1"), 10) || 1);
@@ -1614,7 +1619,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
       const rolls = Array.from({ length: attackSpecNow.n * modelQtyNum }, () => Math.ceil(Math.random() * attackSpecNow.sides));
       await animateField(setAttacksRolls, rolls, attackSpecNow.sides);
       attacksTotal = rolls.reduce((s, d) => s + d, 0) + attackSpecNow.mod * modelQtyNum;
-      await pause(120);
+      await pause(30);
     }
     const rfXNum = Math.max(0, Number(rapidFireX) || 0);
     if (rapidFire && halfRange && rfXNum > 0) attacksTotal += rfXNum;
@@ -1631,7 +1636,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
         const eligible = hitRollsFinal.filter(d => rerollHitOnes ? d === 1 : d + effectiveHitMod < toHitNum);
         if (eligible.length > 0) {
           const rr = Array.from({ length: eligible.length }, () => Math.ceil(Math.random() * 6));
-          await pause(80); await animateField(setHitRerollRollsText, rr, 6);
+          await pause(20); await animateField(setHitRerollRollsText, rr, 6);
           let ri = 0;
           hitRollsFinal = hitRollsFinal.map(d => ((rerollHitOnes && d === 1) || (rerollHitFails && d + effectiveHitMod < toHitNum)) ? (rr[ri++] ?? d) : d);
         }
@@ -1659,7 +1664,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
         const eligible = woundRollsFinal.filter(d => (rerollWoundOnes && !twinLinked) ? d === 1 : d + effectiveWoundMod < woundTarget);
         if (eligible.length > 0) {
           const rr = Array.from({ length: eligible.length }, () => Math.ceil(Math.random() * 6));
-          await pause(80); await animateField(setWoundRerollRollsText, rr, 6);
+          await pause(20); await animateField(setWoundRerollRollsText, rr, 6);
           let ri = 0;
           woundRollsFinal = woundRollsFinal.map(d => (rerollWoundOnes && !twinLinked && d === 1) || ((rerollWoundFails || twinLinked) && d + effectiveWoundMod < woundTarget) ? (rr[ri++] ?? d) : d);
         }
@@ -1687,7 +1692,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
         await animateField(setSaveRollsText, saveRollsFinal, 6);
         failedSaves = saveRollsFinal.filter(d => d < saveTarget).length;
       }
-      await pause(120);
+      await pause(30);
       const failedEffective = Math.max(0, failedSaves - (ignoreFirstFailedSave ? 1 : 0));
       let totalDmg = 0;
       if (!damageFixed && dmgSpec.hasDie) {
@@ -1697,7 +1702,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
           const rolls = Array.from({ length: totalDmgDice }, () => Math.ceil(Math.random() * dmgSpec.sides));
           await animateField(setDamageRolls, rolls, dmgSpec.sides);
           totalDmg = rolls.reduce((s, d) => s + d, 0) + woundCount * dmgSpec.mod;
-          await pause(120);
+          await pause(30);
         } else { setDamageRolls(""); }
       } else if (damageFixed) {
         totalDmg = (failedEffective + mortalWoundAttacks) * (Number(damageValue) || 0);
@@ -1721,7 +1726,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
 
       // Push the correct allocation to state now so wound fields update before saves roll
       dispatch({ type: "SYNC_SPLIT_WOUNDS", total: totalWounds });
-      await pause(80);
+      await pause(20);
 
       // T1 saves
       let t1Failed = 0;
@@ -1729,7 +1734,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
         const t1Saves = Array.from({ length: t1WoundsCount }, () => Math.ceil(Math.random() * 6));
         await animateField(setSaveRollsText, t1Saves, 6);
         t1Failed = t1Saves.filter(d => d < saveTarget).length;
-        await pause(80);
+        await pause(20);
       } else {
         setSaveRollsText("");
       }
@@ -1747,7 +1752,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
         const tSaves = Array.from({ length: wN }, () => Math.ceil(Math.random() * 6));
         await animateField(v => setSplitTargetField(i, "saveRollsText", v), tSaves, 6);
         extFailed.push(tSaves.filter(d => d < tSaveTarget).length);
-        await pause(80);
+        await pause(20);
       }
       await pause(40);
 
@@ -1761,7 +1766,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
           const t1DmgRolls = Array.from({ length: t1DmgDice }, () => Math.ceil(Math.random() * dmgSpec.sides));
           await animateField(setDamageRolls, t1DmgRolls, dmgSpec.sides);
           t1Dmg = t1DmgRolls.reduce((s, d) => s + d, 0) + t1WoundCount * dmgSpec.mod;
-          await pause(80);
+          await pause(20);
         } else { setDamageRolls(""); }
       } else if (damageFixed) {
         t1Dmg = (t1FailedEff + mortalWoundAttacks) * (Number(damageValue) || 0);
@@ -1770,7 +1775,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
       if (fnpEnabled && fnp !== "" && t1Dmg > 0) {
         const t1FnpRolls = Array.from({ length: t1Dmg }, () => Math.ceil(Math.random() * 6));
         await animateField(setFnpRollsText, t1FnpRolls, 6);
-        await pause(80);
+        await pause(20);
       } else { setFnpRollsText(""); }
 
       // Extra target damage + FNP
@@ -1782,7 +1787,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
           const extDmgRolls = Array.from({ length: failedEff * dmgSpec.n }, () => Math.ceil(Math.random() * dmgSpec.sides));
           await animateField(v => setSplitTargetField(i, "damageRolls", v), extDmgRolls, dmgSpec.sides);
           tDmg = extDmgRolls.reduce((s, d) => s + d, 0) + failedEff * dmgSpec.mod;
-          await pause(80);
+          await pause(20);
         } else if (damageFixed) {
           tDmg = failedEff * (Number(damageValue) || 0);
           setSplitTargetField(i, "damageRolls", "");
@@ -1790,7 +1795,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
         if (t.fnpEnabled && t.fnp !== "" && tDmg > 0) {
           const tFnpRolls = Array.from({ length: tDmg }, () => Math.ceil(Math.random() * 6));
           await animateField(v => setSplitTargetField(i, "fnpRollsText", v), tFnpRolls, 6);
-          await pause(80);
+          await pause(20);
         } else { setSplitTargetField(i, "fnpRollsText", ""); }
       }
     }
@@ -1817,8 +1822,8 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
         flushSync(() => {
           setter(Array.from({ length: finalRolls.length }, () => Math.ceil(Math.random() * sides)).join(" "));
         });
-        if (++step >= 10) { clearInterval(ticker); flushSync(() => setter(finalRolls.join(" "))); resolve(); }
-      }, 60);
+        if (++step >= 4) { clearInterval(ticker); flushSync(() => setter(finalRolls.join(" "))); resolve(); }
+      }, 25);
     });
     const pause = (ms) => new Promise(r => setTimeout(r, ms));
     const modelQtyNum = Math.max(1, parseInt(String(modelQty || "1"), 10) || 1);
@@ -1829,7 +1834,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
       const rolls = Array.from({ length: attackSpecNow.n * modelQtyNum }, () => Math.ceil(Math.random() * attackSpecNow.sides));
       await animateField(setAttacksRolls, rolls, attackSpecNow.sides);
       attacksTotal = rolls.reduce((s, d) => s + d, 0) + attackSpecNow.mod * modelQtyNum;
-      await pause(120);
+      await pause(30);
     }
     const rfXNum = Math.max(0, Number(rapidFireX) || 0);
     if (rapidFire && halfRange && rfXNum > 0) attacksTotal += rfXNum;
@@ -1846,7 +1851,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
         const eligible = hitRollsFinal.filter(d => rerollHitOnes ? d === 1 : d + effectiveHitMod < toHitNum);
         if (eligible.length > 0) {
           const rr = Array.from({ length: eligible.length }, () => Math.ceil(Math.random() * 6));
-          await pause(80); await animateField(setHitRerollRollsText, rr, 6);
+          await pause(20); await animateField(setHitRerollRollsText, rr, 6);
           let ri = 0;
           hitRollsFinal = hitRollsFinal.map(d => ((rerollHitOnes && d === 1) || (rerollHitFails && d + effectiveHitMod < toHitNum)) ? (rr[ri++] ?? d) : d);
         }
@@ -1875,7 +1880,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
         const eligible = woundRollsFinal.filter(d => (rerollWoundOnes && !twinLinked) ? d === 1 : d < woundTarget);
         if (eligible.length > 0) {
           const rr = Array.from({ length: eligible.length }, () => Math.ceil(Math.random() * 6));
-          await pause(80); await animateField(setWoundRerollRollsText, rr, 6);
+          await pause(20); await animateField(setWoundRerollRollsText, rr, 6);
           let ri = 0;
           woundRollsFinal = woundRollsFinal.map(d =>
             (rerollWoundOnes && !twinLinked && d === 1) || ((rerollWoundFails || twinLinked) && d < woundTarget)
@@ -1903,7 +1908,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
   };
 
   const rollTarget = async () => {
-    if (isRollingAll || isRollingWeapon || isRollingTarget) return;
+    if (isRollingAll || isRollingWeapon || isRollingTarget || !effectiveStatsReady) return;
     const freshExtras = extraTargetsRef.current;
     const hasSplitExtra = splitEnabled && freshExtras.length > 0;
     const currentSaveNeeded = splitEnabled ? target1Wounds : (activeComputed.savableWounds || 0);
@@ -1927,8 +1932,8 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
         flushSync(() => {
           setter(Array.from({ length: finalRolls.length }, () => Math.ceil(Math.random() * sides)).join(" "));
         });
-        if (++step >= 10) { clearInterval(ticker); flushSync(() => setter(finalRolls.join(" "))); resolve(); }
-      }, 60);
+        if (++step >= 4) { clearInterval(ticker); flushSync(() => setter(finalRolls.join(" "))); resolve(); }
+      }, 25);
     });
     const pause = (ms) => new Promise(r => setTimeout(r, ms));
 
@@ -1940,7 +1945,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
       await animateField(setSaveRollsText, saveRollsFinal, 6);
       const failedSaves = saveRollsFinal.filter(d => d < saveTarget).length;
       t1FailedEff = Math.max(0, failedSaves - (ignoreFirstFailedSave ? 1 : 0));
-      await pause(120);
+      await pause(30);
 
       // Phase 5: T1 Damage
       if (!damageFixed && dmgSpec.hasDie) {
@@ -1950,7 +1955,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
           const rolls = Array.from({ length: totalDmgDice }, () => Math.ceil(Math.random() * dmgSpec.sides));
           await animateField(setDamageRolls, rolls, dmgSpec.sides);
           t1Dmg = rolls.reduce((s, d) => s + d, 0) + t1WoundCount * dmgSpec.mod;
-          await pause(120);
+          await pause(30);
         } else { setDamageRolls(""); }
       } else if (damageFixed) {
         t1Dmg = (t1FailedEff + mortalWoundAttacks) * (Number(damageValue) || 0);
@@ -1983,14 +1988,14 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
         await animateField(v => setSplitTargetField(i, "saveRollsText", v), tSaves, 6);
         const tFailed = tSaves.filter(d => d < tSaveTarget).length;
         const tFailedEff = Math.max(0, tFailed - (t.ignoreFirstFailedSave ? 1 : 0));
-        await pause(80);
+        await pause(20);
 
         let tDmg = 0;
         if (!damageFixed && dmgSpec.hasDie && tFailedEff > 0) {
           const extDmgRolls = Array.from({ length: tFailedEff * dmgSpec.n }, () => Math.ceil(Math.random() * dmgSpec.sides));
           await animateField(v => setSplitTargetField(i, "damageRolls", v), extDmgRolls, dmgSpec.sides);
           tDmg = extDmgRolls.reduce((s, d) => s + d, 0) + tFailedEff * dmgSpec.mod;
-          await pause(80);
+          await pause(20);
         } else if (damageFixed) {
           tDmg = tFailedEff * (Number(damageValue) || 0);
           setSplitTargetField(i, "damageRolls", "");
@@ -2000,7 +2005,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
         if (t.fnpEnabled && t.fnp !== "" && tDmg > 0) {
           const tFnpRolls = Array.from({ length: tDmg }, () => Math.ceil(Math.random() * 6));
           await animateField(v => setSplitTargetField(i, "fnpRollsText", v), tFnpRolls, 6);
-          await pause(80);
+          await pause(20);
         } else {
           setSplitTargetField(i, "fnpRollsText", "");
         }
@@ -2014,7 +2019,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
     <div className={`min-h-screen ${viz.pageBg || "bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950"} p-4 relative overflow-x-hidden`}>
       {/* Animated page-wide emoji backdrop — fixed so it covers full viewport regardless of scroll */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden mix-blend-screen" style={{ zIndex: 0, opacity: 0.04 }}>
-        {diceReady && (
+        {diceReady && !isAnyRolling && (
           <div style={{ display: "flex", flexDirection: "column", gap: "18px", paddingTop: "40px" }}>
             {Array.from({ length: 22 }).map((_, i) => (
               <div
@@ -2050,7 +2055,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
         <div className={`sticky top-0 z-40 border-b border-gray-700/80 shadow-lg rounded-2xl ${viz.headerBg}`}>
 
           {/* Emoji marquee background — only when hard total is ready */}
-          {diceReady && (
+          {diceReady && !isAnyRolling && (
             <div className="absolute inset-0 pointer-events-none overflow-hidden" style={{ opacity: 0.12 }}>
               <div className="nape-marquee-row" style={{ animationDuration: "30s", fontSize: "0.9rem", lineHeight: 1.5 }}>
                 {Array.from({ length: 40 }).map((_, i) => <span key={i} className="mr-3">{viz.emoji}</span>)}
@@ -2472,9 +2477,9 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                                 />
                                 <RollButton
                                   onClick={rollTarget}
-                                  disabled={!((splitEnabled ? target1Wounds : (activeComputed.savableWounds || 0)) > 0) || isRollingAll || isRollingWeapon || isRollingTarget}
+                                  disabled={!effectiveStatsReady || !((splitEnabled ? target1Wounds : (activeComputed.savableWounds || 0)) > 0) || isRollingAll || isRollingWeapon || isRollingTarget}
                                   isRolling={isRollingTarget}
-                                  isReady={(splitEnabled ? target1Wounds : (activeComputed.savableWounds || 0)) > 0}
+                                  isReady={effectiveStatsReady && (splitEnabled ? target1Wounds : (activeComputed.savableWounds || 0)) > 0}
                                   emoji="🎯"
                                   label="Roll target"
                                   readyClass="bg-gradient-to-r from-teal-700 to-cyan-700 hover:from-teal-600 hover:to-cyan-600 border-teal-500/40 text-white"
@@ -2788,7 +2793,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                 {splitEnabled && activeSplitResults.length > 1 ? (
                   // ── Split view: per-target grid inside the same viz panel ──
                   <div className={`mt-4 rounded-2xl border p-4 ${viz.totalPanel} relative overflow-visible`}>
-                    {diceReady && allSplitStatsReady ? (
+                    {diceReady && allSplitStatsReady && !isAnyRolling ? (
                       <div className="absolute inset-0 pointer-events-none opacity-15 overflow-hidden rounded-2xl">
                         <div className="nape-marquee-row" style={{ animationDuration: "24s" }}>
                           {Array.from({ length: 28 }).map((_, i) => <span key={`m-${i}`}>{viz.emoji}</span>)}
@@ -2858,7 +2863,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                 ) : (
                   // ── Normal single-target view ──
                   <div className={`mt-4 rounded-2xl border p-4 ${viz.totalPanel} relative overflow-visible w-full`}>
-                    {diceReady ? (
+                    {diceReady && !isAnyRolling ? (
                       <div className="absolute inset-0 pointer-events-none opacity-15 overflow-hidden rounded-2xl">
                         <div className="nape-marquee-row" style={{ animationDuration: "24s" }}>
                           {Array.from({ length: 28 }).map((_, i) => <span key={`m-${i}`}>{viz.emoji}</span>)}
@@ -3143,14 +3148,14 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                 font-size: 3.25rem;
                 line-height: 1;
                 padding: 1.25rem 1.25rem 0 1.25rem;
-                animation: napeMarquee linear infinite;
+                animation: napeMarquee linear infinite alternate;
                 will-change: transform;
               }
               .nape-emoji-tile {display:flex; align-items:center; justify-content:center;}
             .nape-emoji-tile-inner {font-size: 3.25rem; line-height:1.05; white-space: pre-wrap;}
-            
+
             .nape-marquee-reverse {
-                animation-direction: reverse;
+                animation-direction: alternate-reverse;
                 padding-top: 0.25rem;
               }
             `}</style>

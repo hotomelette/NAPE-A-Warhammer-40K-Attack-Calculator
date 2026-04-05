@@ -87,7 +87,7 @@ export const initialUI = {
   simpleMode: (() => {
     try { return localStorage.getItem("nape-simple-mode") === "true"; } catch { return false; }
   })(),
-  showLog: true,
+  showLog: false,
   showTableUse: false,
   showLimitations: false,
   showCheatSheet: false,
