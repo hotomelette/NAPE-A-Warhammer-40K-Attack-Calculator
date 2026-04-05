@@ -504,7 +504,7 @@ function WeaponStatTable({
           placeholder="0"
           className={`${inputCls} ${!isNum(ap) ? "text-red-400" : dark ? "text-gray-100" : "text-gray-900"}`} />
         <input value={damageValue}
-          onChange={e => setDamageValue(damageFixed ? e.target.value : e.target.value.replace(/[^0-9dD+]/g, "").toUpperCase())}
+          onChange={e => { if (damageFixed) { const raw = e.target.value; if (raw === "") { setDamageValue(""); return; } const n = parseInt(raw, 10); if (!isNaN(n)) setDamageValue(String(Math.max(1, n))); } else { setDamageValue(e.target.value.replace(/[^0-9dD+]/g, "").toUpperCase()); } }}
           inputMode={damageFixed ? "numeric" : "text"}
           type={damageFixed ? "number" : "text"}
           placeholder={damageFixed ? "#" : "D6"}
@@ -555,37 +555,110 @@ function TargetStatTable({
   );
 }
 
-function ColoredDiceInput({ value, onChange, className, target, mod = 0, theme, placeholder, disabled, ...props }) {
-  const [editing, setEditing] = React.useState(false);
-  const inputRef = React.useRef(null);
-  const rolls = parseDiceList(value);
+function getCursorOffset(el) {
+  const sel = window.getSelection();
+  if (!sel || !sel.rangeCount) return 0;
+  const pre = sel.getRangeAt(0).cloneRange();
+  pre.selectNodeContents(el);
+  pre.setEnd(sel.getRangeAt(0).endContainer, sel.getRangeAt(0).endOffset);
+  return pre.toString().length;
+}
+
+function setCursorOffset(el, offset) {
+  const sel = window.getSelection();
+  if (!sel) return;
+  const range = document.createRange();
+  let rem = offset;
+  let placed = false;
+  const walk = (node) => {
+    if (placed) return;
+    if (node.nodeType === 3) {
+      if (rem <= node.nodeValue.length) { range.setStart(node, rem); range.collapse(true); placed = true; }
+      else rem -= node.nodeValue.length;
+    } else for (const c of node.childNodes) walk(c);
+  };
+  walk(el);
+  if (!placed) { range.selectNodeContents(el); range.collapse(false); }
+  sel.removeAllRanges();
+  sel.addRange(range);
+}
+
+function ColoredDiceInput({ value, onChange, className, target, mod = 0, theme, placeholder, disabled }) {
+  const divRef = React.useRef(null);
+  const focused = React.useRef(false);
   const dark = theme === "dark";
-  const showChips = !editing && rolls.length > 0 && target > 0;
 
+  const buildHtml = React.useCallback((val) => {
+    const rolls = parseDiceList(val);
+    if (!rolls.length || !target) return val || "";
+    return rolls.map(d => {
+      const success = d !== 1 && (d + mod) >= target;
+      const color = success
+        ? (dark ? "#4ade80" : "#16a34a")
+        : (dark ? "#fb923c" : "#f97316");
+      return `<span style="color:${color};font-weight:700">${d}</span>`;
+    }).join(" ");
+  }, [target, mod, dark]);
+
+  // Sync innerHTML for external changes (rolling, loading) — only when not focused
   React.useEffect(() => {
-    if (editing && inputRef.current) inputRef.current.focus();
-  }, [editing]);
+    if (focused.current || !divRef.current) return;
+    const html = buildHtml(value);
+    if (divRef.current.innerHTML !== html) divRef.current.innerHTML = html;
+  });
 
-  if (!showChips) {
-    return (
-      <input ref={inputRef} {...props} value={value} onChange={onChange}
-        onBlur={() => setEditing(false)} placeholder={placeholder} disabled={disabled}
-        className={className} />
-    );
-  }
+  const extractValue = (trim = true) => {
+    const raw = (divRef.current?.innerText || "").replace(/[^0-9]/g, " ").replace(/\s+/g, " ");
+    return trim ? raw.trim() : raw.trimStart();
+  };
+
+  const handleInput = () => {
+    if (!divRef.current) return;
+    const offset = getCursorOffset(divRef.current);
+    const text = extractValue(false); // preserve trailing space while typing
+    const trimmed = text.trimEnd();
+    // preserve trailing space in HTML so cursor stays past the last die
+    const html = buildHtml(trimmed) + (text.endsWith(" ") ? " " : "");
+    divRef.current.innerHTML = html;
+    setCursorOffset(divRef.current, offset);
+    onChange({ target: { value: trimmed } });
+  };
+
+  const handleFocus = () => { focused.current = true; };
+
+  const handleBlur = () => {
+    focused.current = false;
+    onChange({ target: { value: extractValue(true) } });
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === "Enter") { e.preventDefault(); return; }
+    const pass = /^[0-9 ]$/.test(e.key) ||
+      ["Backspace","Delete","ArrowLeft","ArrowRight","ArrowUp","ArrowDown","Home","End","Tab"].includes(e.key) ||
+      e.ctrlKey || e.metaKey;
+    if (!pass) e.preventDefault();
+  };
+
+  const handlePaste = (e) => {
+    e.preventDefault();
+    const text = (e.clipboardData.getData("text") || "").replace(/[^0-9]/g, " ").replace(/\s+/g, " ").trim();
+    document.execCommand("insertText", false, text);
+  };
+
   return (
-    <div className={`${className} flex items-center flex-wrap gap-0.5 cursor-text`}
-      style={{ alignContent: "center" }}
-      onClick={() => setEditing(true)} tabIndex={0} onFocus={() => setEditing(true)}>
-      {rolls.map((d, i) => {
-        const success = d !== 1 && (d + mod) >= target;
-        return (
-          <span key={i} className={`inline-flex items-center justify-center px-0.5 rounded text-lg font-bold ${
-            success ? (dark ? "text-green-400" : "text-green-600") : (dark ? "text-orange-400" : "text-orange-500")
-          }`}>{d}</span>
-        );
-      })}
-    </div>
+    <div
+      ref={divRef}
+      contentEditable={!disabled}
+      suppressContentEditableWarning
+      onInput={handleInput}
+      onFocus={handleFocus}
+      onBlur={handleBlur}
+      onKeyDown={handleKeyDown}
+      onPaste={handlePaste}
+      data-placeholder={placeholder}
+      className={`${className} outline-none cursor-text nape-dice-input`}
+      style={{ minHeight: "2.5rem", alignContent: "center", whiteSpace: "pre-wrap" }}
+    />
   );
 }
 
@@ -643,7 +716,7 @@ function damageViz(total) {
   if (total <= 0) {
     return {
       title: "Harmless",
-      emoji: "😐🛡️✨",
+      emoji: "🦾🛡️✨",
       sub: "No damage dealt",
 
       // Small card styling
@@ -664,7 +737,7 @@ function damageViz(total) {
   if (total <= 3) {
     return {
       title: "Light Damage",
-      emoji: "😖🩹💢",
+      emoji: "🤕👊💫",
       sub: "Grazed but standing",
       container: "bg-emerald-50 border-emerald-200",
       pageBg: "bg-gradient-to-b from-emerald-950 via-slate-950 to-gray-950",
@@ -679,7 +752,7 @@ function damageViz(total) {
   if (total <= 5) {
     return {
       title: "Major Damage",
-      emoji: "🤕🦴💥",
+      emoji: "💀💥💢",
       sub: "Chunks missing",
       container: "bg-amber-50 border-amber-200",
       pageBg: "bg-gradient-to-b from-amber-950 via-slate-950 to-gray-950",
@@ -694,7 +767,7 @@ function damageViz(total) {
   if (total <= 9) {
     return {
       title: "Critical Damage",
-      emoji: "😵‍💫🩸⚠️",
+      emoji: "☠️🩸🔥",
       sub: "Barely alive",
       container: "bg-red-50 border-red-200",
       pageBg: "bg-gradient-to-b from-red-950 via-slate-950 to-gray-950",
@@ -708,7 +781,7 @@ function damageViz(total) {
   }
   return {
     title: "Lethal",
-    emoji: "☠🕳️🌌️",
+    emoji: "🩻☢️🕳️",
     sub: "Erased from reality",
     container: "bg-[#2a0b0f] border-[#5b1520]",
     pageBg: "bg-gradient-to-b from-[#2a0b0f] via-slate-950 to-gray-950",
@@ -899,7 +972,7 @@ function WizardOverlay({
                 </label>
                 {damageFixed ? (
                   <input type="text" inputMode="numeric"
-                    value={damageValue} onChange={e => setDamageValue(e.target.value)}
+                    value={damageValue} onChange={e => { const raw = e.target.value; if (raw === "") { setDamageValue(""); return; } const n = parseInt(raw, 10); if (!isNaN(n)) setDamageValue(String(Math.max(1, n))); }}
                     placeholder="e.g. 2"
                     className={`w-full rounded-lg border p-2 text-base font-bold ${input}`} />
                 ) : (
@@ -3137,6 +3210,11 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
             )}
 
             <style>{`
+              .nape-dice-input:empty::before {
+                content: attr(data-placeholder);
+                color: #6b7280;
+                pointer-events: none;
+              }
               @keyframes napeMarquee {
                 0% { transform: translateX(0); }
                 100% { transform: translateX(-50%); }
