@@ -888,7 +888,7 @@ function ProbabilityPanel({ params, theme, statsReady }) {
   const maxProb = Math.max(...dist.map(r => r.prob));
   const median = dist.find(r => r.atLeast <= 0.5)?.damage ?? 0;
   const mode = dist.reduce((best, r) => r.prob > best.prob ? r : best, dist[0]).damage;
-  const visibleDist = dist.filter(r => r.prob > 0 || r.damage === median || r.damage === mode);
+  const visibleDist = dist.filter(r => r.prob > 0);
 
   // SVG chart dimensions — extra bottom margin for legend + x labels
   const W = 560, H = 250;
