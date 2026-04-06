@@ -203,8 +203,7 @@ export const PRESETS = [
       strength: "12",
       ap: "-3",
       damageFixed: false,
-      damageValue: "",
-      damageRolls: "D6",
+      damageValue: "D6",
     },
     target: {
       ...initialTarget,
