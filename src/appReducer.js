@@ -97,7 +97,7 @@ export const initialUI = {
   strictMode: false,
   preserveHooks: false,
   showExperimental: false,
-  showProbability: false,
+  showProbability: true,
 };
 
 export const initialEaster = {
@@ -147,22 +147,95 @@ export const initialState = {
 // Example preset
 // ─────────────────────────────────────────
 
-export const EXAMPLE_WEAPON = {
-  ...initialWeapon,
-  attacksFixed: true,
-  attacksValue: "10",
-  toHit: "3",
-  strength: "5",
-  ap: "-1",
-  damageFixed: true,
-  damageValue: "2",
-};
+// ─────────────────────────────────────────
+// Presets
+// ─────────────────────────────────────────
 
-export const EXAMPLE_TARGET = {
-  ...initialTarget,
-  toughness: "4",
-  armorSave: "3",
-};
+export const PRESETS = [
+  {
+    label: "Intercessors — Bolt Rifles",
+    weapon: {
+      ...initialWeapon,
+      modelQty: 10,
+      attacksFixed: true,
+      attacksValue: "2",
+      toHit: "3",
+      strength: "4",
+      ap: "-1",
+      damageFixed: true,
+      damageValue: "1",
+    },
+    target: {
+      ...initialTarget,
+      toughness: "4",
+      armorSave: "3",
+    },
+  },
+  {
+    label: "Hellblasters — Plasma Incinerators",
+    weapon: {
+      ...initialWeapon,
+      modelQty: 5,
+      attacksFixed: true,
+      attacksValue: "2",
+      toHit: "3",
+      strength: "7",
+      ap: "-2",
+      damageFixed: true,
+      damageValue: "2",
+      sustainedHits: true,
+      sustainedHitsN: 1,
+    },
+    target: {
+      ...initialTarget,
+      toughness: "6",
+      armorSave: "3",
+    },
+  },
+  {
+    label: "Lascannons — Anti-Tank",
+    weapon: {
+      ...initialWeapon,
+      modelQty: 4,
+      attacksFixed: true,
+      attacksValue: "1",
+      toHit: "3",
+      strength: "12",
+      ap: "-3",
+      damageFixed: false,
+      damageValue: "",
+      damageRolls: "D6",
+    },
+    target: {
+      ...initialTarget,
+      toughness: "11",
+      armorSave: "3",
+    },
+  },
+  {
+    label: "Ork Boyz — Choppas",
+    weapon: {
+      ...initialWeapon,
+      modelQty: 20,
+      attacksFixed: true,
+      attacksValue: "2",
+      toHit: "3",
+      strength: "5",
+      ap: "-1",
+      damageFixed: true,
+      damageValue: "1",
+    },
+    target: {
+      ...initialTarget,
+      toughness: "4",
+      armorSave: "3",
+    },
+  },
+];
+
+// Keep LOAD_EXAMPLE pointing at the first preset for backwards compat
+export const EXAMPLE_WEAPON = { ...PRESETS[0].weapon };
+export const EXAMPLE_TARGET = { ...PRESETS[0].target };
 
 export const EXAMPLE_DICE = {
   ...initialDice,
@@ -360,6 +433,8 @@ export function appReducer(state, action) {
         weapon: { ...initialWeapon, ...action.preset.weapon },
         target: { ...initialTarget, ...action.preset.target },
         dice: { ...initialDice },
+        rerolls: { ...initialRerolls },
+        split: { ...initialSplit },
       };
 
     // ── Slice delegation ──

@@ -2,7 +2,7 @@ import React, { useReducer, useState, useEffect, useRef } from "react";
 import { useCalculator } from "./useCalculator.js";
 import { useCalculatorSplit } from "./useCalculatorSplit.js";
 import { parseDiceList, parseDiceSpec, clampModPlusMinusOne, rollDice, chooseSaveTarget, clampMin2Plus, woundTargetNumber } from "./calculatorUtils.js";
-import { appReducer, initialState } from "./appReducer.js";
+import { appReducer, initialState, PRESETS } from "./appReducer.js";
 import { SettingsPanel, getApiKey } from "./SettingsPanel.jsx";
 import { useUnitLookup } from "./useUnitLookup.js";
 import { useUnitHistory } from "./useUnitHistory.js";
@@ -868,10 +868,12 @@ function runMonteCarlo(params, iterations = 50000) {
 
 function ProbabilityPanel({ params, theme, statsReady }) {
   const dark = theme === "dark";
+  const [tableOpen, setTableOpen] = React.useState(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const result = React.useMemo(() => {
     if (!statsReady) return null;
     return runMonteCarlo(params);
-  }, [statsReady, ...Object.values(params)]);  // eslint-disable-line react-hooks/exhaustive-deps
+  }, [statsReady, JSON.stringify(params)]);
 
   if (!statsReady) {
     return (
@@ -1040,40 +1042,36 @@ function ProbabilityPanel({ params, theme, statsReady }) {
       </svg>
 
       {/* Compact data table — collapsible */}
-      {(() => {
-        const [tableOpen, setTableOpen] = React.useState(false);
-        return (
-          <div>
-            <button type="button" onClick={() => setTableOpen(o => !o)}
-              className={`text-xs flex items-center gap-1 ${dark ? "text-gray-500 hover:text-gray-300" : "text-gray-400 hover:text-gray-600"} transition`}>
-              {tableOpen ? "▾" : "▸"} {tableOpen ? "Hide" : "Show"} data table
-            </button>
-            {tableOpen && (
-              <div className={`font-mono text-xs space-y-0.5 mt-1`}>
-                <div className={`grid gap-x-2 mb-1 font-bold uppercase tracking-wide ${dark ? "text-gray-500" : "text-gray-400"}`}
+      {/* Compact data table — collapsible */}
+      <div>
+        <button type="button" onClick={() => setTableOpen(o => !o)}
+          className={`text-xs flex items-center gap-1 ${dark ? "text-gray-500 hover:text-gray-300" : "text-gray-400 hover:text-gray-600"} transition`}>
+          {tableOpen ? "▾" : "▸"} {tableOpen ? "Hide" : "Show"} data table
+        </button>
+        {tableOpen && (
+          <div className={`font-mono text-xs space-y-0.5 mt-1`}>
+            <div className={`grid gap-x-2 mb-1 font-bold uppercase tracking-wide ${dark ? "text-gray-500" : "text-gray-400"}`}
+              style={{ gridTemplateColumns: "3ch 6ch 6ch" }}>
+              <span>Dmg</span><span className="text-right">Prob</span><span className="text-right">P(≥x)</span>
+            </div>
+            {visibleDist.map(({ damage, prob, atLeast }) => {
+              const isMode = damage === mode;
+              const isMed = damage === median;
+              return (
+                <div key={damage}
+                  className={`grid gap-x-2 rounded px-1 ${isMode ? (dark ? "bg-amber-900/30" : "bg-amber-50") : isMed ? (dark ? "bg-indigo-900/30" : "bg-indigo-50") : ""}`}
                   style={{ gridTemplateColumns: "3ch 6ch 6ch" }}>
-                  <span>Dmg</span><span className="text-right">Prob</span><span className="text-right">P(≥x)</span>
+                  <span className={`tabular-nums ${dark ? "text-gray-300" : "text-gray-700"}`}>
+                    {damage}{isMode ? " ◀" : isMed && !isMode ? " ·" : ""}
+                  </span>
+                  <span className={`tabular-nums text-right ${dark ? "text-gray-300" : "text-gray-700"}`}>{(prob * 100).toFixed(1)}%</span>
+                  <span className={`tabular-nums text-right ${dark ? "text-blue-400" : "text-blue-600"}`}>{(atLeast * 100).toFixed(0)}%</span>
                 </div>
-                {visibleDist.map(({ damage, prob, atLeast }) => {
-                  const isMode = damage === mode;
-                  const isMed = damage === median;
-                  return (
-                    <div key={damage}
-                      className={`grid gap-x-2 rounded px-1 ${isMode ? (dark ? "bg-amber-900/30" : "bg-amber-50") : isMed ? (dark ? "bg-indigo-900/30" : "bg-indigo-50") : ""}`}
-                      style={{ gridTemplateColumns: "3ch 6ch 6ch" }}>
-                      <span className={`tabular-nums ${dark ? "text-gray-300" : "text-gray-700"}`}>
-                        {damage}{isMode ? " ◀" : isMed && !isMode ? " ·" : ""}
-                      </span>
-                      <span className={`tabular-nums text-right ${dark ? "text-gray-300" : "text-gray-700"}`}>{(prob * 100).toFixed(1)}%</span>
-                      <span className={`tabular-nums text-right ${dark ? "text-blue-400" : "text-blue-600"}`}>{(atLeast * 100).toFixed(0)}%</span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+              );
+            })}
           </div>
-        );
-      })()}
+        )}
+      </div>
 
       {/* Summary stats */}
       <div className={`pt-2 border-t text-xs flex gap-4 flex-wrap ${dark ? "border-gray-700 text-gray-400" : "border-gray-200 text-gray-500"}`}>
@@ -3230,14 +3228,22 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
       <span className="leading-none">{statusEmoji}</span>
       <span>{status}</span>
     </div>
-    <button
-      type="button"
-      className="rounded px-2 py-1 text-xs font-extrabold border transition bg-gradient-to-r from-yellow-400/80 to-amber-400/80 text-gray-950 border-yellow-200/40 hover:from-yellow-300/90 hover:to-amber-300/90"
-      onClick={loadExample}
-      title="Fill all fields with a known working example"
+    <select
+      className="rounded px-2 py-1 text-xs font-extrabold border transition bg-gradient-to-r from-yellow-400/80 to-amber-400/80 text-gray-950 border-yellow-200/40 hover:from-yellow-300/90 hover:to-amber-300/90 cursor-pointer"
+      title="Load a preset example"
+      value=""
+      onChange={e => {
+        const idx = Number(e.target.value);
+        if (!isNaN(idx) && e.target.value !== "") {
+          dispatch({ type: "LOAD_PRESET", preset: PRESETS[idx] });
+        }
+      }}
     >
-      Load example
-    </button>
+      <option value="" disabled>Load preset…</option>
+      {PRESETS.map((p, i) => (
+        <option key={i} value={i}>{p.label}</option>
+      ))}
+    </select>
     <button
       type="button"
       className={`rounded px-2 py-1 text-xs font-semibold border transition ${theme === "dark" ? "bg-gray-900 text-gray-100 border-gray-700 hover:bg-gray-800" : "bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200"}`}
