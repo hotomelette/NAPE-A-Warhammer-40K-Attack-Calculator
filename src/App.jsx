@@ -1,7 +1,7 @@
 import React, { useReducer, useState, useEffect, useRef } from "react";
 import { useCalculator } from "./useCalculator.js";
 import { useCalculatorSplit } from "./useCalculatorSplit.js";
-import { parseDiceList, parseDiceSpec, clampModPlusMinusOne, rollDice, chooseSaveTarget, clampMin2Plus } from "./calculatorUtils.js";
+import { parseDiceList, parseDiceSpec, clampModPlusMinusOne, rollDice, chooseSaveTarget, clampMin2Plus, woundTargetNumber } from "./calculatorUtils.js";
 import { appReducer, initialState } from "./appReducer.js";
 import { SettingsPanel, getApiKey } from "./SettingsPanel.jsx";
 import { useUnitLookup } from "./useUnitLookup.js";
@@ -433,6 +433,7 @@ function WeaponStatTable({
   strength, setStrength,
   ap, setAp,
   damageFixed, setDamageFixed, damageValue, setDamageValue,
+  torrent, overwatch,
   isNum, theme
 }) {
   const dark = theme === "dark";
@@ -495,8 +496,14 @@ function WeaponStatTable({
           placeholder={attacksFixed ? "#" : "D6"}
           title={attacksFixed ? "Fixed attacks per model (max 20)" : "Dice expression e.g. D6, 2D3+1"}
           className={`${inputCls} ${attacksErr ? "text-red-400" : dark ? "text-gray-100" : "text-gray-900"}`} />
-        <input type="number" value={toHit} onChange={e => setToHit(e.target.value)} placeholder="4"
-          className={`${inputCls} ${!isNum(toHit) ? "text-red-400" : dark ? "text-gray-100" : "text-gray-900"}`} />
+        {(torrent || overwatch) ? (
+          <div className={`${inputCls} flex items-center justify-center text-sm font-bold opacity-40 ${dark ? "text-gray-400" : "text-gray-500"}`}>
+            {overwatch ? "6+" : "N/A"}
+          </div>
+        ) : (
+          <input type="number" value={toHit} onChange={e => setToHit(e.target.value)} placeholder="4"
+            className={`${inputCls} ${!isNum(toHit) ? "text-red-400" : dark ? "text-gray-100" : "text-gray-900"}`} />
+        )}
         <input type="number" value={strength} onChange={e => setStrength(e.target.value)} placeholder="4"
           className={`${inputCls} ${!isNum(strength) ? "text-red-400" : dark ? "text-gray-100" : "text-gray-900"}`} />
         <input type="number" value={ap}
@@ -706,6 +713,376 @@ function KeywordGroup({ items, theme, label, hint }) {
           {inactive.map(i => <div key={i.key}>{i.node}</div>)}
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── Monte Carlo probability engine ─────────────────────────────────────────
+
+function rollD(sides) { return Math.ceil(Math.random() * sides); }
+
+function simulateOnce({
+  attacksFixed, attacksValue, modelQty,
+  rapidFire, rapidFireX, halfRange,
+  blastEnabled, blastUnitSize,
+  toHit, hitMod, overwatch,
+  strength, ap, lance,
+  damageFixed, damageValue,
+  critHitThreshold, critWoundThreshold,
+  antiXEnabled, antiXThreshold,
+  torrent, lethalHits, sustainedHits, sustainedHitsN,
+  devastatingWounds,
+  rerollHitOnes, rerollHitFails,
+  rerollWoundOnes, rerollWoundFails, twinLinked,
+  toughness, armorSave, invulnSave,
+  inCover, ignoreAp, saveMod,
+  ignoreFirstFailedSave, minusOneDamage, halfDamage,
+  fnpEnabled, fnp,
+  meltaEnabled, meltaX,
+  woundMod,
+}) {
+  const modelQtyNum = Math.max(1, parseInt(String(modelQty || "1"), 10) || 1);
+
+  // Attacks
+  let A = 0;
+  if (attacksFixed) {
+    A = Math.max(0, parseInt(String(attacksValue || "0"), 10) || 0) * modelQtyNum;
+  } else {
+    const spec = parseDiceSpec(attacksValue);
+    if (spec.ok) A = (Array.from({ length: spec.n * modelQtyNum }, () => rollD(spec.sides)).reduce((s, d) => s + d, 0) + spec.mod * modelQtyNum);
+  }
+  if (rapidFire && halfRange) A += Math.max(0, parseInt(String(rapidFireX || "0"), 10) || 0) * modelQtyNum;
+  if (blastEnabled) A += Math.floor((parseInt(String(blastUnitSize || "0"), 10) || 0) / 5);
+
+  // Hit phase
+  const effectiveToHit = overwatch ? 6 : (Number(toHit) || 7);
+  const hitModCapped = overwatch ? 0 : clampModPlusMinusOne(Number(hitMod) || 0);
+  const critHitThr = Number(critHitThreshold) || 6;
+  const effectiveCritWoundThr = antiXEnabled ? Math.max(2, Math.min(6, Number(antiXThreshold) || 6)) : (Number(critWoundThreshold) || 6);
+  const woundModNum = Number(woundMod) || 0;
+
+  let autoWoundsFromLethal = 0;
+  let sustainedExtra = 0;
+  const hitRolls = [];
+
+  if (torrent) {
+    for (let i = 0; i < A; i++) hitRolls.push({ success: true, crit: false });
+  } else {
+    for (let i = 0; i < A; i++) {
+      let d = rollD(6);
+      const success = d !== 1 && (d + hitModCapped) >= effectiveToHit;
+      const crit = d >= critHitThr;
+      if (!success && (rerollHitOnes && d === 1) || (rerollHitFails && !success)) d = rollD(6);
+      const success2 = d !== 1 && (d + hitModCapped) >= effectiveToHit;
+      const crit2 = d >= critHitThr;
+      const finalSuccess = success || success2;
+      const finalCrit = (success && crit) || (!success && success2 && crit2);
+      hitRolls.push({ success: finalSuccess, crit: finalCrit });
+    }
+    for (const h of hitRolls) {
+      if (h.success && h.crit) {
+        if (sustainedHits) sustainedExtra += Math.max(0, Number(sustainedHitsN) || 0);
+        if (lethalHits) autoWoundsFromLethal++;
+      }
+    }
+  }
+
+  const baseHits = hitRolls.filter(h => h.success).length;
+  const woundRollPool = Math.max(0, baseHits + sustainedExtra - autoWoundsFromLethal);
+
+  // Wound phase
+  const needed = woundTargetNumber(Number(strength) || 0, Number(toughness) || 0);
+  const effectiveAp = lance ? Math.max(-6, (Number(ap) || 0) - 1) : (Number(ap) || 0);
+  let woundSuccesses = 0;
+  let critWounds = 0;
+
+  for (let i = 0; i < woundRollPool; i++) {
+    let d = rollD(6);
+    const autoWound = antiXEnabled && d !== 1 && d >= effectiveCritWoundThr;
+    let success = autoWound || (d !== 1 && (d + woundModNum) >= needed);
+    if (!success && (rerollWoundOnes && d === 1) || ((rerollWoundFails || twinLinked) && !success)) {
+      d = rollD(6);
+      const autoWound2 = antiXEnabled && d !== 1 && d >= effectiveCritWoundThr;
+      success = autoWound2 || (d !== 1 && (d + woundModNum) >= needed);
+    }
+    if (success) { woundSuccesses++; if (d >= effectiveCritWoundThr) critWounds++; }
+  }
+
+  const totalWounds = woundSuccesses + autoWoundsFromLethal;
+  let savableWounds = totalWounds;
+  let mortalWounds = 0;
+  if (devastatingWounds) { mortalWounds = Math.min(critWounds, totalWounds); savableWounds = totalWounds - mortalWounds; }
+
+  // Save phase
+  const armorWithCover = inCover ? Math.max(1, (Number(armorSave) || 7) - 1) : (Number(armorSave) || 7);
+  const apForSave = ignoreAp ? 0 : effectiveAp;
+  const saveModCapped = clampModPlusMinusOne(Number(saveMod) || 0);
+  const saveTarget = clampMin2Plus(chooseSaveTarget(armorWithCover, Number(invulnSave) || 0, apForSave));
+  let failedSaves = 0;
+  for (let i = 0; i < savableWounds; i++) {
+    const d = rollD(6);
+    if (d === 1 || (d + saveModCapped) < saveTarget) failedSaves++;
+  }
+  if (ignoreFirstFailedSave) failedSaves = Math.max(0, failedSaves - 1);
+
+  // Damage phase
+  const dmgSpec = parseDiceSpec(String(damageValue || "1"));
+  let totalDmg = mortalWounds;
+  for (let i = 0; i < failedSaves; i++) {
+    let dmg = damageFixed ? (parseInt(String(damageValue || "1"), 10) || 1) : (dmgSpec.ok ? rollD(dmgSpec.sides) + dmgSpec.mod : 1);
+    if (meltaEnabled) dmg += rollD(6);
+    if (minusOneDamage) dmg = Math.max(1, dmg - 1);
+    if (halfDamage) dmg = Math.max(1, Math.ceil(dmg / 2));
+    // FNP
+    if (fnpEnabled && Number(fnp) >= 2) {
+      let saved = 0;
+      for (let j = 0; j < dmg; j++) { if (rollD(6) >= Number(fnp)) saved++; }
+      dmg = Math.max(0, dmg - saved);
+    }
+    totalDmg += dmg;
+  }
+  return totalDmg;
+}
+
+function runMonteCarlo(params, iterations = 50000) {
+  const counts = {};
+  for (let i = 0; i < iterations; i++) {
+    const dmg = simulateOnce(params);
+    counts[dmg] = (counts[dmg] || 0) + 1;
+  }
+  const maxDmg = Math.max(...Object.keys(counts).map(Number));
+  const dist = [];
+  for (let d = 0; d <= maxDmg; d++) {
+    dist.push({ damage: d, prob: (counts[d] || 0) / iterations });
+  }
+  const expected = dist.reduce((s, { damage, prob }) => s + damage * prob, 0);
+  // cumulative P(≥x) for each damage value
+  let cumulative = 1;
+  const withCumulative = dist.map(row => {
+    const result = { ...row, atLeast: cumulative };
+    cumulative -= row.prob;
+    return result;
+  });
+  return { dist: withCumulative, expected, maxDmg };
+}
+
+function ProbabilityPanel({ params, theme, statsReady }) {
+  const dark = theme === "dark";
+  const result = React.useMemo(() => {
+    if (!statsReady) return null;
+    return runMonteCarlo(params);
+  }, [statsReady, ...Object.values(params)]);  // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!statsReady) {
+    return (
+      <div className={`text-sm text-center py-4 ${dark ? "text-gray-500" : "text-gray-400"}`}>
+        Fill in weapon and target stats to see probability distribution.
+      </div>
+    );
+  }
+  if (!result) return null;
+
+  const { dist, expected } = result;
+  const maxProb = Math.max(...dist.map(r => r.prob));
+  const median = dist.find(r => r.atLeast <= 0.5)?.damage ?? 0;
+  const mode = dist.reduce((best, r) => r.prob > best.prob ? r : best, dist[0]).damage;
+  const visibleDist = dist.filter(r => r.prob > 0 || r.damage === median || r.damage === mode);
+
+  // SVG chart dimensions — extra bottom margin for legend + x labels
+  const W = 560, H = 250;
+  const ML = 44, MR = 48, MT = 20, MB = 52;
+  const cW = W - ML - MR;
+  const cH = H - MT - MB;
+  const n = visibleDist.length;
+  const slotW = n > 1 ? cW / n : cW;
+  const barW = Math.max(4, slotW * 0.55);
+
+  const xOf = i => ML + slotW * i + slotW / 2;
+  // Left axis: actual probability scale, rounded up to a nice ceiling
+  const rawMaxPct = maxProb * 100;
+  const yMaxPct = rawMaxPct <= 15 ? Math.ceil(rawMaxPct / 5) * 5
+                : rawMaxPct <= 35 ? Math.ceil(rawMaxPct / 10) * 10
+                : rawMaxPct <= 60 ? Math.ceil(rawMaxPct / 20) * 20
+                : Math.ceil(rawMaxPct / 25) * 25;
+  const yBar  = prob    => MT + cH * (1 - (prob * 100) / yMaxPct);
+  const yLine = atLeast => MT + cH * (1 - atLeast);
+
+  const barCol   = dark ? "#f59e0b" : "#d97706";
+  const lineCol  = dark ? "#60a5fa" : "#2563eb";
+  const gridCol  = dark ? "#374151" : "#e5e7eb";
+  const labelCol = dark ? "#9ca3af" : "#6b7280";
+  const axisCol  = dark ? "#4b5563" : "#d1d5db";
+  const modeCol  = dark ? "#f59e0b" : "#d97706";
+  const medCol   = dark ? "#818cf8" : "#6366f1";
+  const expCol   = dark ? "#6ee7b7" : "#059669";
+
+  // Left Y-axis grid steps (actual probability %)
+  const leftSteps = Array.from({ length: 5 }, (_, i) => Math.round(yMaxPct * i / 4));
+  // Right Y-axis grid steps (cumulative %)
+  const rightSteps = [0, 25, 50, 75, 100];
+
+  // P(≥x) polyline
+  const linePoints = visibleDist.map((r, i) => `${xOf(i)},${yLine(r.atLeast)}`).join(" ");
+
+  // Expected value X position (interpolated between slots)
+  const expX = (() => {
+    if (n < 2) return null;
+    const first = visibleDist[0].damage;
+    const last  = visibleDist[n - 1].damage;
+    const span  = last - first || 1;
+    return ML + ((expected - first) / span) * (cW - slotW) + slotW / 2;
+  })();
+
+  // Legend row height (bottom of chart area + x labels + gap)
+  const legendY = MT + cH + 38;
+
+  return (
+    <div className="space-y-3">
+      {/* Chart */}
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ maxHeight: 280 }}>
+
+        {/* Left axis label — rotated "Probability %" */}
+        <text transform={`rotate(-90)`} x={-(MT + cH / 2)} y={12} textAnchor="middle" fontSize="9" fill={labelCol}>Probability %</text>
+
+        {/* Right axis label — rotated "P(≥x)" */}
+        <text transform={`rotate(90)`} x={MT + cH / 2} y={-(W - 11)} textAnchor="middle" fontSize="9" fill={lineCol} fillOpacity="0.8">P(≥x)</text>
+
+        {/* Grid lines — left scale (prob) */}
+        {leftSteps.map(pct => {
+          const y = MT + cH * (1 - pct / yMaxPct);
+          return (
+            <g key={`l${pct}`}>
+              <line x1={ML} x2={ML + cW} y1={y} y2={y} stroke={gridCol} strokeWidth="0.5" strokeDasharray="3,3" />
+              <text x={ML - 5} y={y + 3.5} textAnchor="end" fontSize="9" fill={labelCol}>{pct}%</text>
+            </g>
+          );
+        })}
+
+        {/* Right axis tick labels (cumulative %) */}
+        {rightSteps.map(pct => {
+          const y = MT + cH * (1 - pct / 100);
+          return (
+            <text key={`r${pct}`} x={ML + cW + 5} y={y + 3.5} textAnchor="start" fontSize="9" fill={lineCol} fillOpacity="0.8">{pct}%</text>
+          );
+        })}
+
+        {/* Axis lines */}
+        <line x1={ML} x2={ML} y1={MT} y2={MT + cH} stroke={axisCol} strokeWidth="1" />
+        <line x1={ML + cW} x2={ML + cW} y1={MT} y2={MT + cH} stroke={lineCol} strokeWidth="0.5" opacity="0.4" />
+        <line x1={ML} x2={ML + cW} y1={MT + cH} y2={MT + cH} stroke={axisCol} strokeWidth="1" />
+
+        {/* Expected value line */}
+        {expX && <line x1={expX} x2={expX} y1={MT} y2={MT + cH} stroke={expCol} strokeWidth="1.5" strokeDasharray="5,3" opacity="0.85" />}
+        {expX && <text x={expX} y={MT - 4} textAnchor="middle" fontSize="8" fill={expCol} fontWeight="bold">E={expected.toFixed(1)}</text>}
+
+        {/* Median indicator line */}
+        {(() => {
+          const mi = visibleDist.findIndex(r => r.damage === median);
+          if (mi < 0) return null;
+          const mx = xOf(mi);
+          return <line x1={mx} x2={mx} y1={MT} y2={MT + cH} stroke={medCol} strokeWidth="1" strokeDasharray="3,3" opacity="0.6" />;
+        })()}
+
+        {/* Bars */}
+        {visibleDist.map((r, i) => {
+          const x   = xOf(i) - barW / 2;
+          const barH = Math.max(0, cH * (r.prob * 100) / yMaxPct);
+          const y   = MT + cH - barH;
+          const isMode = r.damage === mode;
+          const isMed  = r.damage === median;
+          return (
+            <g key={r.damage}>
+              <rect x={x} y={y} width={barW} height={barH}
+                fill={isMode ? modeCol : isMed ? medCol : barCol}
+                fillOpacity={isMode ? 1 : isMed ? 0.85 : 0.6}
+                rx="2" />
+              {/* Mode crown */}
+              {isMode && <text x={xOf(i)} y={y - 3} textAnchor="middle" fontSize="9" fill={modeCol} fontWeight="bold">▲</text>}
+              {/* Median dot */}
+              {isMed && !isMode && <text x={xOf(i)} y={y - 3} textAnchor="middle" fontSize="9" fill={medCol}>◆</text>}
+              {/* Damage label */}
+              <text x={xOf(i)} y={MT + cH + 13} textAnchor="middle" fontSize="9" fill={labelCol}>{r.damage}</text>
+              {/* Prob on bar if tall enough */}
+              {barH > 16 && (
+                <text x={xOf(i)} y={y + 10} textAnchor="middle" fontSize="8" fill={dark ? "#1f2937" : "#fff"} fontWeight="bold">
+                  {(r.prob * 100).toFixed(1)}%
+                </text>
+              )}
+            </g>
+          );
+        })}
+
+        {/* P(≥x) line */}
+        <polyline points={linePoints} fill="none" stroke={lineCol} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+        {visibleDist.map((r, i) => (
+          <circle key={r.damage} cx={xOf(i)} cy={yLine(r.atLeast)} r="2.5" fill={lineCol} />
+        ))}
+
+        {/* X axis label */}
+        <text x={ML + cW / 2} y={MT + cH + 26} textAnchor="middle" fontSize="9" fill={labelCol}>Damage</text>
+
+        {/* Legend row */}
+        <rect x={ML} y={legendY} width="8" height="8" fill={barCol} fillOpacity="0.65" rx="1" />
+        <text x={ML + 11} y={legendY + 7} fontSize="8" fill={labelCol}>Prob %</text>
+
+        <line x1={ML + 52} x2={ML + 62} y1={legendY + 4} y2={legendY + 4} stroke={lineCol} strokeWidth="2" />
+        <circle cx={ML + 57} cy={legendY + 4} r="2.5" fill={lineCol} />
+        <text x={ML + 65} y={legendY + 7} fontSize="8" fill={labelCol}>P(≥x)</text>
+
+        <line x1={ML + 102} x2={ML + 112} y1={legendY + 4} y2={legendY + 4} stroke={expCol} strokeWidth="1.5" strokeDasharray="5,3" opacity="0.85" />
+        <text x={ML + 115} y={legendY + 7} fontSize="8" fill={labelCol}>E[dmg]</text>
+
+        <text x={ML + 152} y={legendY + 7} fontSize="9" fill={modeCol} fontWeight="bold">▲</text>
+        <text x={ML + 162} y={legendY + 7} fontSize="8" fill={labelCol}>Mode</text>
+
+        <text x={ML + 200} y={legendY + 7} fontSize="9" fill={medCol}>◆</text>
+        <text x={ML + 210} y={legendY + 7} fontSize="8" fill={labelCol}>Median</text>
+      </svg>
+
+      {/* Compact data table — collapsible */}
+      {(() => {
+        const [tableOpen, setTableOpen] = React.useState(false);
+        return (
+          <div>
+            <button type="button" onClick={() => setTableOpen(o => !o)}
+              className={`text-xs flex items-center gap-1 ${dark ? "text-gray-500 hover:text-gray-300" : "text-gray-400 hover:text-gray-600"} transition`}>
+              {tableOpen ? "▾" : "▸"} {tableOpen ? "Hide" : "Show"} data table
+            </button>
+            {tableOpen && (
+              <div className={`font-mono text-xs space-y-0.5 mt-1`}>
+                <div className={`grid gap-x-2 mb-1 font-bold uppercase tracking-wide ${dark ? "text-gray-500" : "text-gray-400"}`}
+                  style={{ gridTemplateColumns: "3ch 6ch 6ch" }}>
+                  <span>Dmg</span><span className="text-right">Prob</span><span className="text-right">P(≥x)</span>
+                </div>
+                {visibleDist.map(({ damage, prob, atLeast }) => {
+                  const isMode = damage === mode;
+                  const isMed = damage === median;
+                  return (
+                    <div key={damage}
+                      className={`grid gap-x-2 rounded px-1 ${isMode ? (dark ? "bg-amber-900/30" : "bg-amber-50") : isMed ? (dark ? "bg-indigo-900/30" : "bg-indigo-50") : ""}`}
+                      style={{ gridTemplateColumns: "3ch 6ch 6ch" }}>
+                      <span className={`tabular-nums ${dark ? "text-gray-300" : "text-gray-700"}`}>
+                        {damage}{isMode ? " ◀" : isMed && !isMode ? " ·" : ""}
+                      </span>
+                      <span className={`tabular-nums text-right ${dark ? "text-gray-300" : "text-gray-700"}`}>{(prob * 100).toFixed(1)}%</span>
+                      <span className={`tabular-nums text-right ${dark ? "text-blue-400" : "text-blue-600"}`}>{(atLeast * 100).toFixed(0)}%</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
+      {/* Summary stats */}
+      <div className={`pt-2 border-t text-xs flex gap-4 flex-wrap ${dark ? "border-gray-700 text-gray-400" : "border-gray-200 text-gray-500"}`}>
+        <span>E[dmg] = <span className={`font-bold ${dark ? "text-emerald-400" : "text-emerald-700"}`}>{expected.toFixed(2)}</span></span>
+        <span>Median = <span className={`font-bold ${dark ? "text-white" : "text-gray-900"}`}>{median}</span></span>
+        <span>Mode = <span className={`font-bold ${dark ? "text-amber-400" : "text-amber-600"}`}>{mode}</span></span>
+        <span>P(≥{Math.round(expected)}) = <span className={`font-bold ${dark ? "text-white" : "text-gray-900"}`}>{((dist.find(r => r.damage === Math.round(expected))?.atLeast || 0) * 100).toFixed(0)}%</span></span>
+        <span className={`ml-auto ${dark ? "text-gray-600" : "text-gray-300"}`}>50k runs</span>
+      </div>
     </div>
   );
 }
@@ -1076,7 +1453,7 @@ function AttackCalculator() {
     damageFixed, damageValue, damageRolls,
     critHitThreshold, critWoundThreshold,
     rapidFire, rapidFireX, halfRange,
-    torrent, lethalHits, sustainedHits, sustainedHitsN,
+    torrent, overwatch, lethalHits, sustainedHits, sustainedHitsN,
     devastatingWounds, precision,
     blastEnabled, blastUnitSize,
     antiXEnabled, antiXThreshold,
@@ -1118,7 +1495,7 @@ function AttackCalculator() {
   const {
     theme, simpleMode, showLog, showLimitations, showCheatSheet,
     showDiceRef, showTableUse, showWizard, strictMode, preserveHooks,
-    showExperimental,
+    showExperimental, showProbability,
   } = ui;
 
   const {
@@ -1155,6 +1532,7 @@ function AttackCalculator() {
   const setRapidFireX    = v => dispatch({ type: "SET_WEAPON_FIELD", field: "rapidFireX",    value: v });
   const setHalfRange     = v => dispatch({ type: "SET_WEAPON_FIELD", field: "halfRange",     value: v });
   const setTorrent       = v => dispatch({ type: "SET_WEAPON_FIELD", field: "torrent",       value: v });
+  const setOverwatch     = v => dispatch({ type: "SET_WEAPON_FIELD", field: "overwatch",     value: v });
   const setLethalHits    = v => dispatch({ type: "SET_WEAPON_FIELD", field: "lethalHits",    value: v });
   const setSustainedHits = v => dispatch({ type: "SET_WEAPON_FIELD", field: "sustainedHits", value: v });
   const setSustainedHitsN= v => dispatch({ type: "SET_WEAPON_FIELD", field: "sustainedHitsN",value: v });
@@ -1208,6 +1586,7 @@ function AttackCalculator() {
 
   // UI fields
   const setShowLog         = v => dispatch({ type: "SET_UI_FIELD", field: "showLog",         value: v });
+  const setShowProbability = v => dispatch({ type: "SET_UI_FIELD", field: "showProbability", value: v });
   const setShowLimitations = v => dispatch({ type: "SET_UI_FIELD", field: "showLimitations", value: v });
   const setShowCheatSheet  = v => dispatch({ type: "SET_UI_FIELD", field: "showCheatSheet",  value: v });
   const setShowDiceRef     = v => dispatch({ type: "SET_UI_FIELD", field: "showDiceRef",     value: v });
@@ -1272,7 +1651,7 @@ function AttackCalculator() {
     damageFixed, damageValue, damageRolls,
     critHitThreshold, critWoundThreshold,
     antiXEnabled, antiXThreshold,
-    torrent, lethalHits, sustainedHits, sustainedHitsN,
+    torrent, overwatch, lethalHits, sustainedHits, sustainedHitsN,
     devastatingWounds, precision, lance,
     rerollHitOnes, rerollHitFails,
     rerollWoundOnes, rerollWoundFails, twinLinked,
@@ -1415,7 +1794,7 @@ function AttackCalculator() {
   } else {
     if (!parseDiceSpec(attacksValue).ok) missingWeapon.push("Attacks expression");
   }
-  if (!isNum(toHit)) missingWeapon.push("To Hit");
+  if (!torrent && !overwatch && !isNum(toHit)) missingWeapon.push("To Hit");
   if (!isNum(strength)) missingWeapon.push("Strength");
   if (!isNum(ap)) missingWeapon.push("AP");
   if (damageFixed) {
@@ -2256,6 +2635,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                 ap={ap} setAp={setAp}
                 damageFixed={damageFixed} setDamageFixed={setDamageFixed}
                 damageValue={damageValue} setDamageValue={setDamageValue}
+                torrent={torrent} overwatch={overwatch}
                 isNum={isNum} theme={theme}
               />
 
@@ -2279,6 +2659,13 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                       <input type="checkbox" checked={torrent} onChange={(e) => setTorrent(e.target.checked)} />
                       <span className="font-semibold">TORRENT</span>
                       <span className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>(auto-hit)</span>
+                    </label>
+                  )},
+                  { key: "overwatch", checked: overwatch, node: (
+                    <label className="flex items-center gap-2 min-h-[36px]">
+                      <input type="checkbox" checked={overwatch} onChange={(e) => setOverwatch(e.target.checked)} disabled={torrent} />
+                      <span className={`font-semibold ${torrent ? "opacity-40" : ""}`}>Overwatch</span>
+                      <span className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-500"} ${torrent ? "opacity-40" : ""}`}>(hits on nat 6 only)</span>
                     </label>
                   )},
                   { key: "lethalHits", checked: lethalHits, node: (
@@ -3053,6 +3440,31 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                   </div>
                 </Section>
               )}
+
+              {showProbability && (
+                <Section theme={theme} title="📊 Damage Probability Distribution">
+                  <ProbabilityPanel theme={theme} statsReady={statsReady} params={{
+                    attacksFixed, attacksValue, modelQty,
+                    rapidFire, rapidFireX, halfRange,
+                    blastEnabled, blastUnitSize,
+                    toHit, hitMod: effectiveHitMod, overwatch,
+                    strength, ap, lance,
+                    damageFixed, damageValue,
+                    critHitThreshold, critWoundThreshold,
+                    antiXEnabled, antiXThreshold,
+                    torrent, lethalHits, sustainedHits, sustainedHitsN,
+                    devastatingWounds,
+                    rerollHitOnes, rerollHitFails,
+                    rerollWoundOnes, rerollWoundFails, twinLinked,
+                    toughness, armorSave, invulnSave,
+                    inCover, ignoreAp, saveMod,
+                    ignoreFirstFailedSave, minusOneDamage, halfDamage,
+                    fnpEnabled, fnp,
+                    meltaEnabled, meltaX,
+                    woundMod: effectiveWoundMod,
+                  }} />
+                </Section>
+              )}
           </div>
 
         </div>
@@ -3067,6 +3479,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
                   { label: `Preserve hooks: ${preserveHooks ? "ON" : "OFF"}`, on: preserveHooks, action: () => setPreserveHooks(!preserveHooks), title: "Keep toggle states on Clear" },
                   { label: `Strict: ${strictMode ? "ON" : "OFF"}`, on: strictMode, action: () => setStrictMode(!strictMode), title: "Lock totals until dice complete" },
                   { label: showLog ? "Hide log" : "Show log", on: showLog, action: () => setShowLog(!showLog) },
+                  { label: showProbability ? "Hide probability" : "📊 Probability", on: showProbability, action: () => setShowProbability(!showProbability), title: "Show damage probability distribution" },
                   { label: showExperimental ? "Hide experimental" : "Experimental", on: showExperimental, action: () => setShowExperimental(!showExperimental), title: "Show/hide rerolls and crit thresholds" },
                 ].map(({ label, on, action, title }) => (
                   <button key={label} type="button"

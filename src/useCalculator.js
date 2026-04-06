@@ -19,7 +19,7 @@ export function useCalculator({
   critHitThreshold, critWoundThreshold,
   antiXEnabled, antiXThreshold,
   // Keywords
-  torrent, lethalHits, sustainedHits, sustainedHitsN,
+  torrent, overwatch, lethalHits, sustainedHits, sustainedHitsN,
   devastatingWounds, precision, lance,
   // Rerolls
   rerollHitOnes, rerollHitFails,
@@ -45,7 +45,9 @@ export function useCalculator({
     const log = [];
     const errors = [];
 
-    const hitModCapped = clampModPlusMinusOne(Number(hitMod) || 0);
+    // Overwatch: always hits on natural 6, no hit modifiers apply
+    const effectiveToHit = overwatch ? 6 : (Number(toHit) || 7);
+    const hitModCapped = overwatch ? 0 : clampModPlusMinusOne(Number(hitMod) || 0);
     const saveModCapped = clampModPlusMinusOne(Number(saveMod) || 0);
     const woundModNum = Number(woundMod) || 0;
 
@@ -131,7 +133,7 @@ export function useCalculator({
           errors.push(`Hit roll #${i + 1} is not a valid D6 result (1-6).`);
           continue;
         }
-        const success = unmod !== 1 && meets(Number(toHit) || 7, unmod, hitModCapped);
+        const success = unmod !== 1 && meets(effectiveToHit, unmod, hitModCapped);
         const crit = unmod >= (Number(critHitThreshold) || 6);
         hits.push({ unmod, success, crit });
 
@@ -189,7 +191,7 @@ export function useCalculator({
             }
           }
 
-          const success = meets(Number(toHit) || 7, unmod, hitModCapped);
+          const success = meets(effectiveToHit, unmod, hitModCapped);
           const crit = unmod >= (Number(critHitThreshold) || 6);
           hits[i] = { unmod, success, crit };
 

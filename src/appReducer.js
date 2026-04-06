@@ -42,6 +42,7 @@ export const initialWeapon = {
   antiXEnabled: false,
   antiXThreshold: 5,
   modelQty: 1,
+  overwatch: false,
 };
 
 export const initialTarget = {
@@ -96,6 +97,7 @@ export const initialUI = {
   strictMode: false,
   preserveHooks: false,
   showExperimental: false,
+  showProbability: false,
 };
 
 export const initialEaster = {
