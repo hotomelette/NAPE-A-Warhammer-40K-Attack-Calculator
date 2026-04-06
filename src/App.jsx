@@ -1004,11 +1004,20 @@ function ProbabilityPanel({ params, theme, statsReady }) {
               {isMed && !isMode && <text x={xOf(i)} y={y - 3} textAnchor="middle" fontSize="9" fill={medCol}>◆</text>}
               {/* Damage label */}
               <text x={xOf(i)} y={MT + cH + 13} textAnchor="middle" fontSize="9" fill={labelCol}>{r.damage}</text>
-              {/* Prob on bar if tall enough */}
-              {barH > 16 && (
+              {/* Prob label — inside bar if wide+tall enough, above bar if tall but narrow */}
+              {barH > 16 && barW >= 28 && (
                 <text x={xOf(i)} y={y + 10} textAnchor="middle" fontSize="8" fill={dark ? "#1f2937" : "#fff"} fontWeight="bold">
                   {(r.prob * 100).toFixed(1)}%
                 </text>
+              )}
+              {barH > 16 && barW < 28 && (
+                <>
+                  <rect x={xOf(i) - 13} y={y - 14} width="26" height="11" rx="2"
+                    fill={dark ? "#111827" : "#f9fafb"} fillOpacity="0.85" />
+                  <text x={xOf(i)} y={y - 5} textAnchor="middle" fontSize="8" fill={dark ? "#d1d5db" : "#374151"} fontWeight="bold">
+                    {(r.prob * 100).toFixed(1)}%
+                  </text>
+                </>
               )}
             </g>
           );
