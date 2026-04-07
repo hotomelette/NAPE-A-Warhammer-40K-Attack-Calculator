@@ -722,7 +722,7 @@ function KeywordGroup({ items, theme, label, hint }) {
 function rollD(sides) { return Math.ceil(Math.random() * sides); }
 
 function simulateOnce({
-  attacksFixed, attacksValue, modelQty,
+  attacksFixed, attacksValue, attacksRolls, modelQty,
   rapidFire, rapidFireX, halfRange,
   blastEnabled, blastUnitSize,
   toHit, hitMod, overwatch,
@@ -748,7 +748,7 @@ function simulateOnce({
   if (attacksFixed) {
     A = Math.max(0, parseInt(String(attacksValue || "0"), 10) || 0) * modelQtyNum;
   } else {
-    const spec = parseDiceSpec(attacksValue);
+    const spec = parseDiceSpec(attacksRolls);
     if (spec.ok) A = (Array.from({ length: spec.n * modelQtyNum }, () => rollD(spec.sides)).reduce((s, d) => s + d, 0) + spec.mod * modelQtyNum);
   }
   if (rapidFire && halfRange) A += Math.max(0, parseInt(String(rapidFireX || "0"), 10) || 0) * modelQtyNum;
@@ -1012,9 +1012,9 @@ function ProbabilityPanel({ params, theme, statsReady }) {
               )}
               {barH > 16 && barW < 28 && (
                 <>
-                  <rect x={xOf(i) - 13} y={y - 14} width="26" height="11" rx="2"
+                  <rect x={xOf(i) - 13} y={y - (isMode || isMed ? 26 : 14)} width="26" height="11" rx="2"
                     fill={dark ? "#111827" : "#f9fafb"} fillOpacity="0.85" />
-                  <text x={xOf(i)} y={y - 5} textAnchor="middle" fontSize="8" fill={dark ? "#d1d5db" : "#374151"} fontWeight="bold">
+                  <text x={xOf(i)} y={y - (isMode || isMed ? 17 : 5)} textAnchor="middle" fontSize="8" fill={dark ? "#d1d5db" : "#374151"} fontWeight="bold">
                     {(r.prob * 100).toFixed(1)}%
                   </text>
                 </>
@@ -1589,7 +1589,6 @@ function AttackCalculator() {
   const setRerollWoundOnes = v => dispatch({ type: "SET_REROLL_FIELD", field: "rerollWoundOnes", value: v });
   const setRerollWoundFails= v => dispatch({ type: "SET_REROLL_FIELD", field: "rerollWoundFails",value: v });
   const setTwinLinked      = v => dispatch({ type: "SET_REROLL_FIELD", field: "twinLinked",      value: v });
-  const setShowRerolls     = v => dispatch({ type: "SET_REROLL_FIELD", field: "showRerolls",     value: v });
 
   // UI fields
   const setShowLog         = v => dispatch({ type: "SET_UI_FIELD", field: "showLog",         value: v });
@@ -1638,7 +1637,6 @@ function AttackCalculator() {
   const clearWeapon = () => dispatch({ type: "CLEAR_WEAPON" });
   const clearTarget = () => dispatch({ type: "CLEAR_TARGET" });
   const clearAll    = () => dispatch({ type: "CLEAR_ALL" });
-  const loadExample = () => dispatch({ type: "LOAD_EXAMPLE" });
 
 
   // Transient animation state — declared early because displayComputed depends on it
@@ -3459,7 +3457,7 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
               {showProbability && (
                 <Section theme={theme} title="📊 Damage Probability Distribution">
                   <ProbabilityPanel theme={theme} statsReady={statsReady} params={{
-                    attacksFixed, attacksValue, modelQty,
+                    attacksFixed, attacksValue, attacksRolls, modelQty,
                     rapidFire, rapidFireX, halfRange,
                     blastEnabled, blastUnitSize,
                     toHit, hitMod: effectiveHitMod, overwatch,

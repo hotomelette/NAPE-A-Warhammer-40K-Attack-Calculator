@@ -78,7 +78,6 @@ export const initialRerolls = {
   rerollWoundOnes: false,
   rerollWoundFails: false,
   twinLinked: false,
-  showRerolls: false,
 };
 
 export const initialUI = {
@@ -232,16 +231,6 @@ export const PRESETS = [
   },
 ];
 
-// Keep LOAD_EXAMPLE pointing at the first preset for backwards compat
-export const EXAMPLE_WEAPON = { ...PRESETS[0].weapon };
-export const EXAMPLE_TARGET = { ...PRESETS[0].target };
-
-export const EXAMPLE_DICE = {
-  ...initialDice,
-  hitRollsText: "6 5 5 4 4 3 2 2 1 6",
-  woundRollsText: "6 5 4 3 2 1 6",
-  saveRollsText: "1 2 4 5 6",
-};
 
 // ─────────────────────────────────────────
 // Reducers
@@ -405,22 +394,6 @@ export function appReducer(state, action) {
           ? { ...initialTarget, saveMod: savedHooks.saveMod, hasLeaderAttached: savedHooks.hasLeaderAttached, allocatePrecisionToLeader: savedHooks.allocatePrecisionToLeader }
           : { ...initialTarget },
         dice: { ...initialDice },
-        rerolls: { ...initialRerolls },
-        split: { ...initialSplit },
-      };
-    }
-
-    case "LOAD_EXAMPLE": {
-      const preserveHooks = state.ui.preserveHooks;
-      return {
-        ...state,
-        weapon: preserveHooks
-          ? { ...EXAMPLE_WEAPON, hitMod: state.weapon.hitMod, woundMod: state.weapon.woundMod }
-          : { ...EXAMPLE_WEAPON },
-        target: preserveHooks
-          ? { ...EXAMPLE_TARGET, saveMod: state.target.saveMod }
-          : { ...EXAMPLE_TARGET },
-        dice: { ...EXAMPLE_DICE },
         rerolls: { ...initialRerolls },
         split: { ...initialSplit },
       };
