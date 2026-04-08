@@ -900,7 +900,7 @@ function runMonteCarlo(params, iterations = 50000) {
     cumulative -= row.prob;
     return result;
   });
-  return { dist: withCumulative, expected, maxDmg };
+  return { dist: withCumulative, expected, maxDmg, iterations };
 }
 
 function ProbabilityPanel({ params, theme, statsReady }) {
@@ -921,7 +921,7 @@ function ProbabilityPanel({ params, theme, statsReady }) {
   }
   if (!result) return null;
 
-  const { dist, expected } = result;
+  const { dist, expected, iterations } = result;
   const maxProb = Math.max(...dist.map(r => r.prob));
   const median = dist.find(r => r.atLeast <= 0.5)?.damage ?? 0;
   const mode = dist.reduce((best, r) => r.prob > best.prob ? r : best, dist[0]).damage;
@@ -930,22 +930,24 @@ function ProbabilityPanel({ params, theme, statsReady }) {
 
   // Table: sim entries + theoretical max, skipping zero-prob rows unless median/mode/theorMax
   const distMap = Object.fromEntries(dist.map(r => [r.damage, r]));
+  const theorMaxObserved = theoreticalMax in distMap;
   const theorMaxEntry = distMap[theoreticalMax] ?? { damage: theoreticalMax, prob: 0, atLeast: 0 };
   const tableDist = [
     ...dist.filter(r => r.prob > 0 || r.damage === median || r.damage === mode),
-    ...(distMap[theoreticalMax] ? [] : [theorMaxEntry]),
+    ...(theorMaxObserved ? [] : [theorMaxEntry]),
   ].sort((a, b) => a.damage - b.damage);
 
   // Chart bars: 1 decimal place (keeps labels short)
   const fmtPctChart = p => (p * 100).toFixed(1) + "%";
   // Table: 2 significant figures (2 digits past the leading zeros)
   const fmtPctTable = p => {
-    if (p <= 0) return "0.000%";
     const pct = p * 100;
     if (pct >= 1) return pct.toFixed(1) + "%";
     const dp = 1 - Math.floor(Math.log10(pct)); // decimal places for 2 sig figs
     return pct.toFixed(dp) + "%";
   };
+  // Upper-bound label for values never observed in the simulation
+  const theorMaxBound = `< ${fmtPctTable(1 / iterations)}`;
 
   // SVG chart dimensions — extra bottom margin for legend + x labels
   const W = 560, H = 250;
@@ -1121,15 +1123,18 @@ function ProbabilityPanel({ params, theme, statsReady }) {
             {tableDist.map(({ damage, prob, atLeast }) => {
               const isMode = damage === mode;
               const isMed = damage === median;
+              const isUnobservedMax = damage === theoreticalMax && !theorMaxObserved;
+              const probLabel    = isUnobservedMax ? theorMaxBound : fmtPctTable(prob);
+              const atLeastLabel = isUnobservedMax ? theorMaxBound : `${(atLeast * 100).toFixed(0)}%`;
               return (
                 <div key={damage}
-                  className={`grid gap-x-2 rounded px-1 ${isMode ? (dark ? "bg-amber-900/30" : "bg-amber-50") : isMed ? (dark ? "bg-indigo-900/30" : "bg-indigo-50") : ""}`}
+                  className={`grid gap-x-2 rounded px-1 ${isUnobservedMax ? (dark ? "bg-red-900/20" : "bg-red-50") : isMode ? (dark ? "bg-amber-900/30" : "bg-amber-50") : isMed ? (dark ? "bg-indigo-900/30" : "bg-indigo-50") : ""}`}
                   style={{ gridTemplateColumns: "3ch 7ch 6ch" }}>
-                  <span className={`tabular-nums ${dark ? "text-gray-300" : "text-gray-700"}`}>
-                    {damage}{isMode ? " ◀" : isMed && !isMode ? " ·" : ""}
+                  <span className={`tabular-nums ${isUnobservedMax ? (dark ? "text-red-400" : "text-red-600") : dark ? "text-gray-300" : "text-gray-700"}`}>
+                    {damage}{isUnobservedMax ? " ★" : isMode ? " ◀" : isMed && !isMode ? " ·" : ""}
                   </span>
-                  <span className={`tabular-nums text-right ${dark ? "text-gray-300" : "text-gray-700"}`}>{fmtPctTable(prob)}</span>
-                  <span className={`tabular-nums text-right ${dark ? "text-blue-400" : "text-blue-600"}`}>{(atLeast * 100).toFixed(0)}%</span>
+                  <span className={`tabular-nums text-right ${isUnobservedMax ? (dark ? "text-red-400" : "text-red-600") : dark ? "text-gray-300" : "text-gray-700"}`}>{probLabel}</span>
+                  <span className={`tabular-nums text-right ${isUnobservedMax ? (dark ? "text-red-400/70" : "text-red-500") : dark ? "text-blue-400" : "text-blue-600"}`}>{atLeastLabel}</span>
                 </div>
               );
             })}
@@ -1144,8 +1149,9 @@ function ProbabilityPanel({ params, theme, statsReady }) {
         <span>Mode = <span className={`font-bold ${dark ? "text-amber-400" : "text-amber-600"}`}>{mode}</span></span>
         <span>P(≥{Math.round(expected)}) = <span className={`font-bold ${dark ? "text-white" : "text-gray-900"}`}>{((dist.find(r => r.damage === Math.round(expected))?.atLeast || 0) * 100).toFixed(0)}%</span></span>
         <span>Max = <span className={`font-bold ${dark ? "text-red-400" : "text-red-600"}`}>{theoreticalMax}</span></span>
+        <span className={`text-xs ${dark ? "text-gray-600" : "text-gray-400"}`}>n=50k</span>
         <button type="button" onClick={() => setRollKey(k => k + 1)}
-          className={`ml-auto text-xs px-1.5 py-0.5 rounded border transition ${dark ? "text-gray-500 border-gray-700 hover:text-gray-300 hover:border-gray-500" : "text-gray-400 border-gray-300 hover:text-gray-600 hover:border-gray-400"}`}
+          className={`text-xs px-1.5 py-0.5 rounded border transition ${dark ? "text-gray-500 border-gray-700 hover:text-gray-300 hover:border-gray-500" : "text-gray-400 border-gray-300 hover:text-gray-600 hover:border-gray-400"}`}
           title="Re-run simulation">
           ↺ reroll
         </button>
