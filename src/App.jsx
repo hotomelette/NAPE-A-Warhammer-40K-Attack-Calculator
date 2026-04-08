@@ -906,10 +906,11 @@ function runMonteCarlo(params, iterations = 50000) {
 function ProbabilityPanel({ params, theme, statsReady }) {
   const dark = theme === "dark";
   const [tableOpen, setTableOpen] = React.useState(false);
+  const [rollKey, setRollKey] = React.useState(0);
   const result = React.useMemo(() => {
     if (!statsReady) return null;
     return runMonteCarlo(params);
-  }, [statsReady, JSON.stringify(params)]);  // eslint-disable-line react-hooks/exhaustive-deps, react-hooks/use-memo
+  }, [statsReady, rollKey, JSON.stringify(params)]);  // eslint-disable-line react-hooks/exhaustive-deps, react-hooks/use-memo
 
   if (!statsReady) {
     return (
@@ -927,6 +928,18 @@ function ProbabilityPanel({ params, theme, statsReady }) {
   const TAIL_THRESHOLD = 0.001; // 0.1%
   const visibleDist = dist.filter(r => r.prob >= TAIL_THRESHOLD);
   const tailDist    = dist.filter(r => r.prob > 0 && r.prob < TAIL_THRESHOLD);
+
+  // Tail label for legend (computed once, used in SVG + removed from bottom)
+  const tailLabel = (() => {
+    const theoreticalMax = computeTheoreticalMax(params);
+    const simTailMin = tailDist.length > 0 ? tailDist[0].damage : null;
+    const simTailMax = tailDist.length > 0 ? tailDist[tailDist.length - 1].damage : null;
+    const chartMax   = visibleDist.length > 0 ? visibleDist[visibleDist.length - 1].damage : null;
+    const rangeStart = simTailMin ?? (chartMax != null ? chartMax + 1 : null);
+    const rangeEnd   = theoreticalMax > (simTailMax ?? 0) ? theoreticalMax : simTailMax;
+    if (rangeStart == null || rangeEnd == null || rangeEnd <= (chartMax ?? 0)) return null;
+    return `Tail <0.1%: ${rangeStart}–${rangeEnd}`;
+  })();
 
   // SVG chart dimensions — extra bottom margin for legend + x labels
   const W = 560, H = 250;
@@ -1085,9 +1098,16 @@ function ProbabilityPanel({ params, theme, statsReady }) {
 
         <text x={ML + 200} y={legendY + 7} fontSize="9" fill={medCol}>◆</text>
         <text x={ML + 210} y={legendY + 7} fontSize="8" fill={labelCol}>Median</text>
+
+        {/* Tail label — right-aligned in legend row */}
+        {tailLabel && (
+          <text x={W - MR} y={legendY + 7} textAnchor="end" fontSize="8"
+            fill={dark ? "#4b5563" : "#d1d5db"}>
+            {tailLabel}
+          </text>
+        )}
       </svg>
 
-      {/* Compact data table — collapsible */}
       {/* Compact data table — collapsible */}
       <div>
         <button type="button" onClick={() => setTableOpen(o => !o)}
@@ -1125,27 +1145,12 @@ function ProbabilityPanel({ params, theme, statsReady }) {
         <span>Median = <span className={`font-bold ${dark ? "text-white" : "text-gray-900"}`}>{median}</span></span>
         <span>Mode = <span className={`font-bold ${dark ? "text-amber-400" : "text-amber-600"}`}>{mode}</span></span>
         <span>P(≥{Math.round(expected)}) = <span className={`font-bold ${dark ? "text-white" : "text-gray-900"}`}>{((dist.find(r => r.damage === Math.round(expected))?.atLeast || 0) * 100).toFixed(0)}%</span></span>
-        <span className={`ml-auto ${dark ? "text-gray-600" : "text-gray-300"}`}>50k runs</span>
+        <button type="button" onClick={() => setRollKey(k => k + 1)}
+          className={`ml-auto text-xs px-1.5 py-0.5 rounded border transition ${dark ? "text-gray-500 border-gray-700 hover:text-gray-300 hover:border-gray-500" : "text-gray-400 border-gray-300 hover:text-gray-600 hover:border-gray-400"}`}
+          title="Re-run simulation">
+          ↺ reroll
+        </button>
       </div>
-
-      {/* Tail note */}
-      {(() => {
-        const theoreticalMax = computeTheoreticalMax(params);
-        const simTailMin = tailDist.length > 0 ? tailDist[0].damage : null;
-        const simTailMax = tailDist.length > 0 ? tailDist[tailDist.length - 1].damage : null;
-        const chartMax = visibleDist.length > 0 ? visibleDist[visibleDist.length - 1].damage : null;
-        const rangeStart = simTailMin ?? (chartMax != null ? chartMax + 1 : null);
-        const rangeEnd = theoreticalMax > (simTailMax ?? 0) ? theoreticalMax : simTailMax;
-        if (rangeStart == null || rangeEnd == null || rangeEnd <= (chartMax ?? 0)) return null;
-        return (
-          <div className={`text-xs mt-1 ${dark ? "text-gray-600" : "text-gray-400"}`}>
-            Tail (&lt;0.1%): {rangeStart}–{rangeEnd} dmg
-            {theoreticalMax > (simTailMax ?? 0) && (
-              <span className={dark ? "text-gray-700" : "text-gray-300"}> · theoretical max: {theoreticalMax}</span>
-            )}
-          </div>
-        );
-      })()}
     </div>
   );
 }
