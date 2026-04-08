@@ -89,7 +89,6 @@ export const initialUI = {
   })(),
   showLog: false,
   showTableUse: false,
-  showLimitations: false,
   showCheatSheet: false,
   showDiceRef: false,
   showWizard: false,

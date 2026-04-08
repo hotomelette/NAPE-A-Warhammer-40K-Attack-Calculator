@@ -830,7 +830,7 @@ function simulateOnce({
   let totalDmg = mortalWounds;
   for (let i = 0; i < failedSaves; i++) {
     let dmg = damageFixed ? (parseInt(String(damageValue || "1"), 10) || 1) : (dmgSpec.ok ? rollD(dmgSpec.sides) + dmgSpec.mod : 1);
-    if (meltaEnabled) dmg += rollD(6);
+    if (meltaEnabled) dmg += Math.max(0, Number(meltaX) || 0);
     if (minusOneDamage) dmg = Math.max(1, dmg - 1);
     if (halfDamage) dmg = Math.max(1, Math.ceil(dmg / 2));
     // FNP
@@ -869,11 +869,10 @@ function runMonteCarlo(params, iterations = 50000) {
 function ProbabilityPanel({ params, theme, statsReady }) {
   const dark = theme === "dark";
   const [tableOpen, setTableOpen] = React.useState(false);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const result = React.useMemo(() => {
     if (!statsReady) return null;
     return runMonteCarlo(params);
-  }, [statsReady, JSON.stringify(params)]);
+  }, [statsReady, JSON.stringify(params)]);  // eslint-disable-line react-hooks/exhaustive-deps, react-hooks/use-memo
 
   if (!statsReady) {
     return (
@@ -906,7 +905,6 @@ function ProbabilityPanel({ params, theme, statsReady }) {
                 : rawMaxPct <= 35 ? Math.ceil(rawMaxPct / 10) * 10
                 : rawMaxPct <= 60 ? Math.ceil(rawMaxPct / 20) * 20
                 : Math.ceil(rawMaxPct / 25) * 25;
-  const yBar  = prob    => MT + cH * (1 - (prob * 100) / yMaxPct);
   const yLine = atLeast => MT + cH * (1 - atLeast);
 
   const barCol   = dark ? "#f59e0b" : "#d97706";
@@ -1206,7 +1204,7 @@ function WizardOverlay({
   // Computed (for dice counts)
   computed, hitNeeded, woundNeeded, saveNeeded,
   // Needed for torrent display only
-  torrent, fnp, fnpEnabled,
+  torrent,
 }) {
   const dark = theme === "dark";
 
@@ -1496,17 +1494,17 @@ function AttackCalculator() {
   const {
     rerollHitOnes, rerollHitFails,
     rerollWoundOnes, rerollWoundFails,
-    twinLinked, showRerolls,
+    twinLinked,
   } = rerolls;
 
   const {
-    theme, simpleMode, showLog, showLimitations, showCheatSheet,
+    theme, showLog, showCheatSheet,
     showDiceRef, showTableUse, showWizard, strictMode, preserveHooks,
     showExperimental, showProbability,
   } = ui;
 
   const {
-    secretClicks, emperorToast, clearAllTapCount, lastClearAllTapMs,
+    emperorToast, clearAllTapCount, lastClearAllTapMs,
   } = easter;
 
   // ── Split volley state ──
@@ -1518,7 +1516,6 @@ function AttackCalculator() {
     dispatch({ type: "TOGGLE_SPLIT" });
     if (!splitEnabled) dispatch({ type: "ADD_SPLIT_TARGET", totalWounds: totalSavableWounds });
   };
-  const addSplitTarget = () => dispatch({ type: "ADD_SPLIT_TARGET", totalWounds: totalSavableWounds });
   const removeSplitTarget   = (i) => dispatch({ type: "REMOVE_SPLIT_TARGET", index: i });
   const setSplitTargetField = (i, field, value) => dispatch({ type: "SET_SPLIT_TARGET_FIELD", index: i, field, value });
 
@@ -1544,7 +1541,6 @@ function AttackCalculator() {
   const setSustainedHits = v => dispatch({ type: "SET_WEAPON_FIELD", field: "sustainedHits", value: v });
   const setSustainedHitsN= v => dispatch({ type: "SET_WEAPON_FIELD", field: "sustainedHitsN",value: v });
   const setDevastatingWounds = v => dispatch({ type: "SET_WEAPON_FIELD", field: "devastatingWounds", value: v });
-  const setPrecision     = v => dispatch({ type: "SET_WEAPON_FIELD", field: "precision",     value: v });
   const setPlusOneToHit   = v => dispatch({ type: "SET_WEAPON_FIELD", field: "plusOneToHit",   value: v });
   const setIndirectFire   = v => dispatch({ type: "SET_WEAPON_FIELD", field: "indirectFire",   value: v });
   const setLance          = v => dispatch({ type: "SET_WEAPON_FIELD", field: "lance",           value: v });
@@ -1555,8 +1551,6 @@ function AttackCalculator() {
   const setAntiXEnabled   = v => dispatch({ type: "SET_WEAPON_FIELD", field: "antiXEnabled",   value: v });
   const setModelQty       = v => dispatch({ type: "SET_WEAPON_FIELD", field: "modelQty",       value: v });
   const setAntiXThreshold = v => dispatch({ type: "SET_WEAPON_FIELD", field: "antiXThreshold", value: v });
-  const setHitMod        = v => dispatch({ type: "SET_WEAPON_FIELD", field: "hitMod",        value: v });
-  const setWoundMod      = v => dispatch({ type: "SET_WEAPON_FIELD", field: "woundMod",      value: v });
 
   // Target fields
   const setToughness     = v => dispatch({ type: "SET_TARGET_FIELD", field: "toughness",     value: v });
@@ -1569,9 +1563,6 @@ function AttackCalculator() {
   const setIgnoreFirstFailedSave = v => dispatch({ type: "SET_TARGET_FIELD", field: "ignoreFirstFailedSave", value: v });
   const setMinusOneDamage= v => dispatch({ type: "SET_TARGET_FIELD", field: "minusOneDamage",value: v });
   const setHalfDamage    = v => dispatch({ type: "SET_TARGET_FIELD", field: "halfDamage",    value: v });
-  const setSaveMod       = v => dispatch({ type: "SET_TARGET_FIELD", field: "saveMod",       value: v });
-  const setHasLeaderAttached         = v => dispatch({ type: "SET_TARGET_FIELD", field: "hasLeaderAttached",         value: v });
-  const setAllocatePrecisionToLeader = v => dispatch({ type: "SET_TARGET_FIELD", field: "allocatePrecisionToLeader", value: v });
   const setStealthSmoke    = v => dispatch({ type: "SET_TARGET_FIELD", field: "stealthSmoke",    value: v });
   const setMinusOneToWound = v => dispatch({ type: "SET_TARGET_FIELD", field: "minusOneToWound", value: v });
 
@@ -1593,7 +1584,6 @@ function AttackCalculator() {
   // UI fields
   const setShowLog         = v => dispatch({ type: "SET_UI_FIELD", field: "showLog",         value: v });
   const setShowProbability = v => dispatch({ type: "SET_UI_FIELD", field: "showProbability", value: v });
-  const setShowLimitations = v => dispatch({ type: "SET_UI_FIELD", field: "showLimitations", value: v });
   const setShowCheatSheet  = v => dispatch({ type: "SET_UI_FIELD", field: "showCheatSheet",  value: v });
   const setShowDiceRef     = v => dispatch({ type: "SET_UI_FIELD", field: "showDiceRef",     value: v });
   const setShowTableUse    = v => dispatch({ type: "SET_UI_FIELD", field: "showTableUse",    value: v });
@@ -1602,10 +1592,6 @@ function AttackCalculator() {
   const setPreserveHooks   = v => dispatch({ type: "SET_UI_FIELD", field: "preserveHooks",   value: v });
   const setShowExperimental= v => dispatch({ type: "SET_UI_FIELD", field: "showExperimental", value: v });
   const toggleTheme        = () => dispatch({ type: "TOGGLE_THEME" });
-  const toggleSimpleMode = () => {
-    if (!simpleMode) dispatch({ type: "CLEAR_SPLIT" });
-    dispatch({ type: "TOGGLE_SIMPLE_MODE" });
-  };
 
   // Easter egg fields
   const setSecretClicks     = v => dispatch({ type: "SET_EASTER_FIELD", field: "secretClicks",     value: v });
@@ -1715,7 +1701,6 @@ function AttackCalculator() {
   ];
 
   const splitA = splitResults[0];
-  const splitB = splitResults[1];
 
   // In split mode, override totals with Target 1 results; merge all errors/logs
   const activeSplitResults = splitResults.filter((_, i) => i === 0 || (splitEnabled && extraTargets[i - 1]));
@@ -1778,9 +1763,6 @@ function AttackCalculator() {
   // Reroll eligibility is computed from the initial rolls in the memoized resolver.
   const hitRerollNeeded = activeComputed.hitRerollNeeded || 0;
   const woundRerollNeeded = activeComputed.woundRerollNeeded || 0;
-  const hitRerollRemaining = Math.max(0, hitRerollNeeded - hitRerollEntered);
-  const woundRerollRemaining = Math.max(0, woundRerollNeeded - woundRerollEntered);
-
   const hasHitRerollCountError = hitRerollEntered !== hitRerollNeeded;
   const hasWoundRerollCountError = woundRerollEntered !== woundRerollNeeded;
 
@@ -2027,11 +2009,6 @@ function AttackCalculator() {
         : (theme === "dark"
             ? "border-red-600 bg-red-900/30 text-red-200"
             : "border-red-300 bg-red-50 text-red-900");
-
-  const mainToggleBtnClass = theme === "dark"
-  ? "px-3 py-2 rounded-lg border border-gray-700 bg-gray-900/40 text-sm font-semibold text-gray-100 hover:bg-gray-900/60 hover:border-gray-500 transition"
-  : "px-3 py-2 rounded-lg border border-gray-300 bg-white text-sm font-semibold text-gray-900 hover:bg-gray-50 hover:border-gray-400 transition";
-const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font-semibold border border-gray-700 hover:bg-gray-800";
 
   // ── Roll All ──
   const rollAll = async () => {
@@ -2327,9 +2304,6 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
     await pause(120);
 
     // Phase 3: Wounds
-    const critHitTW = Number(critHitThreshold) || 6;
-    const critWoundTW = Number(critWoundThreshold) || 6;
-    let totalWoundsW = 0, mortalWoundAttacksW = 0;
     if (normalHits > 0) {
       let woundRollsFinal = Array.from({ length: normalHits }, () => Math.ceil(Math.random() * 6));
       await animateField(setWoundRollsText, woundRollsFinal, 6);
@@ -2345,14 +2319,6 @@ const ctlBtnClass = "rounded-lg bg-gray-900 text-gray-100 px-3 py-2 text-sm font
               : d
           );
         }
-      }
-      const effectiveCritWoundTW = antiXEnabled ? Math.max(2, Math.min(6, Number(antiXThreshold) || 6)) : critWoundTW;
-      for (const d of woundRollsFinal) {
-        if (d === 1) continue;
-        const normalWoundW = d + effectiveWoundMod >= woundTarget;
-        const isCritW = d >= effectiveCritWoundTW && (antiXEnabled || normalWoundW);
-        if (isCritW) { if (devastatingWounds) mortalWoundAttacksW++; else totalWoundsW++; }
-        else if (normalWoundW) totalWoundsW++;
       }
     }
 
