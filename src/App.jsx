@@ -925,17 +925,19 @@ function ProbabilityPanel({ params, theme, statsReady }) {
   const maxProb = Math.max(...dist.map(r => r.prob));
   const median = dist.find(r => r.atLeast <= 0.5)?.damage ?? 0;
   const mode = dist.reduce((best, r) => r.prob > best.prob ? r : best, dist[0]).damage;
-  const visibleDist = dist.filter(r => r.prob >= 0.001); // ≥0.1% on chart
-  const tableDist   = dist.filter(r => r.prob > 0);      // full data in table
+  const visibleDist    = dist.filter(r => r.prob >= 0.001); // ≥0.1% on chart
   const theoreticalMax = computeTheoreticalMax(params);
 
-  // Adaptive precision: show enough decimals that small values aren't rounded to 0.0%
-  const fmtPct = p => {
-    const pct = p * 100;
-    if (pct >= 1)   return pct.toFixed(1) + "%";
-    if (pct >= 0.1) return pct.toFixed(2) + "%";
-    return pct.toFixed(3) + "%";
-  };
+  // Table shows every damage value 0..theoreticalMax, zeroing out entries not seen in sim
+  const distMap = Object.fromEntries(dist.map(r => [r.damage, r]));
+  const tableDist = Array.from({ length: theoreticalMax + 1 }, (_, d) =>
+    distMap[d] ?? { damage: d, prob: 0, atLeast: 0 }
+  );
+
+  // Chart bars: 1 decimal place (keeps labels short)
+  const fmtPctChart = p => (p * 100).toFixed(1) + "%";
+  // Table: fixed 3 decimal places
+  const fmtPctTable = p => (p * 100).toFixed(3) + "%";
 
   // SVG chart dimensions — extra bottom margin for legend + x labels
   const W = 560, H = 250;
@@ -1053,14 +1055,14 @@ function ProbabilityPanel({ params, theme, statsReady }) {
               {/* Prob label — inside bar if wide+tall, always above otherwise */}
               {barW >= 28 && barH > 16 ? (
                 <text x={xOf(i)} y={y + 11} textAnchor="middle" fontSize="10" fill={dark ? "#1f2937" : "#fff"} fontWeight="bold">
-                  {fmtPct(r.prob)}
+                  {fmtPctChart(r.prob)}
                 </text>
               ) : (
                 <>
                   <rect x={xOf(i) - 15} y={y - (isMode || isMed ? 28 : 15)} width="30" height="13" rx="2"
                     fill={dark ? "#111827" : "#f9fafb"} fillOpacity="0.85" />
                   <text x={xOf(i)} y={y - (isMode || isMed ? 18 : 4)} textAnchor="middle" fontSize="10" fill={dark ? "#d1d5db" : "#374151"} fontWeight="bold">
-                    {fmtPct(r.prob)}
+                    {fmtPctChart(r.prob)}
                   </text>
                 </>
               )}
@@ -1118,7 +1120,7 @@ function ProbabilityPanel({ params, theme, statsReady }) {
                   <span className={`tabular-nums ${dark ? "text-gray-300" : "text-gray-700"}`}>
                     {damage}{isMode ? " ◀" : isMed && !isMode ? " ·" : ""}
                   </span>
-                  <span className={`tabular-nums text-right ${dark ? "text-gray-300" : "text-gray-700"}`}>{fmtPct(prob)}</span>
+                  <span className={`tabular-nums text-right ${dark ? "text-gray-300" : "text-gray-700"}`}>{fmtPctTable(prob)}</span>
                   <span className={`tabular-nums text-right ${dark ? "text-blue-400" : "text-blue-600"}`}>{(atLeast * 100).toFixed(0)}%</span>
                 </div>
               );
