@@ -921,32 +921,36 @@ function ProbabilityPanel({ params, theme, statsReady }) {
   }
   if (!result) return null;
 
-  const { dist, expected, iterations } = result;
+  const { dist, expected, maxDmg, iterations } = result;
   const maxProb = Math.max(...dist.map(r => r.prob));
   const median = dist.find(r => r.atLeast <= 0.5)?.damage ?? 0;
   const mode = dist.reduce((best, r) => r.prob > best.prob ? r : best, dist[0]).damage;
   const visibleDist    = dist.filter(r => r.prob >= 0.001); // ≥0.1% on chart
   const theoreticalMax = computeTheoreticalMax(params);
 
-  // Table: sim entries + theoretical max, skipping zero-prob rows unless median/mode/theorMax
-  const distMap = Object.fromEntries(dist.map(r => [r.damage, r]));
-  const theorMaxObserved = theoreticalMax in distMap;
-  const theorMaxEntry = distMap[theoreticalMax] ?? { damage: theoreticalMax, prob: 0, atLeast: 0 };
-  const tableDist = [
-    ...dist.filter(r => r.prob > 0 || r.damage === median || r.damage === mode),
-    ...(theorMaxObserved ? [] : [theorMaxEntry]),
-  ].sort((a, b) => a.damage - b.damage);
+  // Table: sim entries only (no zero-prob padding), skip theorMax — handled as range row below
+  const tableDist = dist
+    .filter(r => r.prob > 0 || r.damage === median || r.damage === mode)
+    .sort((a, b) => a.damage - b.damage);
+
+  // Unobserved range above the highest rolled value up to theoreticalMax
+  const theorMaxObserved = theoreticalMax <= maxDmg;
+  const showUnobservedRange = !theorMaxObserved && theoreticalMax > maxDmg;
+  const unobservedRangeLabel = (maxDmg + 1 === theoreticalMax)
+    ? String(theoreticalMax)
+    : `${maxDmg + 1}–${theoreticalMax}`;
 
   // Chart bars: 1 decimal place (keeps labels short)
   const fmtPctChart = p => (p * 100).toFixed(1) + "%";
-  // Table: 2 significant figures (2 digits past the leading zeros)
+  // Table: 2 significant figures (2 digits past the leading zeros); safe for p=0
   const fmtPctTable = p => {
+    if (p <= 0) return "0.000%";
     const pct = p * 100;
     if (pct >= 1) return pct.toFixed(1) + "%";
     const dp = 1 - Math.floor(Math.log10(pct)); // decimal places for 2 sig figs
     return pct.toFixed(dp) + "%";
   };
-  // Upper-bound label for values never observed in the simulation
+  // Upper-bound label for the unobserved range
   const theorMaxBound = `< ${fmtPctTable(1 / iterations)}`;
 
   // SVG chart dimensions — extra bottom margin for legend + x labels
@@ -1123,21 +1127,26 @@ function ProbabilityPanel({ params, theme, statsReady }) {
             {tableDist.map(({ damage, prob, atLeast }) => {
               const isMode = damage === mode;
               const isMed = damage === median;
-              const isUnobservedMax = damage === theoreticalMax && !theorMaxObserved;
-              const probLabel    = isUnobservedMax ? theorMaxBound : fmtPctTable(prob);
-              const atLeastLabel = isUnobservedMax ? theorMaxBound : `${(atLeast * 100).toFixed(0)}%`;
               return (
                 <div key={damage}
-                  className={`grid gap-x-2 rounded px-1 ${isUnobservedMax ? (dark ? "bg-red-900/20" : "bg-red-50") : isMode ? (dark ? "bg-amber-900/30" : "bg-amber-50") : isMed ? (dark ? "bg-indigo-900/30" : "bg-indigo-50") : ""}`}
+                  className={`grid gap-x-2 rounded px-1 ${isMode ? (dark ? "bg-amber-900/30" : "bg-amber-50") : isMed ? (dark ? "bg-indigo-900/30" : "bg-indigo-50") : ""}`}
                   style={{ gridTemplateColumns: "3ch 7ch 6ch" }}>
-                  <span className={`tabular-nums ${isUnobservedMax ? (dark ? "text-red-400" : "text-red-600") : dark ? "text-gray-300" : "text-gray-700"}`}>
-                    {damage}{isUnobservedMax ? " ★" : isMode ? " ◀" : isMed && !isMode ? " ·" : ""}
+                  <span className={`tabular-nums ${dark ? "text-gray-300" : "text-gray-700"}`}>
+                    {damage}{isMode ? " ◀" : isMed && !isMode ? " ·" : ""}
                   </span>
-                  <span className={`tabular-nums text-right ${isUnobservedMax ? (dark ? "text-red-400" : "text-red-600") : dark ? "text-gray-300" : "text-gray-700"}`}>{probLabel}</span>
-                  <span className={`tabular-nums text-right ${isUnobservedMax ? (dark ? "text-red-400/70" : "text-red-500") : dark ? "text-blue-400" : "text-blue-600"}`}>{atLeastLabel}</span>
+                  <span className={`tabular-nums text-right ${dark ? "text-gray-300" : "text-gray-700"}`}>{fmtPctTable(prob)}</span>
+                  <span className={`tabular-nums text-right ${dark ? "text-blue-400" : "text-blue-600"}`}>{(atLeast * 100).toFixed(0)}%</span>
                 </div>
               );
             })}
+            {showUnobservedRange && (
+              <div className={`grid gap-x-2 rounded px-1 mt-0.5 ${dark ? "bg-red-900/20" : "bg-red-50"}`}
+                style={{ gridTemplateColumns: "auto 7ch 6ch" }}>
+                <span className={`tabular-nums text-xs italic ${dark ? "text-red-400" : "text-red-600"}`}>{unobservedRangeLabel} ★</span>
+                <span className={`tabular-nums text-right text-xs ${dark ? "text-red-400" : "text-red-600"}`}>{theorMaxBound}</span>
+                <span className={`tabular-nums text-right text-xs ${dark ? "text-red-400/70" : "text-red-500"}`}>{theorMaxBound}</span>
+              </div>
+            )}
           </div>
         )}
       </div>
