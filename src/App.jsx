@@ -925,7 +925,8 @@ function ProbabilityPanel({ params, theme, statsReady }) {
   const maxProb = Math.max(...dist.map(r => r.prob));
   const median = dist.find(r => r.atLeast <= 0.5)?.damage ?? 0;
   const mode = dist.reduce((best, r) => r.prob > best.prob ? r : best, dist[0]).damage;
-  const visibleDist = dist.filter(r => r.prob > 0);
+  const visibleDist = dist.filter(r => r.prob >= 0.001); // ≥0.1% on chart
+  const tableDist   = dist.filter(r => r.prob > 0);      // full data in table
   const theoreticalMax = computeTheoreticalMax(params);
 
   // Adaptive precision: show enough decimals that small values aren't rounded to 0.0%
@@ -1102,18 +1103,18 @@ function ProbabilityPanel({ params, theme, statsReady }) {
           {tableOpen ? "▾" : "▸"} {tableOpen ? "Hide" : "Show"} data table
         </button>
         {tableOpen && (
-          <div className={`font-mono text-xs space-y-0.5 mt-1`}>
+          <div className={`font-mono text-sm space-y-0.5 mt-1`}>
             <div className={`grid gap-x-2 mb-1 font-bold uppercase tracking-wide ${dark ? "text-gray-500" : "text-gray-400"}`}
-              style={{ gridTemplateColumns: "3ch 6ch 6ch" }}>
+              style={{ gridTemplateColumns: "3ch 7ch 6ch" }}>
               <span>Dmg</span><span className="text-right">Prob</span><span className="text-right">P(≥x)</span>
             </div>
-            {visibleDist.map(({ damage, prob, atLeast }) => {
+            {tableDist.map(({ damage, prob, atLeast }) => {
               const isMode = damage === mode;
               const isMed = damage === median;
               return (
                 <div key={damage}
                   className={`grid gap-x-2 rounded px-1 ${isMode ? (dark ? "bg-amber-900/30" : "bg-amber-50") : isMed ? (dark ? "bg-indigo-900/30" : "bg-indigo-50") : ""}`}
-                  style={{ gridTemplateColumns: "3ch 6ch 6ch" }}>
+                  style={{ gridTemplateColumns: "3ch 7ch 6ch" }}>
                   <span className={`tabular-nums ${dark ? "text-gray-300" : "text-gray-700"}`}>
                     {damage}{isMode ? " ◀" : isMed && !isMode ? " ·" : ""}
                   </span>
