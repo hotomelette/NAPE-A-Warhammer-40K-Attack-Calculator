@@ -887,7 +887,9 @@ function ProbabilityPanel({ params, theme, statsReady }) {
   const maxProb = Math.max(...dist.map(r => r.prob));
   const median = dist.find(r => r.atLeast <= 0.5)?.damage ?? 0;
   const mode = dist.reduce((best, r) => r.prob > best.prob ? r : best, dist[0]).damage;
-  const visibleDist = dist.filter(r => r.prob > 0);
+  const TAIL_THRESHOLD = 0.001; // 0.1%
+  const visibleDist = dist.filter(r => r.prob >= TAIL_THRESHOLD);
+  const tailDist    = dist.filter(r => r.prob > 0 && r.prob < TAIL_THRESHOLD);
 
   // SVG chart dimensions — extra bottom margin for legend + x labels
   const W = 560, H = 250;
@@ -1088,6 +1090,19 @@ function ProbabilityPanel({ params, theme, statsReady }) {
         <span>P(≥{Math.round(expected)}) = <span className={`font-bold ${dark ? "text-white" : "text-gray-900"}`}>{((dist.find(r => r.damage === Math.round(expected))?.atLeast || 0) * 100).toFixed(0)}%</span></span>
         <span className={`ml-auto ${dark ? "text-gray-600" : "text-gray-300"}`}>50k runs</span>
       </div>
+
+      {/* Tail note */}
+      {tailDist.length > 0 && (() => {
+        const minDmg = tailDist[0].damage;
+        const maxDmg = tailDist[tailDist.length - 1].damage;
+        const minPct = tailDist[tailDist.length - 1].prob * 100;
+        const tier = minPct < 0.01 ? "<0.01%" : "<0.1%";
+        return (
+          <div className={`text-xs mt-1 ${dark ? "text-gray-600" : "text-gray-400"}`}>
+            Tail ({tier}): {minDmg === maxDmg ? `${minDmg} dmg` : `${minDmg}–${maxDmg} dmg`} — not shown on chart
+          </div>
+        );
+      })()}
     </div>
   );
 }
