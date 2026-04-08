@@ -994,10 +994,10 @@ function ProbabilityPanel({ params, theme, statsReady }) {
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ maxHeight: 280 }}>
 
         {/* Left axis label — rotated "Probability %" */}
-        <text transform={`rotate(-90)`} x={-(MT + cH / 2)} y={12} textAnchor="middle" fontSize="9" fill={labelCol}>Probability %</text>
+        <text transform={`rotate(-90)`} x={-(MT + cH / 2)} y={12} textAnchor="middle" fontSize="10" fill={labelCol}>Probability %</text>
 
         {/* Right axis label — rotated "P(≥x)" */}
-        <text transform={`rotate(90)`} x={MT + cH / 2} y={-(W - 11)} textAnchor="middle" fontSize="9" fill={lineCol} fillOpacity="0.8">P(≥x)</text>
+        <text transform={`rotate(90)`} x={MT + cH / 2} y={-(W - 11)} textAnchor="middle" fontSize="10" fill={lineCol} fillOpacity="0.8">P(≥x)</text>
 
         {/* Grid lines — left scale (prob) */}
         {leftSteps.map(pct => {
@@ -1005,7 +1005,7 @@ function ProbabilityPanel({ params, theme, statsReady }) {
           return (
             <g key={`l${pct}`}>
               <line x1={ML} x2={ML + cW} y1={y} y2={y} stroke={gridCol} strokeWidth="0.5" strokeDasharray="3,3" />
-              <text x={ML - 5} y={y + 3.5} textAnchor="end" fontSize="9" fill={labelCol}>{pct}%</text>
+              <text x={ML - 5} y={y + 3.5} textAnchor="end" fontSize="10" fill={labelCol}>{pct}%</text>
             </g>
           );
         })}
@@ -1014,7 +1014,7 @@ function ProbabilityPanel({ params, theme, statsReady }) {
         {rightSteps.map(pct => {
           const y = MT + cH * (1 - pct / 100);
           return (
-            <text key={`r${pct}`} x={ML + cW + 5} y={y + 3.5} textAnchor="start" fontSize="9" fill={lineCol} fillOpacity="0.8">{pct}%</text>
+            <text key={`r${pct}`} x={ML + cW + 5} y={y + 3.5} textAnchor="start" fontSize="10" fill={lineCol} fillOpacity="0.8">{pct}%</text>
           );
         })}
 
@@ -1025,7 +1025,7 @@ function ProbabilityPanel({ params, theme, statsReady }) {
 
         {/* Expected value line */}
         {expX && <line x1={expX} x2={expX} y1={MT} y2={MT + cH} stroke={expCol} strokeWidth="1.5" strokeDasharray="5,3" opacity="0.85" />}
-        {expX && <text x={expX} y={MT - 4} textAnchor="middle" fontSize="8" fill={expCol} fontWeight="bold">E={expected.toFixed(1)}</text>}
+        {expX && <text x={expX} y={MT - 4} textAnchor="middle" fontSize="10" fill={expCol} fontWeight="bold">E={expected.toFixed(1)}</text>}
 
         {/* Median indicator line */}
         {(() => {
@@ -1049,22 +1049,21 @@ function ProbabilityPanel({ params, theme, statsReady }) {
                 fillOpacity={isMode ? 1 : isMed ? 0.85 : 0.6}
                 rx="2" />
               {/* Mode crown */}
-              {isMode && <text x={xOf(i)} y={y - 3} textAnchor="middle" fontSize="9" fill={modeCol} fontWeight="bold">▲</text>}
+              {isMode && <text x={xOf(i)} y={y - 3} textAnchor="middle" fontSize="10" fill={modeCol} fontWeight="bold">▲</text>}
               {/* Median dot */}
-              {isMed && !isMode && <text x={xOf(i)} y={y - 3} textAnchor="middle" fontSize="9" fill={medCol}>◆</text>}
+              {isMed && !isMode && <text x={xOf(i)} y={y - 3} textAnchor="middle" fontSize="10" fill={medCol}>◆</text>}
               {/* Damage label */}
-              <text x={xOf(i)} y={MT + cH + 13} textAnchor="middle" fontSize="9" fill={labelCol}>{r.damage}</text>
-              {/* Prob label — inside bar if wide+tall enough, above bar if tall but narrow */}
-              {barH > 16 && barW >= 28 && (
-                <text x={xOf(i)} y={y + 10} textAnchor="middle" fontSize="8" fill={dark ? "#1f2937" : "#fff"} fontWeight="bold">
+              <text x={xOf(i)} y={MT + cH + 13} textAnchor="middle" fontSize="10" fill={labelCol}>{r.damage}</text>
+              {/* Prob label — inside bar if wide+tall, always above otherwise */}
+              {barW >= 28 && barH > 16 ? (
+                <text x={xOf(i)} y={y + 11} textAnchor="middle" fontSize="10" fill={dark ? "#1f2937" : "#fff"} fontWeight="bold">
                   {(r.prob * 100).toFixed(1)}%
                 </text>
-              )}
-              {barH > 16 && barW < 28 && (
+              ) : (
                 <>
-                  <rect x={xOf(i) - 13} y={y - (isMode || isMed ? 26 : 14)} width="26" height="11" rx="2"
+                  <rect x={xOf(i) - 15} y={y - (isMode || isMed ? 28 : 15)} width="30" height="13" rx="2"
                     fill={dark ? "#111827" : "#f9fafb"} fillOpacity="0.85" />
-                  <text x={xOf(i)} y={y - (isMode || isMed ? 17 : 5)} textAnchor="middle" fontSize="8" fill={dark ? "#d1d5db" : "#374151"} fontWeight="bold">
+                  <text x={xOf(i)} y={y - (isMode || isMed ? 18 : 4)} textAnchor="middle" fontSize="10" fill={dark ? "#d1d5db" : "#374151"} fontWeight="bold">
                     {(r.prob * 100).toFixed(1)}%
                   </text>
                 </>
@@ -1080,28 +1079,28 @@ function ProbabilityPanel({ params, theme, statsReady }) {
         ))}
 
         {/* X axis label */}
-        <text x={ML + cW / 2} y={MT + cH + 26} textAnchor="middle" fontSize="9" fill={labelCol}>Damage</text>
+        <text x={ML + cW / 2} y={MT + cH + 26} textAnchor="middle" fontSize="10" fill={labelCol}>Damage</text>
 
         {/* Legend row */}
-        <rect x={ML} y={legendY} width="8" height="8" fill={barCol} fillOpacity="0.65" rx="1" />
-        <text x={ML + 11} y={legendY + 7} fontSize="8" fill={labelCol}>Prob %</text>
+        <rect x={ML} y={legendY} width="9" height="9" fill={barCol} fillOpacity="0.65" rx="1" />
+        <text x={ML + 13} y={legendY + 8} fontSize="10" fill={labelCol}>Prob %</text>
 
-        <line x1={ML + 52} x2={ML + 62} y1={legendY + 4} y2={legendY + 4} stroke={lineCol} strokeWidth="2" />
-        <circle cx={ML + 57} cy={legendY + 4} r="2.5" fill={lineCol} />
-        <text x={ML + 65} y={legendY + 7} fontSize="8" fill={labelCol}>P(≥x)</text>
+        <line x1={ML + 58} x2={ML + 70} y1={legendY + 4} y2={legendY + 4} stroke={lineCol} strokeWidth="2" />
+        <circle cx={ML + 64} cy={legendY + 4} r="2.5" fill={lineCol} />
+        <text x={ML + 74} y={legendY + 8} fontSize="10" fill={labelCol}>P(≥x)</text>
 
-        <line x1={ML + 102} x2={ML + 112} y1={legendY + 4} y2={legendY + 4} stroke={expCol} strokeWidth="1.5" strokeDasharray="5,3" opacity="0.85" />
-        <text x={ML + 115} y={legendY + 7} fontSize="8" fill={labelCol}>E[dmg]</text>
+        <line x1={ML + 114} x2={ML + 126} y1={legendY + 4} y2={legendY + 4} stroke={expCol} strokeWidth="1.5" strokeDasharray="5,3" opacity="0.85" />
+        <text x={ML + 130} y={legendY + 8} fontSize="10" fill={labelCol}>E[dmg]</text>
 
-        <text x={ML + 152} y={legendY + 7} fontSize="9" fill={modeCol} fontWeight="bold">▲</text>
-        <text x={ML + 162} y={legendY + 7} fontSize="8" fill={labelCol}>Mode</text>
+        <text x={ML + 172} y={legendY + 8} fontSize="10" fill={modeCol} fontWeight="bold">▲</text>
+        <text x={ML + 183} y={legendY + 8} fontSize="10" fill={labelCol}>Mode</text>
 
-        <text x={ML + 200} y={legendY + 7} fontSize="9" fill={medCol}>◆</text>
-        <text x={ML + 210} y={legendY + 7} fontSize="8" fill={labelCol}>Median</text>
+        <text x={ML + 222} y={legendY + 8} fontSize="10" fill={medCol}>◆</text>
+        <text x={ML + 233} y={legendY + 8} fontSize="10" fill={labelCol}>Median</text>
 
         {/* Tail label — right-aligned in legend row */}
         {tailLabel && (
-          <text x={W - MR} y={legendY + 7} textAnchor="end" fontSize="8"
+          <text x={W - MR} y={legendY + 8} textAnchor="end" fontSize="10"
             fill={dark ? "#4b5563" : "#d1d5db"}>
             {tailLabel}
           </text>
