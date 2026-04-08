@@ -2092,6 +2092,17 @@ function AttackCalculator() {
     if (isRollingAll || isRollingWeapon || isRollingTarget || !effectiveStatsReady) return;
     setIsRollingAll(true);
 
+    // Clear all dice from the previous roll so nothing stale remains during animation
+    dispatch({ type: "CLEAR_DICE" });
+    setDamageRolls("");
+    if (splitEnabled && extraTargets.length > 0) {
+      for (let i = 0; i < extraTargets.length; i++) {
+        setSplitTargetField(i, "saveRollsText", "");
+        setSplitTargetField(i, "damageRolls", "");
+        setSplitTargetField(i, "fnpRollsText", "");
+      }
+    }
+
     const attackSpecNow = parseDiceSpec(attacksValue);
     const toHitNum = Number(toHit);
     const strengthNum = Number(strength);
@@ -2327,6 +2338,10 @@ function AttackCalculator() {
   const rollWeapon = async () => {
     if (isRollingAll || isRollingWeapon || isRollingTarget || !statsReady) return;
     setIsRollingWeapon(true);
+
+    // Clear all dice from the previous roll
+    dispatch({ type: "CLEAR_DICE" });
+    setDamageRolls("");
 
     const attackSpecNow = parseDiceSpec(attacksValue);
     const toHitNum = Number(toHit);
