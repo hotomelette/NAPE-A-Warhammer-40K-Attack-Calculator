@@ -925,21 +925,16 @@ function ProbabilityPanel({ params, theme, statsReady }) {
   const maxProb = Math.max(...dist.map(r => r.prob));
   const median = dist.find(r => r.atLeast <= 0.5)?.damage ?? 0;
   const mode = dist.reduce((best, r) => r.prob > best.prob ? r : best, dist[0]).damage;
-  const TAIL_THRESHOLD = 0.001; // 0.1%
-  const visibleDist = dist.filter(r => r.prob >= TAIL_THRESHOLD);
-  const tailDist    = dist.filter(r => r.prob > 0 && r.prob < TAIL_THRESHOLD);
+  const visibleDist = dist.filter(r => r.prob > 0);
+  const theoreticalMax = computeTheoreticalMax(params);
 
-  // Tail label for legend (computed once, used in SVG + removed from bottom)
-  const tailLabel = (() => {
-    const theoreticalMax = computeTheoreticalMax(params);
-    const simTailMin = tailDist.length > 0 ? tailDist[0].damage : null;
-    const simTailMax = tailDist.length > 0 ? tailDist[tailDist.length - 1].damage : null;
-    const chartMax   = visibleDist.length > 0 ? visibleDist[visibleDist.length - 1].damage : null;
-    const rangeStart = simTailMin ?? (chartMax != null ? chartMax + 1 : null);
-    const rangeEnd   = theoreticalMax > (simTailMax ?? 0) ? theoreticalMax : simTailMax;
-    if (rangeStart == null || rangeEnd == null || rangeEnd <= (chartMax ?? 0)) return null;
-    return `Tail <0.1%: ${rangeStart}–${rangeEnd}`;
-  })();
+  // Adaptive precision: show enough decimals that small values aren't rounded to 0.0%
+  const fmtPct = p => {
+    const pct = p * 100;
+    if (pct >= 1)   return pct.toFixed(1) + "%";
+    if (pct >= 0.1) return pct.toFixed(2) + "%";
+    return pct.toFixed(3) + "%";
+  };
 
   // SVG chart dimensions — extra bottom margin for legend + x labels
   const W = 560, H = 250;
@@ -1057,14 +1052,14 @@ function ProbabilityPanel({ params, theme, statsReady }) {
               {/* Prob label — inside bar if wide+tall, always above otherwise */}
               {barW >= 28 && barH > 16 ? (
                 <text x={xOf(i)} y={y + 11} textAnchor="middle" fontSize="10" fill={dark ? "#1f2937" : "#fff"} fontWeight="bold">
-                  {(r.prob * 100).toFixed(1)}%
+                  {fmtPct(r.prob)}
                 </text>
               ) : (
                 <>
                   <rect x={xOf(i) - 15} y={y - (isMode || isMed ? 28 : 15)} width="30" height="13" rx="2"
                     fill={dark ? "#111827" : "#f9fafb"} fillOpacity="0.85" />
                   <text x={xOf(i)} y={y - (isMode || isMed ? 18 : 4)} textAnchor="middle" fontSize="10" fill={dark ? "#d1d5db" : "#374151"} fontWeight="bold">
-                    {(r.prob * 100).toFixed(1)}%
+                    {fmtPct(r.prob)}
                   </text>
                 </>
               )}
@@ -1098,13 +1093,6 @@ function ProbabilityPanel({ params, theme, statsReady }) {
         <text x={ML + 222} y={legendY + 8} fontSize="10" fill={medCol}>◆</text>
         <text x={ML + 233} y={legendY + 8} fontSize="10" fill={labelCol}>Median</text>
 
-        {/* Tail label — right-aligned in legend row */}
-        {tailLabel && (
-          <text x={W - MR} y={legendY + 8} textAnchor="end" fontSize="10"
-            fill={dark ? "#4b5563" : "#d1d5db"}>
-            {tailLabel}
-          </text>
-        )}
       </svg>
 
       {/* Compact data table — collapsible */}
@@ -1129,7 +1117,7 @@ function ProbabilityPanel({ params, theme, statsReady }) {
                   <span className={`tabular-nums ${dark ? "text-gray-300" : "text-gray-700"}`}>
                     {damage}{isMode ? " ◀" : isMed && !isMode ? " ·" : ""}
                   </span>
-                  <span className={`tabular-nums text-right ${dark ? "text-gray-300" : "text-gray-700"}`}>{(prob * 100).toFixed(1)}%</span>
+                  <span className={`tabular-nums text-right ${dark ? "text-gray-300" : "text-gray-700"}`}>{fmtPct(prob)}</span>
                   <span className={`tabular-nums text-right ${dark ? "text-blue-400" : "text-blue-600"}`}>{(atLeast * 100).toFixed(0)}%</span>
                 </div>
               );
@@ -1144,6 +1132,7 @@ function ProbabilityPanel({ params, theme, statsReady }) {
         <span>Median = <span className={`font-bold ${dark ? "text-white" : "text-gray-900"}`}>{median}</span></span>
         <span>Mode = <span className={`font-bold ${dark ? "text-amber-400" : "text-amber-600"}`}>{mode}</span></span>
         <span>P(≥{Math.round(expected)}) = <span className={`font-bold ${dark ? "text-white" : "text-gray-900"}`}>{((dist.find(r => r.damage === Math.round(expected))?.atLeast || 0) * 100).toFixed(0)}%</span></span>
+        <span>Max = <span className={`font-bold ${dark ? "text-red-400" : "text-red-600"}`}>{theoreticalMax}</span></span>
         <button type="button" onClick={() => setRollKey(k => k + 1)}
           className={`ml-auto text-xs px-1.5 py-0.5 rounded border transition ${dark ? "text-gray-500 border-gray-700 hover:text-gray-300 hover:border-gray-500" : "text-gray-400 border-gray-300 hover:text-gray-600 hover:border-gray-400"}`}
           title="Re-run simulation">
