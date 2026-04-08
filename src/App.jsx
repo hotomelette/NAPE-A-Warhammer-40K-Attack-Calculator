@@ -844,6 +844,43 @@ function simulateOnce({
   return totalDmg;
 }
 
+function computeTheoreticalMax({
+  attacksFixed, attacksValue, attacksRolls, modelQty,
+  rapidFire, rapidFireX,
+  blastEnabled, blastUnitSize,
+  sustainedHits, sustainedHitsN,
+  damageFixed, damageValue,
+  meltaEnabled, meltaX,
+}) {
+  const qty = Math.max(1, parseInt(String(modelQty || "1"), 10) || 1);
+
+  // Max attacks
+  let maxA;
+  if (attacksFixed) {
+    maxA = (parseInt(String(attacksValue || "0"), 10) || 0) * qty;
+  } else {
+    const spec = parseDiceSpec(attacksRolls);
+    maxA = spec.ok ? (spec.sides * spec.n + spec.mod) * qty : 0;
+  }
+  if (rapidFire) maxA += (parseInt(String(rapidFireX || "0"), 10) || 0) * qty;
+  if (blastEnabled) maxA += Math.floor((parseInt(String(blastUnitSize || "0"), 10) || 0) / 5);
+
+  // Sustained hits: in the max case every attack is a crit → each generates N extra hits
+  if (sustainedHits) maxA += maxA * (Number(sustainedHitsN) || 1);
+
+  // Max damage per wound (all save, all hit, all wound assumed)
+  let maxDmgPerWound;
+  if (damageFixed) {
+    maxDmgPerWound = parseInt(String(damageValue || "1"), 10) || 1;
+  } else {
+    const spec = parseDiceSpec(String(damageValue || "1"));
+    maxDmgPerWound = spec.ok ? spec.sides * spec.n + spec.mod : 1;
+  }
+  if (meltaEnabled) maxDmgPerWound += Math.max(0, Number(meltaX) || 0);
+
+  return Math.max(0, maxA * maxDmgPerWound);
+}
+
 function runMonteCarlo(params, iterations = 50000) {
   const counts = {};
   for (let i = 0; i < iterations; i++) {
@@ -1092,14 +1129,20 @@ function ProbabilityPanel({ params, theme, statsReady }) {
       </div>
 
       {/* Tail note */}
-      {tailDist.length > 0 && (() => {
-        const minDmg = tailDist[0].damage;
-        const maxDmg = tailDist[tailDist.length - 1].damage;
-        const minPct = tailDist[tailDist.length - 1].prob * 100;
-        const tier = minPct < 0.01 ? "<0.01%" : "<0.1%";
+      {(() => {
+        const theoreticalMax = computeTheoreticalMax(params);
+        const simTailMin = tailDist.length > 0 ? tailDist[0].damage : null;
+        const simTailMax = tailDist.length > 0 ? tailDist[tailDist.length - 1].damage : null;
+        const chartMax = visibleDist.length > 0 ? visibleDist[visibleDist.length - 1].damage : null;
+        const rangeStart = simTailMin ?? (chartMax != null ? chartMax + 1 : null);
+        const rangeEnd = theoreticalMax > (simTailMax ?? 0) ? theoreticalMax : simTailMax;
+        if (rangeStart == null || rangeEnd == null || rangeEnd <= (chartMax ?? 0)) return null;
         return (
           <div className={`text-xs mt-1 ${dark ? "text-gray-600" : "text-gray-400"}`}>
-            Tail ({tier}): {minDmg === maxDmg ? `${minDmg} dmg` : `${minDmg}–${maxDmg} dmg`} — not shown on chart
+            Tail (&lt;0.1%): {rangeStart}–{rangeEnd} dmg
+            {theoreticalMax > (simTailMax ?? 0) && (
+              <span className={dark ? "text-gray-700" : "text-gray-300"}> · theoretical max: {theoreticalMax}</span>
+            )}
           </div>
         );
       })()}
