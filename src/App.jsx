@@ -2150,6 +2150,8 @@ function AttackCalculator() {
           await pause(20); await animateField(setHitRerollRollsText, rr, 6);
           let ri = 0;
           hitRollsFinal = hitRollsFinal.map(d => ((rerollHitOnes && d === 1) || (rerollHitFails && d + effectiveHitMod < toHitNum)) ? (rr[ri++] ?? d) : d);
+        } else {
+          setHitRerollRollsText("");
         }
       }
       for (const d of hitRollsFinal) {
@@ -2178,6 +2180,8 @@ function AttackCalculator() {
           await pause(20); await animateField(setWoundRerollRollsText, rr, 6);
           let ri = 0;
           woundRollsFinal = woundRollsFinal.map(d => (rerollWoundOnes && !twinLinked && d === 1) || ((rerollWoundFails || twinLinked) && d + effectiveWoundMod < woundTarget) ? (rr[ri++] ?? d) : d);
+        } else {
+          setWoundRerollRollsText("");
         }
       }
       const effectiveCritWoundT = antiXEnabled ? Math.max(2, Math.min(6, Number(antiXThreshold) || 6)) : critWoundT;
@@ -2188,6 +2192,10 @@ function AttackCalculator() {
         if (isCrit) { if (devastatingWounds) mortalWoundAttacks++; else totalWounds++; }
         else if (normalWound) totalWounds++;
       }
+    } else {
+      // No normal hits — clear stale wound dice so the calculator sees empty fields
+      setWoundRollsText("");
+      setWoundRerollRollsText("");
     }
     await pause(120);
 
@@ -2202,6 +2210,8 @@ function AttackCalculator() {
         saveRollsFinal = Array.from({ length: totalWounds }, () => Math.ceil(Math.random() * 6));
         await animateField(setSaveRollsText, saveRollsFinal, 6);
         failedSaves = saveRollsFinal.filter(d => d < saveTarget).length;
+      } else {
+        setSaveRollsText("");
       }
       await pause(30);
       const failedEffective = Math.max(0, failedSaves - (ignoreFirstFailedSave ? 1 : 0));
@@ -2365,6 +2375,8 @@ function AttackCalculator() {
           await pause(20); await animateField(setHitRerollRollsText, rr, 6);
           let ri = 0;
           hitRollsFinal = hitRollsFinal.map(d => ((rerollHitOnes && d === 1) || (rerollHitFails && d + effectiveHitMod < toHitNum)) ? (rr[ri++] ?? d) : d);
+        } else {
+          setHitRerollRollsText("");
         }
       }
       for (const d of hitRollsFinal) {
@@ -2395,8 +2407,14 @@ function AttackCalculator() {
               ? (rr[ri++] ?? d)
               : d
           );
+        } else {
+          setWoundRerollRollsText("");
         }
       }
+    } else {
+      // No normal hits — clear stale wound dice
+      setWoundRollsText("");
+      setWoundRerollRollsText("");
     }
 
     // Clear stale target-side fields
