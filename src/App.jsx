@@ -928,16 +928,24 @@ function ProbabilityPanel({ params, theme, statsReady }) {
   const visibleDist    = dist.filter(r => r.prob >= 0.001); // ≥0.1% on chart
   const theoreticalMax = computeTheoreticalMax(params);
 
-  // Table shows every damage value 0..theoreticalMax, zeroing out entries not seen in sim
+  // Table: sim entries + theoretical max, skipping zero-prob rows unless median/mode/theorMax
   const distMap = Object.fromEntries(dist.map(r => [r.damage, r]));
-  const tableDist = Array.from({ length: theoreticalMax + 1 }, (_, d) =>
-    distMap[d] ?? { damage: d, prob: 0, atLeast: 0 }
-  );
+  const theorMaxEntry = distMap[theoreticalMax] ?? { damage: theoreticalMax, prob: 0, atLeast: 0 };
+  const tableDist = [
+    ...dist.filter(r => r.prob > 0 || r.damage === median || r.damage === mode),
+    ...(distMap[theoreticalMax] ? [] : [theorMaxEntry]),
+  ].sort((a, b) => a.damage - b.damage);
 
   // Chart bars: 1 decimal place (keeps labels short)
   const fmtPctChart = p => (p * 100).toFixed(1) + "%";
-  // Table: fixed 3 decimal places
-  const fmtPctTable = p => (p * 100).toFixed(3) + "%";
+  // Table: 2 significant figures (2 digits past the leading zeros)
+  const fmtPctTable = p => {
+    if (p <= 0) return "0.000%";
+    const pct = p * 100;
+    if (pct >= 1) return pct.toFixed(1) + "%";
+    const dp = 1 - Math.floor(Math.log10(pct)); // decimal places for 2 sig figs
+    return pct.toFixed(dp) + "%";
+  };
 
   // SVG chart dimensions — extra bottom margin for legend + x labels
   const W = 560, H = 250;
